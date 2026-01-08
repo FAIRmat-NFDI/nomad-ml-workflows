@@ -25,6 +25,16 @@ with workflow.unsafe.imports_passed_through():
 class SearchWorkflow:
     @workflow.run
     async def run(self, data: SearchWorkflowUserInput) -> str:
+        """
+        Workflow to perform a search action and save the results as a dataset in
+        the specified upload.
+
+        Args:
+            data (SearchWorkflowUserInput): Input data for the search workflow.
+
+        Returns:
+            str: Path to the saved dataset in the upload's `raw` folder.
+        """
         retry_policy = RetryPolicy(
             maximum_attempts=3,
             initial_interval=timedelta(seconds=10),
@@ -65,4 +75,5 @@ class SearchWorkflow:
             start_to_close_timeout=timedelta(minutes=10),
             retry_policy=retry_policy,
         )
+
         return saved_dataset_path
