@@ -39,10 +39,13 @@ dev = [
     "pytest",
     "structlog",
     "mkdocs",
-    "mkdocs-material==8.1.1",
+    "mkdocs-material>=8.1.1",
     "pymdown-extensions",
     "mkdocs-click",
     "pytest-asyncio",
+]
+cpu-action = [
+    "pyarrow",  # for parquet support
 ]
 
 [tool.uv]
@@ -136,4 +139,4 @@ where = ["src"]
 skip = [".github/*"]
 
 [project.entry-points.'nomad.plugin']
-action_entry_point = "nomad_actions.actions:simple_action_entry_point"
+action_entry_point = "nomad_actions.actions:search_action_entry_point"
