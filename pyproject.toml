@@ -35,6 +35,7 @@ Repository = "https://github.com/FAIRmat-NFDI/nomad-actions"
 
 [project.optional-dependencies]
 dev = [
+    "nomad-lab[infrastructure]>=1.4.0",
     "ruff",
     "pytest",
     "structlog",
