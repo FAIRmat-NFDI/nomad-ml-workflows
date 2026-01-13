@@ -68,17 +68,19 @@ class SearchInput(BaseModel):
     required: MetadataRequired | None = Field(
         None, description='Required fields for filtering the search results.'
     )
-    output_file_type: OutputFileTypeLiteral = Field(
-        ..., description='Type of the output file to be generated.'
-    )
     pagination: MetadataPagination = Field(
         ..., description='Pagination settings for the search results.'
     )
-    output_dir: str = Field(..., description='Name of the output directory.')
+    output_file_path: str | None = Field(
+        None, description='Path to the generated output file.'
+    )
 
     @classmethod
     def from_user_input(
-        cls, user_input: ExportEntriesUserInput, /, output_dir
+        cls,
+        user_input: ExportEntriesUserInput,
+        /,
+        output_file_path: str,
     ) -> 'SearchInput':
         """Convert from ExportEntriesUserInput to SearchInput"""
         query = ast.literal_eval(user_input.search_settings.query)
@@ -93,11 +95,18 @@ class SearchInput(BaseModel):
             user_id=user_input.user_id,
             owner=user_input.search_settings.owner,
             query=query,
-            output_file_type=user_input.output_settings.output_file_type,
             required=required,
             pagination=pagination,
-            output_dir=output_dir,
+            output_file_path=output_file_path,
         )
+
+
+class SearchOutput(BaseModel):
+    pagination_next_page_after_value: str | None = Field(
+        None,
+        description='The next_page_after_value from pagination, if more results are '
+        'available.',
+    )
 
 
 class ConsolidateOutputFilesInput(BaseModel):
