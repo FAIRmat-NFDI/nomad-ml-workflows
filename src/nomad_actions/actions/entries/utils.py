@@ -44,8 +44,24 @@ def write_csv_file(path: str, data: list[dict]):
     df.to_csv(path, index=False, mode='w', header=True)
 
 
+def write_json_file(path: str, data: list[dict]):
+    """Writes a list of NOMAD entry dicts to a JSON file.
+
+    Args:
+        path (str): The path where the file will be saved.
+        data (list[dict]): The list of NOMAD entry dicts to be written to the file.
+    """
+    if not path.endswith('json'):
+        raise ValueError('Unsupported file type. Please use JSON.')
+
+    import json
+
+    with open(path, 'w') as f:
+        json.dump(data, f, indent=4)
+
+
 def consolidate_files(input_file_paths: list[str], output_file_path: str):
-    """Consolidates multiple Parquet or CSV files into a single file.
+    """Consolidates multiple Parquet, CSV, or JSON files into a single file.
 
     Args:
         input_file_paths (list[str]): List of file paths to be consolidated.
@@ -78,5 +94,16 @@ def consolidate_files(input_file_paths: list[str], output_file_path: str):
             dataframes.append(df)
         combined_df = pd.concat(dataframes, ignore_index=True)
         combined_df.to_csv(output_file_path, index=False)
+    elif output_file_path.endswith('json'):
+        import json
+
+        combined_data = []
+        for file_path in input_file_paths:
+            with open(file_path, encoding='utf-8') as f:
+                data = json.load(f)
+                # extend the combined entry list with entry list from each file
+                combined_data.extend(data)
+        with open(output_file_path, 'w', encoding='utf-8') as f:
+            json.dump(combined_data, f, indent=4)
     else:
-        raise ValueError('Unsupported file type. Please use parquet or CSV.')
+        raise ValueError('Unsupported file type. Please use parquet, CSV, or JSON.')

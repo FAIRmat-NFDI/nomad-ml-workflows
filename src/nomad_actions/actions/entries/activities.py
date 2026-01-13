@@ -37,7 +37,7 @@ async def create_artifact_subdirectory(data: CreateArtifactSubdirectoryInput) ->
 async def search(data: SearchInput) -> list[str]:
     """
     Activity to perform NOMAD search based on the provided input data. The search
-    results are written to a file in the specified format (Parquet or CSV) in the
+    results are written to a file in the specified format (Parquet, CSV, or JSON) in the
     artifacts directory.
 
     Args:
@@ -46,9 +46,13 @@ async def search(data: SearchInput) -> list[str]:
     Returns:
         list[str]: List of the generated output file paths.
     """
-    from nomad.search import search
+    from nomad.search import search as nomad_search
 
-    from nomad_actions.actions.entries.utils import write_csv_file, write_parquet_file
+    from nomad_actions.actions.entries.utils import (
+        write_csv_file,
+        write_json_file,
+        write_parquet_file,
+    )
 
     logger = activity.logger
 
@@ -56,14 +60,16 @@ async def search(data: SearchInput) -> list[str]:
         write_dataset_file = write_parquet_file
     elif data.output_file_type == 'csv':
         write_dataset_file = write_csv_file
+    elif data.output_file_type == 'json':
+        write_dataset_file = write_json_file
     else:
-        raise ValueError('Unsupported file format. Please use parquet or csv.')
+        raise ValueError('Unsupported file format. Please use parquet, csv, or json.')
 
     generated_file_paths = []
 
     # first query
     search_counter = 1
-    response = search(
+    response = nomad_search(
         user_id=data.user_id,
         owner=data.owner,
         query=data.query,
@@ -86,7 +92,7 @@ async def search(data: SearchInput) -> list[str]:
         # create a copy to preserve the original pagination settings
         pagination = data.pagination.model_copy()
         pagination.page_after_value = response.pagination.next_page_after_value
-        response = search(
+        response = nomad_search(
             user_id=data.user_id,
             owner=data.owner,
             query=data.query,
@@ -111,7 +117,7 @@ async def search(data: SearchInput) -> list[str]:
 @activity.defn
 async def consolidate_output_files(data: ConsolidateOutputFilesInput) -> str:
     """
-    Activity to consolidate multiple Parquet or CSV files into a single file.
+    Activity to consolidate multiple Parquet, CSV, or JSON files into a single file.
 
     Args:
         data (ConsolidateOutputFilesInput): Input data for consolidating files.

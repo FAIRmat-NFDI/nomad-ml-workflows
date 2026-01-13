@@ -5,7 +5,7 @@ from nomad.app.v1.models.models import MetadataPagination, MetadataRequired, Que
 from pydantic import BaseModel, Field
 
 OwnerLiteral = Literal['public', 'visible', 'shared', 'user', 'staging']
-OutputFileTypeLiteral = Literal['parquet', 'csv']
+OutputFileTypeLiteral = Literal['parquet', 'csv', 'json']
 IndexLiteral = Literal['entries', 'datasets', 'models', 'spaces']
 
 
