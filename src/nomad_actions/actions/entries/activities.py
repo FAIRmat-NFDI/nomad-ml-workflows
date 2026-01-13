@@ -83,13 +83,15 @@ async def search(data: SearchInput) -> list[str]:
     # subsequent queries if pagination is present
     while response.pagination and response.pagination.next_page_after_value:
         search_counter += 1
-        response.pagination.page_after_value = response.pagination.next_page_after_value
+        # create a copy to preserve the original pagination settings
+        pagination = data.pagination.model_copy()
+        pagination.page_after_value = response.pagination.next_page_after_value
         response = search(
             user_id=data.user_id,
             owner=data.owner,
             query=data.query,
             required=data.required,
-            pagination=response.pagination,
+            pagination=pagination,
             aggregations={},
         )
         output_filepath = os.path.join(
