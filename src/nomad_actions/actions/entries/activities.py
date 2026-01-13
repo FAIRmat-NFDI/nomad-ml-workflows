@@ -9,6 +9,7 @@ from nomad_actions.actions.entries.models import (
     CreateArtifactSubdirectoryInput,
     ExportDatasetInput,
     SearchInput,
+    SearchOutput,
 )
 
 
@@ -34,7 +35,7 @@ async def create_artifact_subdirectory(data: CreateArtifactSubdirectoryInput) ->
 
 
 @activity.defn
-async def search(data: SearchInput) -> list[str]:
+async def search(data: SearchInput) -> SearchOutput:
     """
     Activity to perform NOMAD search based on the provided input data. The search
     results are written to a file in the specified format (Parquet, CSV, or JSON) in the
@@ -44,7 +45,7 @@ async def search(data: SearchInput) -> list[str]:
         data (SearchInput): Input data for the search activity.
 
     Returns:
-        list[str]: List of the generated output file paths.
+        SearchOutput: Output data from the search activity.
     """
     from nomad.search import search as nomad_search
 
@@ -56,62 +57,39 @@ async def search(data: SearchInput) -> list[str]:
 
     logger = activity.logger
 
-    if data.output_file_type == 'parquet':
+    output_file_extension = os.path.splitext(data.output_file_path)[-1]
+    if output_file_extension == '.parquet':
         write_dataset_file = write_parquet_file
-    elif data.output_file_type == 'csv':
+    elif output_file_extension == '.csv':
         write_dataset_file = write_csv_file
-    elif data.output_file_type == 'json':
+    elif output_file_extension == '.json':
         write_dataset_file = write_json_file
     else:
-        raise ValueError('Unsupported file format. Please use parquet, csv, or json.')
+        raise ValueError(
+            f'Unsupported file format "{output_file_extension}". Please use .parquet, '
+            '.csv, or .json extensions.'
+        )
 
-    generated_file_paths = []
-
-    # first query
-    search_counter = 1
     response = nomad_search(
         user_id=data.user_id,
         owner=data.owner,
         query=data.query,
         required=data.required,
-        pagination=data.pagination,  # full pagination support can be added later
+        pagination=data.pagination,
         aggregations={},  # aggregations support can be added later
     )
-    output_filepath = os.path.join(
-        data.output_dir, str(search_counter) + '.' + data.output_file_type
-    )
-    write_dataset_file(path=output_filepath, data=response.data)
-    generated_file_paths.append(output_filepath)
+    write_dataset_file(path=data.output_file_path, data=response.data)
+    output = SearchOutput()
+    if response.pagination and response.pagination.next_page_after_value:
+        output.pagination_next_page_after_value = (
+            response.pagination.next_page_after_value
+        )
     logger.info(
         f'Page {response.pagination.page} containing {len(response.data)} results '
-        f'written to output file {output_filepath}.'
+        f'written to output file {data.output_file_path}.'
     )
-    # subsequent queries if pagination is present
-    while response.pagination and response.pagination.next_page_after_value:
-        search_counter += 1
-        # create a copy to preserve the original pagination settings
-        pagination = data.pagination.model_copy()
-        pagination.page_after_value = response.pagination.next_page_after_value
-        response = nomad_search(
-            user_id=data.user_id,
-            owner=data.owner,
-            query=data.query,
-            required=data.required,
-            pagination=pagination,
-            aggregations={},
-        )
-        output_filepath = os.path.join(
-            data.output_dir, str(search_counter) + '.' + data.output_file_type
-        )
-        write_dataset_file(path=output_filepath, data=response.data)
-        generated_file_paths.append(output_filepath)
-        logger.info(
-            f'Page {response.pagination.page} containing {len(response.data)} results '
-            f'written to output file {output_filepath}.'
-        )
-    logger.info(f'Search completed. Output files available at: {data.output_dir}')
 
-    return generated_file_paths
+    return output
 
 
 @activity.defn
