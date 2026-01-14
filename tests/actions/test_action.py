@@ -11,7 +11,6 @@ from nomad_actions.actions.entries.activities import (
 )
 from nomad_actions.actions.entries.models import (
     ExportEntriesUserInput,
-    OutputSettings,
     SearchSettings,
 )
 from nomad_actions.actions.entries.workflows import ExportEntriesWorkflow
@@ -40,7 +39,7 @@ async def test_simple_workflow():
                     upload_id='upload_id',
                     user_id='user_id',
                     search_settings=SearchSettings(query='{}'),
-                    output_settings=OutputSettings(),
+                    output_file_type='parquet',
                 ),
                 id='test-workflow',
                 task_queue=task_queue,
