@@ -6,18 +6,18 @@ from temporalio.common import RetryPolicy
 with workflow.unsafe.imports_passed_through():
     from nomad_actions.actions.entries.activities import (
         cleanup_artifacts,
-        merge_output_files,
         create_artifact_subdirectory,
         export_dataset_to_upload,
+        merge_output_files,
         search,
     )
     from nomad_actions.actions.entries.models import (
         CleanupArtifactsInput,
-        MergeOutputFilesInput,
         CreateArtifactSubdirectoryInput,
         ExportDatasetInput,
         ExportDatasetMetadata,
         ExportEntriesUserInput,
+        MergeOutputFilesInput,
         SearchInput,
     )
 

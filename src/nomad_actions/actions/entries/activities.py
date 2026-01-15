@@ -1,13 +1,12 @@
 import os
-from tempfile import TemporaryDirectory
 
 from temporalio import activity
 
 from nomad_actions.actions.entries.models import (
     CleanupArtifactsInput,
-    MergeOutputFilesInput,
     CreateArtifactSubdirectoryInput,
     ExportDatasetInput,
+    MergeOutputFilesInput,
     SearchInput,
     SearchOutput,
 )
