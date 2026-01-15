@@ -46,6 +46,7 @@ class OutputSettings(BaseModel):
     )
     batch_size: int = Field(
         1000,
+        gt=0,
         description='Number of entries to be fetched per search batch. Each batch '
         'generates a separate output file.',
     )
@@ -185,7 +186,7 @@ class ExportDatasetInput(BaseModel):
         description='Subdirectory where the exported dataset zip file will be stored.',
     )
     source_paths: list[str] = Field(
-        ..., description='Path to the source files of dataset.'
+        ..., description='List of paths to the source files of the dataset.'
     )
     metadata: ExportDatasetMetadata | None = Field(
         None, description='Metadata associated with the exported dataset.'
