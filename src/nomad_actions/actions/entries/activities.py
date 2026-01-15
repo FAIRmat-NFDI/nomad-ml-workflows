@@ -84,7 +84,9 @@ async def search(data: SearchInput) -> SearchOutput:
     output.search_end_time = datetime.now(timezone.utc).isoformat()
     output.num_entries = len(response.data)
 
-    write_dataset_file(path=data.output_file_path, data=response.data)
+    if output.num_entries > 0:
+        # skip writing empty files
+        write_dataset_file(path=data.output_file_path, data=response.data)
 
     if response.pagination and response.pagination.next_page_after_value:
         output.pagination_next_page_after_value = (
@@ -100,7 +102,7 @@ async def search(data: SearchInput) -> SearchOutput:
 
 
 @activity.defn
-async def merge_output_files(data: MergeOutputFilesInput) -> str:
+async def merge_output_files(data: MergeOutputFilesInput) -> str | None:
     """
     Activity to merge multiple Parquet, CSV, or JSON files into a single file.
 
@@ -108,9 +110,12 @@ async def merge_output_files(data: MergeOutputFilesInput) -> str:
         data (MergeOutputFilesInput): Input data for merging files.
 
     Returns:
-        str: Path of the merged output file.
+        str | None: Path of the merged output file, or None if no files were merged.
     """
     from nomad_actions.actions.entries.utils import merge_files
+
+    if not data.generated_file_paths:
+        return
 
     merged_file_path = os.path.join(
         os.path.dirname(data.generated_file_paths[0]),
@@ -164,15 +169,12 @@ async def export_dataset_to_upload(data: ExportDatasetInput) -> str:
     zipname = 'exported_entries_' + data.metadata.search_start_time + '.zip'
     zipname = unique_filename(zipname, upload_files)
 
-    # Create a zip file containing all the source paths
-    zippath = os.path.join(os.path.dirname(data.source_paths[0]), zipname)
+    # Create a zip file containing all the source paths and the metadata file
+    zippath = os.path.join(os.path.dirname(data.artifact_subdirectory), zipname)
     with zipfile.ZipFile(zippath, 'w') as zipf:
         for filepath in data.source_paths:
             arcname = os.path.basename(filepath)
             zipf.write(filepath, arcname=arcname)
-
-    # Add a metadata file to the zip
-    with zipfile.ZipFile(zippath, 'a') as zipf:
         metadata_dict = data.metadata.model_dump()
         with zipf.open('metadata.json', 'w') as metafile:
             metafile.write(json.dumps(metadata_dict, indent=4).encode('utf-8'))

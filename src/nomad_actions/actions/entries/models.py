@@ -172,6 +172,10 @@ class ExportDatasetMetadata(BaseModel):
 
 
 class ExportDatasetInput(BaseModel):
+    artifact_subdirectory: str = Field(
+        ...,
+        description='Subdirectory where the exported dataset zip file will be stored.',
+    )
     source_paths: list[str] = Field(
         ..., description='Path to the source files of dataset.'
     )

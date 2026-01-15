@@ -71,7 +71,9 @@ class ExportEntriesWorkflow:
                 start_to_close_timeout=timedelta(hours=2),
                 retry_policy=retry_policy,
             )
-            generated_file_paths.append(search_input.output_file_path)
+            if search_output.num_entries > 0:
+                # writing files was skipped in this case
+                generated_file_paths.append(search_input.output_file_path)
             search_start_times.append(search_output.search_start_time)
             search_end_times.append(search_output.search_end_time)
             total_num_entries += search_output.num_entries
@@ -94,6 +96,7 @@ class ExportEntriesWorkflow:
         saved_dataset_path = await workflow.execute_activity(
             export_dataset_to_upload,
             ExportDatasetInput(
+                artifact_subdirectory=artifact_subdirectory,
                 source_paths=generated_file_paths,
                 metadata=ExportDatasetMetadata(
                     num_entries=total_num_entries,
