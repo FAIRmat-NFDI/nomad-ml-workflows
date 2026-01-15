@@ -141,20 +141,24 @@ async def export_dataset_to_upload(data: ExportDatasetInput) -> str:
 
     def unique_filename(filename: str, upload_files: StagingUploadFiles) -> str:
         """Generate a unique filename for the upload_files directory."""
-        count = 1
-        if upload_files.raw_path_exists(filename):
-            while True:
-                name, ext = os.path.splitext(filename)
-                _filename = f'{name}({count}){ext}'
-                if not upload_files.raw_path_exists(_filename):
-                    return _filename
-                count += 1
+        if not upload_files.raw_path_exists(filename):
+            return filename
 
-    upload_files = get_upload_files(data.user_input.upload_id, data.user_input.user_id)
+        count = 1
+        while True:
+            name, ext = os.path.splitext(filename)
+            _filename = f'{name}({count}){ext}'
+            if not upload_files.raw_path_exists(_filename):
+                return _filename
+            count += 1
+
+    upload_files = get_upload_files(
+        data.metadata.user_input.upload_id, data.metadata.user_input.user_id
+    )
     if not upload_files:
         raise ValueError(
-            f'Upload with ID {data.user_input.upload_id} for user '
-            f'{data.user_input.user_id} not found.'
+            f'Upload with ID {data.metadata.user_input.upload_id} for user '
+            f'{data.metadata.user_input.user_id} not found.'
         )
 
     zipname = 'exported_entries_' + data.metadata.search_start_time + '.zip'
