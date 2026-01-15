@@ -116,7 +116,7 @@ async def merge_output_files(data: MergeOutputFilesInput) -> str | None:
         return
 
     merged_file_path = os.path.join(
-        data.artifact_subdirectory, '1.' + data.output_file_type
+        data.artifact_subdirectory, 'merged.' + data.output_file_type
     )
 
     merge_files(data.generated_file_paths, merged_file_path)
@@ -169,7 +169,7 @@ async def export_dataset_to_upload(data: ExportDatasetInput) -> str:
 
     # Create a zip file containing all the source paths and the metadata file
     zippath = os.path.join(os.path.dirname(data.artifact_subdirectory), zipname)
-    with zipfile.ZipFile(zippath, 'w') as zipf:
+    with zipfile.ZipFile(zippath, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
         for filepath in data.source_paths:
             arcname = os.path.basename(filepath)
             zipf.write(filepath, arcname=arcname)
