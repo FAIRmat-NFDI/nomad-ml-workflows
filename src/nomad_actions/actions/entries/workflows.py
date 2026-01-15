@@ -75,12 +75,14 @@ class ExportEntriesWorkflow:
                 search_output.pagination_next_page_after_value
             )
 
-        consolidated_file_path = await workflow.execute_activity(
-            consolidate_output_files,
-            ConsolidateOutputFilesInput(generated_file_paths=generated_file_paths),
-            start_to_close_timeout=timedelta(hours=2),
-            retry_policy=retry_policy,
-        )
+        if data.output_settings.merge_output_files:
+            consolidated_file_path = await workflow.execute_activity(
+                consolidate_output_files,
+                ConsolidateOutputFilesInput(generated_file_paths=generated_file_paths),
+                start_to_close_timeout=timedelta(hours=2),
+                retry_policy=retry_policy,
+            )
+            generated_file_paths = [consolidated_file_path]
 
         saved_dataset_path = await workflow.execute_activity(
             export_dataset_to_upload,
