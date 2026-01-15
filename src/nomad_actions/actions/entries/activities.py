@@ -118,8 +118,7 @@ async def merge_output_files(data: MergeOutputFilesInput) -> str | None:
         return
 
     merged_file_path = os.path.join(
-        os.path.dirname(data.generated_file_paths[0]),
-        '1.' + data.generated_file_paths[0].split('.')[-1],
+        data.artifact_subdirectory, '1.' + data.output_file_type
     )
 
     merge_files(data.generated_file_paths, merged_file_path)

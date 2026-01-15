@@ -147,6 +147,14 @@ class SearchOutput(BaseModel):
 
 
 class MergeOutputFilesInput(BaseModel):
+    artifact_subdirectory: str = Field(
+        ...,
+        description='Subdirectory where the merged output file will be stored.',
+    )
+    output_file_type: OutputFileTypeLiteral = Field(
+        ...,
+        description='Type of the output file.',
+    )
     generated_file_paths: list[str] = Field(
         ...,
         description='List of the generated file paths to be merged into a single file.',

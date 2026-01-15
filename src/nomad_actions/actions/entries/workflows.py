@@ -87,11 +87,16 @@ class ExportEntriesWorkflow:
         if data.output_settings.merge_output_files:
             merged_file_path = await workflow.execute_activity(
                 merge_output_files,
-                MergeOutputFilesInput(generated_file_paths=generated_file_paths),
+                MergeOutputFilesInput(
+                    artifact_subdirectory=artifact_subdirectory,
+                    output_file_type=data.output_settings.output_file_type,
+                    generated_file_paths=generated_file_paths,
+                ),
                 start_to_close_timeout=timedelta(hours=2),
                 retry_policy=retry_policy,
             )
-            generated_file_paths = [merged_file_path]
+            if merged_file_path:
+                generated_file_paths = [merged_file_path]
 
         saved_dataset_path = await workflow.execute_activity(
             export_dataset_to_upload,
