@@ -118,7 +118,9 @@ class ExportEntriesWorkflow:
                 artifact_subdirectory=artifact_subdirectory,
                 source_paths=generated_file_paths,
                 metadata=ExportDatasetMetadata(
-                    num_entries=total_num_entries,
+                    num_entries_exported=total_num_entries_exported,
+                    num_entries_available=search_output.num_entries_available,
+                    reached_max_entries=reached_max_entries_limit,
                     search_start_time=search_start_times[0]
                     if search_start_times
                     else '',

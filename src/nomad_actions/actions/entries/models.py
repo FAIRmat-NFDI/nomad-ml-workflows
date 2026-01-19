@@ -170,9 +170,20 @@ class MergeOutputFilesInput(BaseModel):
 
 
 class ExportDatasetMetadata(BaseModel):
-    num_entries: int = Field(
+    num_entries_exported: int = Field(
         ...,
-        description='Total number of entries combined in all exported dataset batches.',
+        description='Total number of entries exported in all the exported dataset '
+        'batches.',
+    )
+    num_entries_available: int = Field(
+        ...,
+        description='Total number of entries available for the given search query.',
+    )
+    reached_max_entries: bool = Field(
+        ...,
+        description='Indicates whether the export reached the maximum number of '
+        'entries allowed. If true, the exported dataset contains the first N entries '
+        'up to the maximum limit.',
     )
     search_start_time: str = Field(
         ...,
