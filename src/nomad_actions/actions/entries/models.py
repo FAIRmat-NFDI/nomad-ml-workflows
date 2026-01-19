@@ -175,8 +175,8 @@ class ExportDatasetMetadata(BaseModel):
         description='Total number of entries exported in all the exported dataset '
         'batches.',
     )
-    num_entries_available: int | None = Field(
-        None,
+    num_entries_available: int = Field(
+        ...,
         description='Total number of entries available for the given search query.',
     )
     reached_max_entries: bool = Field(
@@ -195,6 +195,11 @@ class ExportDatasetMetadata(BaseModel):
     )
     user_input: ExportEntriesUserInput = Field(
         ..., description='Original user input for the export entries workflow.'
+    )
+    error_info: str | None = Field(
+        None,
+        description='Error information if any error occurred during the search and '
+        'merging process.',
     )
 
 
