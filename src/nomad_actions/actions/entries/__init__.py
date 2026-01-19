@@ -8,12 +8,12 @@ with workflow.unsafe.imports_passed_through():
 
 class ExportEntriesActionEntryPoint(ActionEntryPoint):
     search_batch_timeout: int = Field(
-        default=60,
+        default=7200,  # 2 hours
         description='Timeout (in seconds) for each search batch in the Export Entries '
         'action. Set this accordingly to time out longer searches.',
     )
     max_entries_export_limit: int = Field(
-        default=6,
+        default=100000,
         description='Maximum number of entries that can be exported in a single '
         'Export Entries action.',
     )
