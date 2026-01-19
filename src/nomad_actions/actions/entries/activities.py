@@ -171,13 +171,19 @@ async def export_dataset_to_upload(data: ExportDatasetInput) -> str:
     zipname = 'export_entries_' + safe_timestamp + '.zip'
     zipname = unique_filename(zipname, upload_files)
 
+    metadata_dict = {
+        'note': 'This metadata file contains information about the exported dataset '
+        'and the conditions under which it was generated.',
+        'data': data.metadata.model_dump(),
+        'schema': data.metadata.model_json_schema(),
+    }
+
     # Create a zip file containing all the source paths and the metadata file
     zippath = os.path.join(os.path.dirname(data.artifact_subdirectory), zipname)
     with zipfile.ZipFile(zippath, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
         for filepath in data.source_paths:
             arcname = os.path.basename(filepath)
             zipf.write(filepath, arcname=arcname)
-        metadata_dict = data.metadata.model_dump()
         with zipf.open('metadata.json', 'w') as metafile:
             metafile.write(json.dumps(metadata_dict, indent=4).encode('utf-8'))
 
