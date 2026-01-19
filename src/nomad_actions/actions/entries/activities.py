@@ -79,22 +79,26 @@ async def search(data: SearchInput) -> SearchOutput:
         aggregations={},  # aggregations support can be added later
     )
     end = datetime.now(timezone.utc).isoformat()
+
+    # Limit the number of exported entries
+    if len(response.data) > data.max_entries_export_limit:
+        entry_list = response.data[: data.max_entries_export_limit]
+    else:
+        entry_list = response.data
+
     output = SearchOutput(
         search_start_time=start,
         search_end_time=end,
-        num_entries=len(response.data),
+        num_entries_exported=len(entry_list),
+        num_entries_available=response.pagination.total,
+        pagination_next_page_after_value=response.pagination.next_page_after_value,
     )
 
-    if output.num_entries == 0:
-        # skip writing empty files
-        return output
-
-    write_dataset_file(path=data.output_file_path, data=response.data)
-
-    if response.pagination and response.pagination.next_page_after_value:
-        output.pagination_next_page_after_value = (
-            response.pagination.next_page_after_value
-        )
+    if len(entry_list) == 0:
+        # skip writing empty files and stop subsequent searches
+        output.pagination_next_page_after_value = None
+    else:
+        write_dataset_file(path=data.output_file_path, data=entry_list)
 
     return output
 
@@ -167,13 +171,19 @@ async def export_dataset_to_upload(data: ExportDatasetInput) -> str:
     zipname = 'export_entries_' + safe_timestamp + '.zip'
     zipname = unique_filename(zipname, upload_files)
 
+    metadata_dict = {
+        'note': 'This metadata file contains information about the exported dataset '
+        'and the conditions under which it was generated.',
+        'data': data.metadata.model_dump(),
+        'schema': data.metadata.model_json_schema(),
+    }
+
     # Create a zip file containing all the source paths and the metadata file
     zippath = os.path.join(os.path.dirname(data.artifact_subdirectory), zipname)
     with zipfile.ZipFile(zippath, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
         for filepath in data.source_paths:
             arcname = os.path.basename(filepath)
             zipf.write(filepath, arcname=arcname)
-        metadata_dict = data.metadata.model_dump()
         with zipf.open('metadata.json', 'w') as metafile:
             metafile.write(json.dumps(metadata_dict, indent=4).encode('utf-8'))
 

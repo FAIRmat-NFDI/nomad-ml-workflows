@@ -4,6 +4,8 @@ from temporalio import workflow
 from temporalio.common import RetryPolicy
 
 with workflow.unsafe.imports_passed_through():
+    from nomad.config import config as nomad_config
+
     from nomad_actions.actions.entries.activities import (
         cleanup_artifacts,
         create_artifact_subdirectory,
@@ -41,6 +43,9 @@ class ExportEntriesWorkflow:
             maximum_interval=timedelta(minutes=1),
             backoff_coefficient=2.0,
         )
+        config = nomad_config.get_plugin_entry_point(
+            'nomad_actions.actions:export_entries_action_entry_point'
+        )
 
         artifact_subdirectory = await workflow.execute_activity(
             create_artifact_subdirectory,
@@ -50,13 +55,16 @@ class ExportEntriesWorkflow:
         )
 
         search_counter = 0
+        num_entries_available = None
         generated_file_paths = []
         search_start_times = []
         search_end_times = []
-        total_num_entries = 0
+        total_num_entries_exported = 0
+        reached_max_entries_limit = False
         search_input = SearchInput.from_user_input(
             data,
             output_file_path='',  # Placeholder, will be set in loop
+            max_entries_export_limit=config.max_entries_export_limit,
         )
         while True:
             search_counter += 1
@@ -68,21 +76,31 @@ class ExportEntriesWorkflow:
                 search,
                 search_input,
                 activity_id=f'search-activity-{search_counter}',
-                start_to_close_timeout=timedelta(hours=2),
+                start_to_close_timeout=timedelta(seconds=config.search_batch_timeout),
                 retry_policy=retry_policy,
             )
-            if search_output.num_entries > 0:
+            if search_counter == 1:
+                # capture the total available entries from the first search output
+                num_entries_available = search_output.num_entries_available
+            if search_output.num_entries_exported > 0:
                 # only save paths if the writing files was not skipped
                 generated_file_paths.append(search_input.output_file_path)
             search_start_times.append(search_output.search_start_time)
             search_end_times.append(search_output.search_end_time)
-            total_num_entries += search_output.num_entries
-            if search_output.pagination_next_page_after_value is None:
-                break
+            total_num_entries_exported += search_output.num_entries_exported
             # Update pagination for next iteration
             search_input.pagination.page_after_value = (
                 search_output.pagination_next_page_after_value
             )
+            search_input.max_entries_export_limit -= search_output.num_entries_exported
+
+            if search_output.pagination_next_page_after_value is None:
+                # break if there are no more pages to fetch
+                break
+            if search_input.max_entries_export_limit <= 0:
+                # break early if the max entries limit has been reached
+                reached_max_entries_limit = True
+                break
 
         if data.output_settings.merge_output_files:
             merged_file_path = await workflow.execute_activity(
@@ -104,7 +122,9 @@ class ExportEntriesWorkflow:
                 artifact_subdirectory=artifact_subdirectory,
                 source_paths=generated_file_paths,
                 metadata=ExportDatasetMetadata(
-                    num_entries=total_num_entries,
+                    num_entries_exported=total_num_entries_exported,
+                    num_entries_available=num_entries_available,
+                    reached_max_entries=reached_max_entries_limit,
                     search_start_time=search_start_times[0]
                     if search_start_times
                     else '',

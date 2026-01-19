@@ -77,14 +77,15 @@ class SearchInput(BaseModel):
     user_id: str = Field(..., description='User ID performing the search.')
     owner: OwnerLiteral = Field(..., description='Owner of the entries to be searched.')
     query: Query = Field(..., description='Search query parameters.')
-    required: MetadataRequired | None = Field(
-        None, description='Required fields for filtering the search results.'
+    required: MetadataRequired = Field(
+        ..., description='Required fields for filtering the search results.'
     )
     pagination: MetadataPagination = Field(
         ..., description='Pagination settings for the search results.'
     )
-    output_file_path: str | None = Field(
-        None, description='Path to the generated output file.'
+    output_file_path: str = Field(..., description='Path to the generated output file.')
+    max_entries_export_limit: int = Field(
+        ..., description='Maximum number of entries to be exported.'
     )
 
     @classmethod
@@ -93,6 +94,7 @@ class SearchInput(BaseModel):
         user_input: ExportEntriesUserInput,
         /,
         output_file_path: str,
+        max_entries_export_limit: int,
     ) -> 'SearchInput':
         """Convert from ExportEntriesUserInput to SearchInput"""
 
@@ -127,12 +129,17 @@ class SearchInput(BaseModel):
             required=required,
             pagination=pagination,
             output_file_path=output_file_path,
+            max_entries_export_limit=max_entries_export_limit,
         )
 
 
 class SearchOutput(BaseModel):
-    num_entries: int = Field(
-        ..., description='Number of entries in the search results.'
+    num_entries_exported: int = Field(
+        ..., description='Number of entries exported to the output file.'
+    )
+    num_entries_available: int = Field(
+        ...,
+        description='Total number of entries available for the given search query.',
     )
     search_start_time: str = Field(
         ..., description='Timestamp when the search started.'
@@ -163,9 +170,20 @@ class MergeOutputFilesInput(BaseModel):
 
 
 class ExportDatasetMetadata(BaseModel):
-    num_entries: int = Field(
+    num_entries_exported: int = Field(
         ...,
-        description='Total number of entries combined in all exported dataset batches.',
+        description='Total number of entries exported in all the exported dataset '
+        'batches.',
+    )
+    num_entries_available: int | None = Field(
+        None,
+        description='Total number of entries available for the given search query.',
+    )
+    reached_max_entries: bool = Field(
+        ...,
+        description='Indicates whether the export reached the maximum number of '
+        'entries allowed. If true, the exported dataset contains the first N entries '
+        'up to the maximum limit.',
     )
     search_start_time: str = Field(
         ...,
