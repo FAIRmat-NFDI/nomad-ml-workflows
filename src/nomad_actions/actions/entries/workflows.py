@@ -53,7 +53,8 @@ class ExportEntriesWorkflow:
             user_id=data.user_id,
             upload_id=data.upload_id,
             artifact_subdirectory=artifact_subdirectory,
-            zipname='export_entries_error.zip',  # name used in case of error
+            exportable_dir_name='export_entries_error',  # name used in case of error
+            zip_output=data.output_settings.zip_output,
             source_paths=[],
             metadata=ExportDatasetMetadata(user_input=data),
         )
@@ -130,8 +131,8 @@ class ExportEntriesWorkflow:
                     generated_file_paths = [merged_file_path]
 
             # Prepare export dataset input and metadata
-            export_dataset_input.zipname = (
-                'export_entries_' + search_start_times[0].replace(':', '-') + '.zip'
+            export_dataset_input.exportable_dir_name = (
+                'export_entries_' + search_start_times[0].replace(':', '-')
             )
             export_dataset_input.source_paths = generated_file_paths
             export_dataset_input.metadata = ExportDatasetMetadata(

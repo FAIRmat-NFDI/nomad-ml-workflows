@@ -1,4 +1,6 @@
 import os
+import shutil
+import tempfile
 
 from temporalio import activity
 
@@ -167,31 +169,40 @@ async def export_dataset_to_upload(data: ExportDatasetInput) -> str:
             f'Upload with ID {data.upload_id} for user {data.user_id} not found.'
         )
 
-    zipname = unique_filename(data.zipname, upload_files)
-
+    # Create a metadata.json file in the artifact subdirectory
     metadata_dict = {
         'note': 'This metadata file contains information about the exported dataset '
         'and the conditions under which it was generated.',
         'data': data.metadata.model_dump(),
         'schema': data.metadata.model_json_schema(),
     }
-
-    # Create a metadata.json file in the artifact subdirectory
     metadata_path = os.path.join(data.artifact_subdirectory, 'metadata.json')
     with open(metadata_path, 'w', encoding='utf-8') as metafile:
         json.dump(metadata_dict, metafile, indent=4)
 
+    exportable_filepaths = data.source_paths + [metadata_path]
+    exportable_dir_name = unique_filename(data.exportable_dir_name, upload_files)
+
     # Create a zip file containing all the source paths and the metadata file
-    zippath = os.path.join(os.path.dirname(data.artifact_subdirectory), zipname)
-    with zipfile.ZipFile(zippath, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
-        for filepath in [*data.source_paths, metadata_path]:
-            arcname = os.path.basename(filepath)
-            zipf.write(filepath, arcname=arcname)
+    if data.zip_output:
+        zipname = exportable_dir_name + '.zip'
+        zippath = os.path.join(os.path.dirname(data.artifact_subdirectory), zipname)
+        with zipfile.ZipFile(zippath, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
+            for filepath in exportable_filepaths:
+                arcname = os.path.basename(filepath)
+                zipf.write(filepath, arcname=arcname)
+        # Upload zip file to the upload_files directory
+        upload_files.add_rawfiles(path=zippath, auto_decompress=False)
+        return zipname
 
-    # Upload zip file to the upload_files directory
-    upload_files.add_rawfiles(path=zippath, auto_decompress=False)
-
-    return zipname
+    # If not zipping, create a temporary directory to hold the files and upload them
+    with tempfile.TemporaryDirectory() as tempdir:
+        for filepath in exportable_filepaths:
+            temp_path = os.path.join(tempdir, os.path.basename(filepath))
+            shutil.copy2(filepath, temp_path)
+        # Upload files to the upload_files directory
+        upload_files.add_rawfiles(path=tempdir, target_dir=exportable_dir_name)
+    return exportable_dir_name
 
 
 @activity.defn
