@@ -43,104 +43,126 @@ class ExportEntriesWorkflow:
             maximum_interval=timedelta(minutes=1),
             backoff_coefficient=2.0,
         )
-        config = nomad_config.get_plugin_entry_point(
-            'nomad_actions.actions:export_entries_action_entry_point'
-        )
-
         artifact_subdirectory = await workflow.execute_activity(
             create_artifact_subdirectory,
             CreateArtifactSubdirectoryInput(subdir_name=workflow.info().workflow_id),
             start_to_close_timeout=timedelta(minutes=10),
             retry_policy=retry_policy,
         )
-
-        search_counter = 0
-        num_entries_available = None
-        generated_file_paths = []
-        search_start_times = []
-        search_end_times = []
-        total_num_entries_exported = 0
-        reached_max_entries_limit = False
-        search_input = SearchInput.from_user_input(
-            data,
-            output_file_path='',  # Placeholder, will be set in loop
-            max_entries_export_limit=config.max_entries_export_limit,
+        export_dataset_input = ExportDatasetInput(
+            user_id=data.user_id,
+            upload_id=data.upload_id,
+            artifact_subdirectory=artifact_subdirectory,
+            zipname='export_entries_error.zip',  # name used in case of error
+            source_paths=[],
+            metadata=ExportDatasetMetadata(user_input=data),
         )
-        while True:
-            search_counter += 1
-            search_input.output_file_path = (
-                f'{artifact_subdirectory}/'
-                f'{search_counter}.{data.output_settings.output_file_type}'
-            )
-            search_output = await workflow.execute_activity(
-                search,
-                search_input,
-                activity_id=f'search-activity-{search_counter}',
-                start_to_close_timeout=timedelta(seconds=config.search_batch_timeout),
-                retry_policy=retry_policy,
-            )
-            if search_counter == 1:
-                # capture the total available entries from the first search output
-                num_entries_available = search_output.num_entries_available
-            if search_output.num_entries_exported > 0:
-                # only save paths if the writing files was not skipped
-                generated_file_paths.append(search_input.output_file_path)
-            search_start_times.append(search_output.search_start_time)
-            search_end_times.append(search_output.search_end_time)
-            total_num_entries_exported += search_output.num_entries_exported
-            # Update pagination for next iteration
-            search_input.pagination.page_after_value = (
-                search_output.pagination_next_page_after_value
-            )
-            search_input.max_entries_export_limit -= search_output.num_entries_exported
 
-            if search_output.pagination_next_page_after_value is None:
-                # break if there are no more pages to fetch
-                break
-            if search_input.max_entries_export_limit <= 0:
-                # break early if the max entries limit has been reached
-                reached_max_entries_limit = True
-                break
+        try:
+            config = nomad_config.get_plugin_entry_point(
+                'nomad_actions.actions:export_entries_action_entry_point'
+            )
 
-        if data.output_settings.merge_output_files:
-            merged_file_path = await workflow.execute_activity(
-                merge_output_files,
-                MergeOutputFilesInput(
-                    artifact_subdirectory=artifact_subdirectory,
-                    output_file_type=data.output_settings.output_file_type,
-                    generated_file_paths=generated_file_paths,
-                ),
+            search_counter = 0
+            num_entries_available = 0
+            generated_file_paths = []
+            search_start_times = []
+            search_end_times = []
+            total_num_entries_exported = 0
+            reached_max_entries_limit = False
+            search_input = SearchInput.from_user_input(
+                data,
+                output_file_path='',  # Placeholder, will be set in loop
+                max_entries_export_limit=config.max_entries_export_limit,
+            )
+            while True:
+                search_counter += 1
+                search_input.output_file_path = (
+                    f'{artifact_subdirectory}/'
+                    f'{search_counter}.{data.output_settings.output_file_type}'
+                )
+                search_output = await workflow.execute_activity(
+                    search,
+                    search_input,
+                    activity_id=f'search-activity-{search_counter}',
+                    start_to_close_timeout=timedelta(
+                        seconds=config.search_batch_timeout
+                    ),
+                    retry_policy=retry_policy,
+                )
+                if search_counter == 1:
+                    # capture the total available entries from the first search output
+                    num_entries_available = search_output.num_entries_available
+                if search_output.num_entries_exported > 0:
+                    # only save paths if the writing files was not skipped
+                    generated_file_paths.append(search_input.output_file_path)
+                search_start_times.append(search_output.search_start_time)
+                search_end_times.append(search_output.search_end_time)
+                total_num_entries_exported += search_output.num_entries_exported
+                # Update pagination for next iteration
+                search_input.pagination.page_after_value = (
+                    search_output.pagination_next_page_after_value
+                )
+                search_input.max_entries_export_limit -= (
+                    search_output.num_entries_exported
+                )
+
+                if search_output.pagination_next_page_after_value is None:
+                    # break if there are no more pages to fetch
+                    break
+                if search_input.max_entries_export_limit <= 0:
+                    # break early if the max entries limit has been reached
+                    reached_max_entries_limit = True
+                    break
+
+            if data.output_settings.merge_output_files:
+                merged_file_path = await workflow.execute_activity(
+                    merge_output_files,
+                    MergeOutputFilesInput(
+                        artifact_subdirectory=artifact_subdirectory,
+                        output_file_type=data.output_settings.output_file_type,
+                        generated_file_paths=generated_file_paths,
+                    ),
+                    start_to_close_timeout=timedelta(hours=2),
+                    retry_policy=retry_policy,
+                )
+                if merged_file_path:
+                    generated_file_paths = [merged_file_path]
+
+            # Prepare export dataset input and metadata
+            export_dataset_input.zipname = (
+                'export_entries_' + search_start_times[0].replace(':', '-') + '.zip'
+            )
+            export_dataset_input.source_paths = generated_file_paths
+            export_dataset_input.metadata = ExportDatasetMetadata(
+                num_entries_exported=total_num_entries_exported,
+                num_entries_available=num_entries_available,
+                reached_max_entries_limit=reached_max_entries_limit,
+                search_start_time=search_start_times[0],
+                search_end_time=search_end_times[-1],
+                user_input=data,
+            )
+
+        except Exception:
+            # Capture error info to include in metadata
+            import traceback
+
+            export_dataset_input.metadata.error_info = traceback.format_exc()
+            raise
+
+        finally:
+            saved_dataset_path = await workflow.execute_activity(
+                export_dataset_to_upload,
+                export_dataset_input,
                 start_to_close_timeout=timedelta(hours=2),
                 retry_policy=retry_policy,
             )
-            if merged_file_path:
-                generated_file_paths = [merged_file_path]
 
-        saved_dataset_path = await workflow.execute_activity(
-            export_dataset_to_upload,
-            ExportDatasetInput(
-                artifact_subdirectory=artifact_subdirectory,
-                source_paths=generated_file_paths,
-                metadata=ExportDatasetMetadata(
-                    num_entries_exported=total_num_entries_exported,
-                    num_entries_available=num_entries_available,
-                    reached_max_entries=reached_max_entries_limit,
-                    search_start_time=search_start_times[0]
-                    if search_start_times
-                    else '',
-                    search_end_time=search_end_times[-1] if search_end_times else '',
-                    user_input=data,
-                ),
-            ),
-            start_to_close_timeout=timedelta(hours=2),
-            retry_policy=retry_policy,
-        )
-
-        await workflow.execute_activity(
-            cleanup_artifacts,
-            CleanupArtifactsInput(subdir_path=artifact_subdirectory),
-            start_to_close_timeout=timedelta(hours=2),
-            retry_policy=retry_policy,
-        )
+            await workflow.execute_activity(
+                cleanup_artifacts,
+                CleanupArtifactsInput(subdir_path=artifact_subdirectory),
+                start_to_close_timeout=timedelta(hours=2),
+                retry_policy=retry_policy,
+            )
 
         return saved_dataset_path

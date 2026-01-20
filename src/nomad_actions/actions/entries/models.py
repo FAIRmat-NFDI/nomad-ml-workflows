@@ -171,43 +171,58 @@ class MergeOutputFilesInput(BaseModel):
 
 class ExportDatasetMetadata(BaseModel):
     num_entries_exported: int = Field(
-        ...,
+        0,
         description='Total number of entries exported in all the exported dataset '
         'batches.',
     )
-    num_entries_available: int | None = Field(
-        None,
+    num_entries_available: int = Field(
+        0,
         description='Total number of entries available for the given search query.',
     )
-    reached_max_entries: bool = Field(
-        ...,
+    reached_max_entries_limit: bool = Field(
+        False,
         description='Indicates whether the export reached the maximum number of '
         'entries allowed. If true, the exported dataset contains the first N entries '
         'up to the maximum limit.',
     )
     search_start_time: str = Field(
-        ...,
+        '',
         description='Timestamp when the first search batch started.',
     )
     search_end_time: str = Field(
-        ...,
+        '',
         description='Timestamp when the last search batch completed.',
     )
-    user_input: ExportEntriesUserInput = Field(
-        ..., description='Original user input for the export entries workflow.'
+    user_input: ExportEntriesUserInput | None = Field(
+        None, description='Original user input for the export entries workflow.'
+    )
+    error_info: str | None = Field(
+        None,
+        description='Error information if any error occurred during the search and '
+        'merging process.',
     )
 
 
 class ExportDatasetInput(BaseModel):
+    user_id: str = Field(
+        ..., description='User ID performing the export dataset operation.'
+    )
+    upload_id: str = Field(
+        ..., description='Upload ID associated with the export dataset operation.'
+    )
     artifact_subdirectory: str = Field(
         ...,
         description='Subdirectory where the exported dataset zip file will be stored.',
     )
+    zipname: str = Field(
+        ...,
+        description='Name of the output zip file for the exported dataset.',
+    )
     source_paths: list[str] = Field(
         ..., description='List of paths to the source files of the dataset.'
     )
-    metadata: ExportDatasetMetadata | None = Field(
-        None, description='Metadata associated with the exported dataset.'
+    metadata: ExportDatasetMetadata = Field(
+        ..., description='Metadata associated with the exported dataset.'
     )
 
 
