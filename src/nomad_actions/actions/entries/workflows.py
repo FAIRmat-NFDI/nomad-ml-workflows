@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
+from temporalio.exceptions import ApplicationError
 
 with workflow.unsafe.imports_passed_through():
     from nomad.config import config as nomad_config
@@ -144,12 +145,14 @@ class ExportEntriesWorkflow:
                 user_input=data,
             )
 
-        except Exception:
+        except Exception as e:
             # Capture error info to include in metadata
             import traceback
 
             export_dataset_input.metadata.error_info = traceback.format_exc()
-            raise
+            raise ApplicationError(
+                'Encountered an error during export entries workflow.',
+            ) from e
 
         finally:
             saved_dataset_path = await workflow.execute_activity(
