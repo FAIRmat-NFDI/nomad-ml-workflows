@@ -1,4 +1,4 @@
-# Welcome to the `nomad-actions` documentation
+# Welcome to the `nomad-ml-workflows` documentation
 
 A plugin containing curated NOMAD Actions.
 

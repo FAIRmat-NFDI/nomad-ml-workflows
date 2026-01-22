@@ -21,14 +21,14 @@ class ExportEntriesActionEntryPoint(ActionEntryPoint):
     def load(self):
         from nomad.actions import Action
 
-        from nomad_actions.actions.entries.activities import (
+        from nomad_ml_workflows.actions.entries.activities import (
             cleanup_artifacts,
             create_artifact_subdirectory,
             export_dataset_to_upload,
             merge_output_files,
             search,
         )
-        from nomad_actions.actions.entries.workflows import ExportEntriesWorkflow
+        from nomad_ml_workflows.actions.entries.workflows import ExportEntriesWorkflow
 
         return Action(
             task_queue=self.task_queue,

@@ -1,8 +1,8 @@
-site_name: nomad-actions
+site_name: nomad-ml-workflows
 site_description: A plugin containing curated NOMAD Actions.
 site_author: Sarthak Kapoor
 
-repo_url: https://github.com/FAIRmat-NFDI/nomad-actions
+repo_url: https://github.com/FAIRmat-NFDI/nomad-ml-workflows
 edit_uri: ""
 
 nav:

@@ -7,14 +7,14 @@ from temporalio.exceptions import ApplicationError
 with workflow.unsafe.imports_passed_through():
     from nomad.config import config as nomad_config
 
-    from nomad_actions.actions.entries.activities import (
+    from nomad_ml_workflows.actions.entries.activities import (
         cleanup_artifacts,
         create_artifact_subdirectory,
         export_dataset_to_upload,
         merge_output_files,
         search,
     )
-    from nomad_actions.actions.entries.models import (
+    from nomad_ml_workflows.actions.entries.models import (
         CleanupArtifactsInput,
         CreateArtifactSubdirectoryInput,
         ExportDatasetInput,
@@ -62,7 +62,7 @@ class ExportEntriesWorkflow:
 
         try:
             config = nomad_config.get_plugin_entry_point(
-                'nomad_actions.actions:export_entries_action_entry_point'
+                'nomad_ml_workflows.actions:export_entries_action_entry_point'
             )
 
             search_counter = 0
