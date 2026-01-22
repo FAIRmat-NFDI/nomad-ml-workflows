@@ -1,10 +1,59 @@
 # nomad-ml-workflows
 
-A plugin containing curated NOMAD Actions.
+A NOMAD plugin for managing ML workflows. Currently, it provides an action to export large number of entries from NOMAD database as tabular data files. Other ML workflow related actions and schemas will be added in future.
 
-This `nomad` plugin was generated with `Cookiecutter` along with `@nomad`'s [`cookiecutter-nomad-plugin`](https://github.com/FAIRmat-NFDI/cookiecutter-nomad-plugin) template.
+## 📦 Installation
+You can install the plugin using pip:
+```sh
+pip install nomad-ml-workflows @ git+https://github.com/FAIRmat-NFDI/nomad-ml-workflows.git
+```
 
-## Development
+However, to fully utilize the plugin, you need to add it to your NOMAD instance as described [below](#adding-this-plugin-to-nomad).
+
+## ✨ Features
+
+- Export large number of NOMAD entries as tabular data files (CSV, Parquet) using NOMAD Actions. Once the action is triggered, it will:
+  - Search entries based on user-defined criteria.
+  - Optionally include or exclude data fields from the entries.
+  - Package the entries into tabular data files like CSV or Parquet (or as JSON)
+  - Export the files to a specified Project (or previously known as Upload) in NOAMD.
+
+  These can then be downloaded from the NOMAD web interface for local use.
+
+## ⚙️ Configuration
+The Export Entries action can be configured using the following parameters in
+the `nomad.yaml` configuration file of your NOMAD Oasis instance:
+
+```yaml
+plugins:
+  entry_points:
+    options:
+      nomad_ml_workflows.actions:export_entries_action_entry_point:
+        search_batch_timeout: 7200
+        # Timeout (in seconds) for each search batch in the Export Entries
+        # action. Set this accordingly to time out longer searches.
+        max_entries_export_limit: 100000
+        # Maximum number of entries that can be exported in a single
+        # Export Entries action.
+```
+
+
+## 🚀 Adding this plugin to NOMAD
+
+Currently, NOMAD has two distinct flavors that are relevant depending on your role as an user:
+1. [A NOMAD Oasis](#adding-this-plugin-in-your-nomad-oasis): any user with a NOMAD Oasis instance.
+2. [Local NOMAD installation and the source code of NOMAD](#adding-this-plugin-in-your-local-nomad-installation-and-the-source-code-of-nomad): internal developers.
+
+### Adding this plugin in your NOMAD Oasis
+
+Read the [NOMAD plugin documentation](https://nomad-lab.eu/prod/v1/staging/docs/howto/oasis/plugins_install.html) for all details on how to deploy the plugin on your NOMAD instance.
+
+### Adding this plugin in your local NOMAD installation and the source code of NOMAD
+
+We now recommend using the dedicated [`nomad-distro-dev`](https://github.com/FAIRmat-NFDI/nomad-distro-dev) repository to simplify the process. Please refer to that repository for detailed instructions.
+
+
+## 🛠️ Development
 
 If you want to develop locally this plugin, clone the project and in the plugin folder, create a virtual environment (you can use Python 3.10, 3.11 or 3.12):
 ```sh
@@ -27,21 +76,6 @@ pip install uv
 Install the `nomad-lab` package:
 ```sh
 uv pip install -e '.[dev]'
-```
-
-### Run the tests
-
-You can run locally the tests:
-```sh
-python -m pytest -sv tests
-```
-
-where the `-s` and `-v` options toggle the output verbosity.
-
-Our CI/CD pipeline produces a more comprehensive test report using the `pytest-cov` package. You can generate a local coverage report:
-```sh
-uv pip install pytest-cov
-python -m pytest --cov=src tests
 ```
 
 ### Run linting and auto-formatting
@@ -94,25 +128,12 @@ Run the documentation server:
 mkdocs serve
 ```
 
-## Adding this plugin to NOMAD
 
-Currently, NOMAD has two distinct flavors that are relevant depending on your role as an user:
-1. [A NOMAD Oasis](#adding-this-plugin-in-your-nomad-oasis): any user with a NOMAD Oasis instance.
-2. [Local NOMAD installation and the source code of NOMAD](#adding-this-plugin-in-your-local-nomad-installation-and-the-source-code-of-nomad): internal developers.
-
-### Adding this plugin in your NOMAD Oasis
-
-Read the [NOMAD plugin documentation](https://nomad-lab.eu/prod/v1/staging/docs/howto/oasis/plugins_install.html) for all details on how to deploy the plugin on your NOMAD instance.
-
-### Adding this plugin in your local NOMAD installation and the source code of NOMAD
-
-We now recommend using the dedicated [`nomad-distro-dev`](https://github.com/FAIRmat-NFDI/nomad-distro-dev) repository to simplify the process. Please refer to that repository for detailed instructions.
-
-### Template update
-
-We use [`cruft`](https://github.com/cruft/cruft) to update the project based on template changes. To run the check for updates locally, run `cruft update` in the root of the project. More details see the instructions on [`cruft` website](https://cruft.github.io/cruft/#updating-a-project).
-
-## Main contributors
+## 👥 Main contributors
 | Name | E-mail     |
 |------|------------|
 | Sarthak Kapoor | [sarthak.kapoor@physik.hu-berlin.de](mailto:sarthak.kapoor@physik.hu-berlin.de)
+
+
+## 📄 License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
