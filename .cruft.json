@@ -8,7 +8,7 @@
       "email": "sarthak.kapoor@physik.hu-berlin.de",
       "github_username": "FAIRmat-NFDI",
       "plugin_name": "nomad-actions",
-      "module_name": "nomad_actions",
+      "module_name": "nomad_ml_workflows",
       "short_description": "A plugin containing curated NOMAD Actions.",
       "version": "0.0.1",
       "license": "MIT",

@@ -4,7 +4,7 @@ import tempfile
 
 from temporalio import activity
 
-from nomad_actions.actions.entries.models import (
+from nomad_ml_workflows.actions.entries.models import (
     CleanupArtifactsInput,
     CreateArtifactSubdirectoryInput,
     ExportDatasetInput,
@@ -55,7 +55,7 @@ async def search(data: SearchInput) -> SearchOutput:
 
     from nomad.search import search as nomad_search
 
-    from nomad_actions.actions.entries.utils import (
+    from nomad_ml_workflows.actions.entries.utils import (
         write_csv_file,
         write_json_file,
         write_parquet_file,
@@ -119,7 +119,7 @@ async def merge_output_files(data: MergeOutputFilesInput) -> str | None:
     Returns:
         str | None: Path of the merged output file, or None if no files were merged.
     """
-    from nomad_actions.actions.entries.utils import merge_files
+    from nomad_ml_workflows.actions.entries.utils import merge_files
 
     if not data.generated_file_paths:
         return

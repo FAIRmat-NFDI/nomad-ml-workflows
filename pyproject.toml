@@ -12,8 +12,8 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "License :: OSI Approved :: MIT License",
 ]
-name = "nomad-actions"
-description = "A plugin containing curated NOMAD Actions."
+name = "nomad-ml-worklfows"
+description = "A NOMAD plugin for managing ML workflows."
 dynamic = ["version"]
 readme = "README.md"
 requires-python = ">=3.10"
@@ -31,7 +31,7 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = "https://github.com/FAIRmat-NFDI/nomad-actions"
+Repository = "https://github.com/FAIRmat-NFDI/nomad-ml-workflows"
 
 [project.optional-dependencies]
 dev = [
@@ -140,4 +140,4 @@ where = ["src"]
 skip = [".github/*"]
 
 [project.entry-points.'nomad.plugin']
-export_entries_action_entry_point = "nomad_actions.actions:export_entries_action_entry_point"
+export_entries_action_entry_point = "nomad_ml_workflows.actions:export_entries_action_entry_point"
