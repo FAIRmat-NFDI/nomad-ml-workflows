@@ -8,11 +8,11 @@ You can install the plugin using pip:
 pip install nomad-ml-workflows @ git+https://github.com/FAIRmat-NFDI/nomad-ml-workflows.git
 ```
 
-However, to fully utilize the plugin, you need to add it to your NOMAD instance as described [below](#adding-this-plugin-to-nomad).
+However, to fully utilize the plugin, you need to add it to your NOMAD instance as described [below](#-adding-this-plugin-to-nomad).
 
 ## ✨ Features
 
-- Export large number of NOMAD entries as tabular data files (CSV, Parquet) using NOMAD Actions. Once the action is triggered, it will:
+- Export a large number of NOMAD entries as tabular data files (CSV, Parquet) using NOMAD Actions. Once the action is triggered, it will:
   - Search entries based on user-defined criteria.
   - Optionally include or exclude data fields from the entries.
   - Package the entries into tabular data files like CSV or Parquet (or as JSON)
