@@ -109,7 +109,9 @@ class SearchInput(BaseModel):
             """
             return field.strip().strip("'").strip('"')
 
-        query = json.loads(_clean_field(user_input.search_settings.query))
+        query = json.loads(
+            _clean_field(user_input.search_settings.query).replace("'", '"')
+        )
 
         required = MetadataRequired()
         if user_input.search_settings.required_include is not None:
