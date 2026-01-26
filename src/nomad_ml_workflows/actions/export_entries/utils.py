@@ -1,3 +1,6 @@
+import json
+
+import pandas as pd
 from nomad.utils import dict_to_dataframe
 
 try:
@@ -61,8 +64,6 @@ def write_json_file(path: str, data: list[dict]):
     if not path.endswith('json'):
         raise ValueError('Unsupported file type. Please use JSON.')
 
-    import json
-
     with open(path, 'w') as f:
         json.dump(data, f, indent=4)
 
@@ -91,17 +92,14 @@ def merge_files(input_file_paths: list[str], output_file_path: str):
                 writer.write_batch(batch)
 
     elif output_file_path.endswith('csv'):
-        import pandas as pd
-
         dataframes = []
         for file_path in input_file_paths:
             df = pd.read_csv(file_path)
             dataframes.append(df)
         combined_df = pd.concat(dataframes, ignore_index=True)
         combined_df.to_csv(output_file_path, index=False)
-    elif output_file_path.endswith('json'):
-        import json
 
+    elif output_file_path.endswith('json'):
         combined_data = []
         for file_path in input_file_paths:
             with open(file_path, encoding='utf-8') as f:
