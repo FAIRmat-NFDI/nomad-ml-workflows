@@ -1,7 +1,13 @@
+import json
 import os
 import shutil
 import tempfile
+import zipfile
+from datetime import datetime, timezone
 
+from nomad.actions.manager import action_artifacts_dir, get_upload_files
+from nomad.files import StagingUploadFiles
+from nomad.search import search as nomad_search
 from temporalio import activity
 
 from nomad_ml_workflows.actions.export_entries.models import (
@@ -11,6 +17,12 @@ from nomad_ml_workflows.actions.export_entries.models import (
     MergeOutputFilesInput,
     SearchInput,
     SearchOutput,
+)
+from nomad_ml_workflows.actions.export_entries.utils import (
+    merge_files,
+    write_csv_file,
+    write_json_file,
+    write_parquet_file,
 )
 
 
@@ -25,7 +37,6 @@ async def create_artifact_subdirectory(data: CreateArtifactSubdirectoryInput) ->
     Returns:
         str: Path to the created subdirectory.
     """
-    from nomad.actions.manager import action_artifacts_dir
 
     subdir_path = os.path.join(action_artifacts_dir(), data.subdir_name)
 
@@ -51,15 +62,6 @@ async def search(data: SearchInput) -> SearchOutput:
     Returns:
         SearchOutput: Output data from the search activity.
     """
-    from datetime import datetime, timezone
-
-    from nomad.search import search as nomad_search
-
-    from nomad_ml_workflows.actions.export_entries.utils import (
-        write_csv_file,
-        write_json_file,
-        write_parquet_file,
-    )
 
     output_file_extension = os.path.splitext(data.output_file_path)[-1]
     if output_file_extension == '.parquet':
@@ -119,7 +121,6 @@ async def merge_output_files(data: MergeOutputFilesInput) -> str | None:
     Returns:
         str | None: Path of the merged output file, or None if no files were merged.
     """
-    from nomad_ml_workflows.actions.export_entries.utils import merge_files
 
     if not data.generated_file_paths:
         return
@@ -144,11 +145,6 @@ async def export_dataset_to_upload(data: ExportDatasetInput) -> str:
     Returns:
         str: Path to the saved zip file in the upload.
     """
-    import json
-    import zipfile
-
-    from nomad.actions.manager import get_upload_files
-    from nomad.files import StagingUploadFiles
 
     def unique_filename(filename: str, upload_files: StagingUploadFiles) -> str:
         """Generate a unique filename for the upload_files directory."""
@@ -213,7 +209,6 @@ async def cleanup_artifacts(data: CleanupArtifactsInput) -> None:
     Args:
         data (CleanupArtifactsInput): Input data for cleaning up artifacts.
     """
-    import shutil
 
     if os.path.exists(data.subdir_path):
         shutil.rmtree(data.subdir_path)
