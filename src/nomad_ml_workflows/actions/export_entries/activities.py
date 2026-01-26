@@ -179,7 +179,7 @@ async def export_dataset_to_upload(data: ExportDatasetInput) -> str:
     # Create a zip file containing all the source paths and the metadata file
     if data.zip_output:
         zipname = exportable_dir_name + '.zip'
-        zippath = os.path.join(os.path.dirname(data.artifact_subdirectory), zipname)
+        zippath = os.path.join(data.artifact_subdirectory, zipname)
         with zipfile.ZipFile(zippath, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
             for filepath in exportable_filepaths:
                 arcname = os.path.basename(filepath)
