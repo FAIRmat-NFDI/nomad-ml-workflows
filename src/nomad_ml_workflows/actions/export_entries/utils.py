@@ -1,6 +1,13 @@
-import pyarrow as pa
-import pyarrow.parquet as pq
 from nomad.utils import dict_to_dataframe
+
+try:
+    import pyarrow as pa
+    import pyarrow.dataset as ds
+    import pyarrow.parquet as pq
+except ImportError as e:
+    raise ImportError(
+        'pyarrow is required. Install with: pip install nomad-ml-workflows[cpu-action]'
+    ) from e
 
 
 def write_parquet_file(path: str, data: list[dict]):
@@ -68,8 +75,6 @@ def merge_files(input_file_paths: list[str], output_file_path: str):
         output_file_path (str): Path of the merged output file.
     """
     if output_file_path.endswith('parquet'):
-        import pyarrow.dataset as ds
-
         # Creates a logical dataset from the input files, not loading all data into
         # memory. Also, unifies the schema across the files.
         dataset = ds.dataset(input_file_paths, format='parquet')
