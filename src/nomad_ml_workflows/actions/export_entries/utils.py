@@ -110,16 +110,9 @@ def merge_files(
         )
 
         # Write the dataset to a single CSV file in batches
-        first_batch = True
-        for batch in dataset.to_batches():
-            df = batch.to_pandas()
-            df.to_csv(
-                output_file_path,
-                index=False,
-                mode='w' if first_batch else 'a',
-                header=first_batch,
-            )
-            first_batch = False
+        with pa.csv.CSVWriter(output_file_path, dataset.schema) as writer:
+            for batch in dataset.to_batches():
+                writer.write_batch(batch)
 
     elif output_file_type == 'json':
         combined_data = []
