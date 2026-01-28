@@ -20,8 +20,6 @@ def write_parquet_file(path: str, data: list[dict]):
     Args:
         path (str): The path where the file will be saved.
         data (list[dict]): The list of NOMAD entry dicts to be written to the file.
-        mode (str, optional): The write mode, either 'overwrite' or 'append'.
-            Defaults to 'overwrite'.
     """
     if not path.endswith('parquet'):
         raise ValueError('Unsupported file type. Please use parquet.')
@@ -44,8 +42,6 @@ def write_csv_file(path: str, data: list[dict]):
     Args:
         path (str): The path where the file will be saved.
         data (list[dict]): The list of NOMAD entry dicts to be written to the file.
-        mode (str, optional): The write mode, either 'overwrite' or 'append'.
-            Defaults to 'overwrite'.
     """
     if not path.endswith('csv'):
         raise ValueError('Unsupported file type. Please use csv.')
@@ -105,11 +101,19 @@ def merge_files(
                 '%Y-%m-%dT%H:%M:%S.%f%z',
             ]
         )
+        # Read more rows for schema inference to avoid null type inference errors
+        # CAUTION: this might not scale for very large files
+        read_options = pcsv.ReadOptions(
+            block_size=100 << 20,  # 100 MB blocks for better schema inference
+        )
         # Creates a logical dataset from the input CSV files, not loading all data into
         # memory. Also, unifies the schema across the files.
         dataset = ds.dataset(
             input_file_paths,
-            format=ds.CsvFileFormat(convert_options=convert_options),
+            format=ds.CsvFileFormat(
+                convert_options=convert_options,
+                read_options=read_options,
+            ),
         )
 
         # Write the dataset to a single CSV file in batches
