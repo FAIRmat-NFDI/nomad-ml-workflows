@@ -1,5 +1,6 @@
 import json
 
+import json_stream
 from nomad.utils import dict_to_dataframe
 
 try:
@@ -115,13 +116,25 @@ def merge_files(
                 writer.write_batch(batch)
 
     elif output_file_type == 'json':
-        combined_data = []
-        for file_path in input_file_paths:
-            with open(file_path, encoding='utf-8') as f:
-                data = json.load(f)
-                # extend the combined entry list with entry list from each file
-                combined_data.extend(data)
+
+        def _json_stream_files(input_file_paths):
+            """Generator that streams one entry dict at a time from multiple files."""
+            for file_path in input_file_paths:
+                with open(file_path, encoding='utf-8') as f:
+                    data = json_stream.load(f)
+                    yield from data
+
+        # Write a single JSON file by streaming entry dicts and wrapping in a list
         with open(output_file_path, 'w', encoding='utf-8') as f:
-            json.dump(combined_data, f, indent=4)
+            f.write('[\n')
+            first_item = True
+            for item in _json_stream_files(input_file_paths):
+                if not first_item:
+                    f.write(',\n')
+                # Convert transient json_stream object to standard Python types
+                json.dump(json_stream.to_standard_types(item), f, indent=4)
+                first_item = False
+            f.write('\n]')
+
     else:
         raise ValueError('Unsupported file type. Please use parquet, csv, or json.')
