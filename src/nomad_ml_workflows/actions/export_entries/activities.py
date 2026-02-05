@@ -19,7 +19,6 @@ from nomad_ml_workflows.actions.export_entries.models import (
 )
 from nomad_ml_workflows.actions.export_entries.utils import (
     merge_files,
-    write_csv_file,
     write_json_file,
     write_parquet_file,
 )
