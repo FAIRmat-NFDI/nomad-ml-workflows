@@ -118,7 +118,7 @@ async def merge_output_files(data: MergeOutputFilesInput) -> str | None:
         raise ValueError('No generated file paths provided for merging.')
 
     merged_file_path = os.path.join(
-        data.artifact_subdirectory, 'data.' + data.batch_file_type
+        data.artifact_subdirectory, 'data.' + data.output_file_type
     )
 
     merge_files(data.generated_file_paths, data.output_file_type, merged_file_path)
