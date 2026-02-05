@@ -1,16 +1,26 @@
+import json
 import os
 import shutil
-import tempfile
+import zipfile
+from datetime import datetime, timezone
 
+from nomad.actions.manager import action_artifacts_dir, get_upload_files
+from nomad.files import StagingUploadFiles
+from nomad.search import search as nomad_search
 from temporalio import activity
 
-from nomad_ml_workflows.actions.entries.models import (
+from nomad_ml_workflows.actions.export_entries.models import (
     CleanupArtifactsInput,
     CreateArtifactSubdirectoryInput,
     ExportDatasetInput,
     MergeOutputFilesInput,
     SearchInput,
     SearchOutput,
+)
+from nomad_ml_workflows.actions.export_entries.utils import (
+    merge_files,
+    write_json_file,
+    write_parquet_file,
 )
 
 
@@ -25,7 +35,6 @@ async def create_artifact_subdirectory(data: CreateArtifactSubdirectoryInput) ->
     Returns:
         str: Path to the created subdirectory.
     """
-    from nomad.actions.manager import action_artifacts_dir
 
     subdir_path = os.path.join(action_artifacts_dir(), data.subdir_name)
 
@@ -42,7 +51,7 @@ async def create_artifact_subdirectory(data: CreateArtifactSubdirectoryInput) ->
 async def search(data: SearchInput) -> SearchOutput:
     """
     Activity to perform NOMAD search based on the provided input data. The search
-    results are written to a file in the specified format (Parquet, CSV, or JSON) in the
+    results are written to a file in the specified format (Parquet or JSON) in the
     artifacts directory.
 
     Args:
@@ -51,28 +60,13 @@ async def search(data: SearchInput) -> SearchOutput:
     Returns:
         SearchOutput: Output data from the search activity.
     """
-    from datetime import datetime, timezone
 
-    from nomad.search import search as nomad_search
-
-    from nomad_ml_workflows.actions.entries.utils import (
-        write_csv_file,
-        write_json_file,
-        write_parquet_file,
-    )
-
-    output_file_extension = os.path.splitext(data.output_file_path)[-1]
-    if output_file_extension == '.parquet':
-        write_dataset_file = write_parquet_file
-    elif output_file_extension == '.csv':
-        write_dataset_file = write_csv_file
-    elif output_file_extension == '.json':
-        write_dataset_file = write_json_file
-    else:
-        raise ValueError(
-            f'Unsupported file format "{output_file_extension}". Please use .parquet, '
-            '.csv, or .json extensions.'
-        )
+    write_dataset_file = {
+        'parquet': write_parquet_file,
+        'json': write_json_file,
+    }.get(data.batch_file_type)
+    if write_dataset_file is None:
+        raise ValueError(f'Unsupported batch file type "{data.batch_file_type}". ')
 
     start = datetime.now(timezone.utc).isoformat()
     response = nomad_search(
@@ -111,7 +105,7 @@ async def search(data: SearchInput) -> SearchOutput:
 @activity.defn
 async def merge_output_files(data: MergeOutputFilesInput) -> str | None:
     """
-    Activity to merge multiple Parquet, CSV, or JSON files into a single file.
+    Activity to merge multiple batch files into a single file.
 
     Args:
         data (MergeOutputFilesInput): Input data for merging files.
@@ -119,16 +113,15 @@ async def merge_output_files(data: MergeOutputFilesInput) -> str | None:
     Returns:
         str | None: Path of the merged output file, or None if no files were merged.
     """
-    from nomad_ml_workflows.actions.entries.utils import merge_files
 
     if not data.generated_file_paths:
-        return
+        raise ValueError('No generated file paths provided for merging.')
 
     merged_file_path = os.path.join(
-        data.artifact_subdirectory, 'merged.' + data.output_file_type
+        data.artifact_subdirectory, 'data.' + data.output_file_type
     )
 
-    merge_files(data.generated_file_paths, merged_file_path)
+    merge_files(data.generated_file_paths, data.output_file_type, merged_file_path)
 
     return merged_file_path
 
@@ -144,11 +137,6 @@ async def export_dataset_to_upload(data: ExportDatasetInput) -> str:
     Returns:
         str: Path to the saved zip file in the upload.
     """
-    import json
-    import zipfile
-
-    from nomad.actions.manager import get_upload_files
-    from nomad.files import StagingUploadFiles
 
     def unique_filename(filename: str, upload_files: StagingUploadFiles) -> str:
         """Generate a unique filename for the upload_files directory."""
@@ -186,22 +174,25 @@ async def export_dataset_to_upload(data: ExportDatasetInput) -> str:
     # Create a zip file containing all the source paths and the metadata file
     if data.zip_output:
         zipname = exportable_dir_name + '.zip'
-        zippath = os.path.join(os.path.dirname(data.artifact_subdirectory), zipname)
+        zippath = os.path.join(data.artifact_subdirectory, zipname)
         with zipfile.ZipFile(zippath, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
             for filepath in exportable_filepaths:
                 arcname = os.path.basename(filepath)
                 zipf.write(filepath, arcname=arcname)
-        # Upload zip file to the upload_files directory
+        # Add zip file to the NOMAD Upload
         upload_files.add_rawfiles(path=zippath, auto_decompress=False)
         return zipname
 
-    # If not zipping, create a temporary directory to hold the files and upload them
-    with tempfile.TemporaryDirectory() as tempdir:
-        for filepath in exportable_filepaths:
-            temp_path = os.path.join(tempdir, os.path.basename(filepath))
-            shutil.copy2(filepath, temp_path)
-        # Upload files to the upload_files directory
-        upload_files.add_rawfiles(path=tempdir, target_dir=exportable_dir_name)
+    # If not zipping, copy files to directory named exportable_dir_name
+    exportable_dir_path = os.path.join(data.artifact_subdirectory, exportable_dir_name)
+    os.mkdir(exportable_dir_path)
+    for filepath in exportable_filepaths:
+        temp_path = os.path.join(exportable_dir_path, os.path.basename(filepath))
+        shutil.copy2(filepath, temp_path)
+        # Add directory to the NOMAD Upload
+        upload_files.add_rawfiles(
+            path=exportable_dir_path, target_dir=exportable_dir_name
+        )
     return exportable_dir_name
 
 
@@ -213,7 +204,6 @@ async def cleanup_artifacts(data: CleanupArtifactsInput) -> None:
     Args:
         data (CleanupArtifactsInput): Input data for cleaning up artifacts.
     """
-    import shutil
 
     if os.path.exists(data.subdir_path):
         shutil.rmtree(data.subdir_path)

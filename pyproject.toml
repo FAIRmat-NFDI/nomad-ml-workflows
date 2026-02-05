@@ -26,6 +26,7 @@ maintainers = [
 license = { file = "LICENSE" }
 dependencies = [
     "nomad-lab>=1.4.0",
+    "json-stream",
     "pydantic",
     "temporalio",
 ]
@@ -140,4 +141,4 @@ where = ["src"]
 skip = [".github/*"]
 
 [project.entry-points.'nomad.plugin']
-export_entries_action_entry_point = "nomad_ml_workflows.actions:export_entries_action_entry_point"
+export_entries_action_entry_point = "nomad_ml_workflows.actions:export_entries"

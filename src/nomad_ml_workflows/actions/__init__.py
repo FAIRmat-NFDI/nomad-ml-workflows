@@ -1,3 +1,3 @@
-from nomad_ml_workflows.actions.entries import export_entries_action_entry_point
+from nomad_ml_workflows.actions.export_entries import export_entries
 
-__all__ = ['export_entries_action_entry_point']
+__all__ = ['export_entries']

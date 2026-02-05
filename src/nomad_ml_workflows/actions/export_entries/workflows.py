@@ -7,14 +7,14 @@ from temporalio.exceptions import ApplicationError
 with workflow.unsafe.imports_passed_through():
     from nomad.config import config as nomad_config
 
-    from nomad_ml_workflows.actions.entries.activities import (
+    from nomad_ml_workflows.actions.export_entries.activities import (
         cleanup_artifacts,
         create_artifact_subdirectory,
         export_dataset_to_upload,
         merge_output_files,
         search,
     )
-    from nomad_ml_workflows.actions.entries.models import (
+    from nomad_ml_workflows.actions.export_entries.models import (
         CleanupArtifactsInput,
         CreateArtifactSubdirectoryInput,
         ExportDatasetInput,
@@ -39,7 +39,7 @@ class ExportEntriesWorkflow:
             str: Path to the saved dataset in the upload's `raw` folder.
         """
         retry_policy = RetryPolicy(
-            maximum_attempts=3,
+            maximum_attempts=1,
             initial_interval=timedelta(seconds=10),
             maximum_interval=timedelta(minutes=1),
             backoff_coefficient=2.0,
@@ -62,7 +62,7 @@ class ExportEntriesWorkflow:
 
         try:
             config = nomad_config.get_plugin_entry_point(
-                'nomad_ml_workflows.actions:export_entries_action_entry_point'
+                'nomad_ml_workflows.actions:export_entries'
             )
 
             search_counter = 0
@@ -80,8 +80,8 @@ class ExportEntriesWorkflow:
             while True:
                 search_counter += 1
                 search_input.output_file_path = (
-                    f'{artifact_subdirectory}/'
-                    f'{search_counter}.{data.output_settings.output_file_type}'
+                    f'{artifact_subdirectory}/{search_counter}.'
+                    f'{search_input.batch_file_type}'
                 )
                 search_output = await workflow.execute_activity(
                     search,
@@ -117,25 +117,22 @@ class ExportEntriesWorkflow:
                     reached_max_entries_limit = True
                     break
 
-            if data.output_settings.merge_output_files:
-                merged_file_path = await workflow.execute_activity(
-                    merge_output_files,
-                    MergeOutputFilesInput(
-                        artifact_subdirectory=artifact_subdirectory,
-                        output_file_type=data.output_settings.output_file_type,
-                        generated_file_paths=generated_file_paths,
-                    ),
-                    start_to_close_timeout=timedelta(hours=2),
-                    retry_policy=retry_policy,
-                )
-                if merged_file_path:
-                    generated_file_paths = [merged_file_path]
+            merged_file_path = await workflow.execute_activity(
+                merge_output_files,
+                MergeOutputFilesInput(
+                    artifact_subdirectory=artifact_subdirectory,
+                    output_file_type=data.output_settings.output_file_type,
+                    generated_file_paths=generated_file_paths,
+                ),
+                start_to_close_timeout=timedelta(hours=2),
+                retry_policy=retry_policy,
+            )
 
             # Prepare export dataset input and metadata
             export_dataset_input.exportable_dir_name = (
                 'export_entries_' + search_start_times[0].replace(':', '-')
             )
-            export_dataset_input.source_paths = generated_file_paths
+            export_dataset_input.source_paths = [merged_file_path]
             export_dataset_input.metadata = ExportDatasetMetadata(
                 num_entries_exported=total_num_entries_exported,
                 num_entries_available=num_entries_available,

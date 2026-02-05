@@ -28,7 +28,7 @@ the `nomad.yaml` configuration file of your NOMAD Oasis instance:
 plugins:
   entry_points:
     options:
-      nomad_ml_workflows.actions:export_entries_action_entry_point:
+      nomad_ml_workflows.actions:export_entries:
         search_batch_timeout: 7200
         # Timeout (in seconds) for each search batch in the Export Entries
         # action. Set this accordingly to time out longer searches.
