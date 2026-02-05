@@ -14,6 +14,44 @@ except ImportError as e:
     ) from e
 
 
+def _is_nested_type(dtype: pa.DataType) -> bool:
+    """Check if a PyArrow type is nested."""
+    return pa.types.is_nested(dtype)
+
+
+def _get_csv_compatible_schema(schema: pa.Schema) -> pa.Schema:
+    """Convert schema to CSV-compatible format by changing nested types to strings."""
+    new_fields = []
+    for field in schema:
+        if _is_nested_type(field.type):
+            new_fields.append(pa.field(field.name, pa.string(), field.nullable))
+        else:
+            new_fields.append(field)
+    return pa.schema(new_fields)
+
+
+def _stringify_nested_columns(batch: pa.RecordBatch) -> pa.RecordBatch:
+    """Convert nested columns (list, struct) in a batch to JSON strings."""
+    new_columns = []
+    for i, column in enumerate(batch.columns):
+        if _is_nested_type(batch.schema.field(i).type):
+            # Convert each element to JSON string
+            stringified = pa.array(
+                [
+                    json.dumps(val.as_py()) if val.as_py() is not None else None
+                    for val in column
+                ],
+                type=pa.string(),
+            )
+            new_columns.append(stringified)
+        else:
+            new_columns.append(column)
+
+    return pa.RecordBatch.from_arrays(
+        new_columns, schema=_get_csv_compatible_schema(batch.schema)
+    )
+
+
 def write_parquet_file(path: str, data: list[dict]):
     """Writes a list of NOMAD entry dicts to a parquet file.
 
@@ -99,10 +137,15 @@ def merge_files(
         # so we read them as Parquet here.
         dataset = ds.dataset(input_file_paths, format='parquet')
 
+        # PyArrow CSV writer doesn't support nested types (list, struct, etc.)
+        # Convert nested columns to JSON strings
+        csv_schema = _get_csv_compatible_schema(dataset.schema)
+
         # Write the dataset to a single CSV file in batches
-        with pa.csv.CSVWriter(output_file_path, dataset.schema) as writer:
+        with pcsv.CSVWriter(output_file_path, csv_schema) as writer:
             for batch in dataset.to_batches():
-                writer.write_batch(batch)
+                csv_batch = _stringify_nested_columns(batch)
+                writer.write_batch(csv_batch)
 
     elif output_file_type == 'json':
 
