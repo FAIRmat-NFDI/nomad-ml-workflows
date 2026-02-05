@@ -52,7 +52,7 @@ async def create_artifact_subdirectory(data: CreateArtifactSubdirectoryInput) ->
 async def search(data: SearchInput) -> SearchOutput:
     """
     Activity to perform NOMAD search based on the provided input data. The search
-    results are written to a file in the specified format (Parquet, CSV, or JSON) in the
+    results are written to a file in the specified format (Parquet or JSON) in the
     artifacts directory.
 
     Args:
@@ -64,14 +64,10 @@ async def search(data: SearchInput) -> SearchOutput:
 
     write_dataset_file = {
         'parquet': write_parquet_file,
-        'csv': write_csv_file,
         'json': write_json_file,
-    }.get(data.output_file_type)
+    }.get(data.batch_file_type)
     if write_dataset_file is None:
-        raise ValueError(
-            f'Unsupported file type "{data.output_file_type}". '
-            'Please use parquet, csv, or json as file types.'
-        )
+        raise ValueError(f'Unsupported batch file type "{data.batch_file_type}". ')
 
     start = datetime.now(timezone.utc).isoformat()
     response = nomad_search(
@@ -110,7 +106,7 @@ async def search(data: SearchInput) -> SearchOutput:
 @activity.defn
 async def merge_output_files(data: MergeOutputFilesInput) -> str | None:
     """
-    Activity to merge multiple Parquet, CSV, or JSON files into a single file.
+    Activity to merge multiple batch files into a single file.
 
     Args:
         data (MergeOutputFilesInput): Input data for merging files.
@@ -123,7 +119,7 @@ async def merge_output_files(data: MergeOutputFilesInput) -> str | None:
         raise ValueError('No generated file paths provided for merging.')
 
     merged_file_path = os.path.join(
-        data.artifact_subdirectory, 'merged.' + data.output_file_type
+        data.artifact_subdirectory, 'data.' + data.batch_file_type
     )
 
     merge_files(data.generated_file_paths, data.output_file_type, merged_file_path)

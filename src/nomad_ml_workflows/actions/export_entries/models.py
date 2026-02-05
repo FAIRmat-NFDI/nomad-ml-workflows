@@ -5,6 +5,7 @@ from nomad.app.v1.models.models import MetadataPagination, MetadataRequired, Que
 from pydantic import BaseModel, Field
 
 OwnerLiteral = Literal['public', 'visible', 'shared', 'user', 'staging']
+BatchFileTypeLiteral = Literal['parquet', 'json']
 OutputFileTypeLiteral = Literal['parquet', 'csv', 'json']
 IndexLiteral = Literal['entries', 'datasets', 'models', 'spaces']
 
@@ -80,7 +81,7 @@ class SearchInput(BaseModel):
     pagination: MetadataPagination = Field(
         ..., description='Pagination settings for the search results.'
     )
-    output_file_type: OutputFileTypeLiteral = Field(
+    batch_file_type: BatchFileTypeLiteral = Field(
         ..., description='Type of the output file.'
     )
     output_file_path: str = Field(..., description='Path to the generated output file.')
@@ -124,13 +125,17 @@ class SearchInput(BaseModel):
 
         pagination = MetadataPagination(page_size=user_input.output_settings.batch_size)
 
+        batch_file_type = user_input.output_settings.output_file_type
+        if batch_file_type == 'csv':
+            batch_file_type = 'parquet'  # use parquet batches for csv
+
         return cls(
             user_id=user_input.user_id,
             owner=user_input.search_settings.owner,
             query=query,
             required=required,
             pagination=pagination,
-            output_file_type=user_input.output_settings.output_file_type,
+            batch_file_type=batch_file_type,
             output_file_path=output_file_path,
             max_entries_export_limit=max_entries_export_limit,
         )
