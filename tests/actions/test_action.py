@@ -2,18 +2,18 @@ import pytest
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
-from nomad_ml_workflows.actions.entries.activities import (
+from nomad_ml_workflows.actions.export_entries.activities import (
     cleanup_artifacts,
     create_artifact_subdirectory,
     export_dataset_to_upload,
     merge_output_files,
     search,
 )
-from nomad_ml_workflows.actions.entries.models import (
+from nomad_ml_workflows.actions.export_entries.models import (
     ExportEntriesUserInput,
     SearchSettings,
 )
-from nomad_ml_workflows.actions.entries.workflows import ExportEntriesWorkflow
+from nomad_ml_workflows.actions.export_entries.workflows import ExportEntriesWorkflow
 
 
 @pytest.mark.skip(reason='Requires infra support like DB connection.')
