@@ -14,6 +14,12 @@ class SearchSettings(BaseModel):
     owner: OwnerLiteral = Field(
         'visible', description='Owner of the entries to be searched.'
     )
+    page_size: int = Field(
+        1000,
+        gt=0,
+        description='Number of entries to be fetched and written per search page. '
+        'Use smaller page sizes when exporting large entries to reduce memory usage.',
+    )
     query: str = Field(
         ...,
         description="""Query for extracting entries. Should be a valid dictionary
@@ -21,15 +27,15 @@ class SearchSettings(BaseModel):
         {
             'entry_type': 'ELNSample'
         }""",
-        # TODO: add `ui:widget` though `json_schema_extra` after NOMAD UI supports it
+        json_schema_extra={'ui:widget': 'textarea', 'ui:options': {'rows': 5}},
     )
     required_include: list[str] = Field(
-        None,
+        [],
         description='List of fields to include in the search results. For example: '
         'results*, data.results*',
     )
     required_exclude: list[str] = Field(
-        None,
+        [],
         description='List of fields to exclude from the search results. For example: '
         'results.method.method_name',
     )
@@ -39,12 +45,6 @@ class OutputSettings(BaseModel):
     output_file_type: OutputFileTypeLiteral = Field(
         'parquet',
         description='Type of the output file.',
-    )
-    batch_size: int = Field(
-        1000,
-        gt=0,
-        description='Number of entries to be fetched and written per search batch. '
-        'Use smaller batch sizes when exporting large entries to reduce memory usage.',
     )
     zip_output: bool = Field(
         True,
@@ -110,7 +110,7 @@ class SearchInput(BaseModel):
         )
 
         required = MetadataRequired()
-        if user_input.search_settings.required_include is not None:
+        if user_input.search_settings.required_include:
             include = [
                 _clean_field(field)
                 for field in user_input.search_settings.required_include
@@ -123,7 +123,7 @@ class SearchInput(BaseModel):
             ]
             required.exclude = exclude if exclude else None
 
-        pagination = MetadataPagination(page_size=user_input.output_settings.batch_size)
+        pagination = MetadataPagination(page_size=user_input.search_settings.page_size)
 
         batch_file_type = user_input.output_settings.output_file_type
         if batch_file_type == 'csv':
