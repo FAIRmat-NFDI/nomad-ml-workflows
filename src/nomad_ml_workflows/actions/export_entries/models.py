@@ -14,6 +14,12 @@ class SearchSettings(BaseModel):
     owner: OwnerLiteral = Field(
         'visible', description='Owner of the entries to be searched.'
     )
+    page_size: int = Field(
+        1000,
+        gt=0,
+        description='Number of entries to be fetched and written per search page. '
+        'Use smaller page sizes when exporting large entries to reduce memory usage.',
+    )
     query: str = Field(
         ...,
         description="""Query for extracting entries. Should be a valid dictionary
@@ -39,12 +45,6 @@ class OutputSettings(BaseModel):
     output_file_type: OutputFileTypeLiteral = Field(
         'parquet',
         description='Type of the output file.',
-    )
-    batch_size: int = Field(
-        1000,
-        gt=0,
-        description='Number of entries to be fetched and written per search batch. '
-        'Use smaller batch sizes when exporting large entries to reduce memory usage.',
     )
     zip_output: bool = Field(
         True,
@@ -123,7 +123,7 @@ class SearchInput(BaseModel):
             ]
             required.exclude = exclude if exclude else None
 
-        pagination = MetadataPagination(page_size=user_input.output_settings.batch_size)
+        pagination = MetadataPagination(page_size=user_input.search_settings.page_size)
 
         batch_file_type = user_input.output_settings.output_file_type
         if batch_file_type == 'csv':
