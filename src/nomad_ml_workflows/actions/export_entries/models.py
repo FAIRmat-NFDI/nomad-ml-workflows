@@ -27,7 +27,7 @@ class SearchSettings(BaseModel):
         {
             'entry_type': 'ELNSample'
         }""",
-        # TODO: add `ui:widget` though `json_schema_extra` after NOMAD UI supports it
+        json_schema_extra={'ui:widget': 'textarea', 'ui:options': {'rows': 5}},
     )
     required_include: list[str] = Field(
         [],
