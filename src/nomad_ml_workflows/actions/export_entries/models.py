@@ -27,7 +27,9 @@ class SearchSettings(BaseModel):
         {
             'entry_type': 'ELNSample'
         }""",
-        json_schema_extra={'ui:widget': 'textarea', 'ui:options': {'rows': 5}},
+        json_schema_extra={
+            'uiSchema': {'ui:widget': 'textarea', 'ui:options': {'rows': 5}}
+        },
     )
     required_include: list[str] = Field(
         [],
