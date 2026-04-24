@@ -83,7 +83,9 @@ class ExportEntriesWorkflow:
             user_id=data.user_id,
             upload_id=data.upload_id,
             artifact_subdirectory=artifact_subdirectory,
-            exportable_dir_name='export_entries_error',  # name used in case of error
+            exportable_dir_name=(
+                f'export_entries_{workflow.info().start_time.isoformat()}'
+            ),
             zip_output=data.output_settings.zip_output,
             source_paths=[],
             metadata=ExportDatasetMetadata(user_input=data),
@@ -187,9 +189,7 @@ class ExportEntriesWorkflow:
             # Pages ran in parallel so take the earliest start and latest end.
             earliest_start = min(search_start_times)
             latest_end = max(search_end_times)
-            export_dataset_input.exportable_dir_name = (
-                'export_entries_' + earliest_start.replace(':', '-')
-            )
+
             export_dataset_input.source_paths = [merged_file_path]
             export_dataset_input.metadata = ExportDatasetMetadata(
                 num_entries_exported=total_num_entries_exported,
