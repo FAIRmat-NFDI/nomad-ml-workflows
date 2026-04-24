@@ -22,7 +22,37 @@ with workflow.unsafe.imports_passed_through():
         ExportEntriesUserInput,
         MergeOutputFilesInput,
         SearchInput,
+        SearchOutput,
     )
+
+
+@workflow.defn
+class SearchPageWorkflow:
+    """
+    Child workflow that executes a single search page activity.
+
+    Each instance handles one page of results, identified by its
+    page_after_value cursor. Running multiple instances concurrently
+    via the parent workflow achieves parallel page fetching.
+    """
+
+    @workflow.run
+    async def run(self, data: SearchInput) -> SearchOutput:
+        config = nomad_config.get_plugin_entry_point(
+            'nomad_ml_workflows.actions:export_entries'
+        )
+        retry_policy = RetryPolicy(
+            maximum_attempts=1,
+            initial_interval=timedelta(seconds=10),
+            maximum_interval=timedelta(minutes=1),
+            backoff_coefficient=2.0,
+        )
+        return await workflow.execute_activity(
+            search,
+            data,
+            start_to_close_timeout=timedelta(seconds=config.search_batch_timeout),
+            retry_policy=retry_policy,
+        )
 
 
 @workflow.defn

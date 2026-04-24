@@ -30,11 +30,13 @@ class ExportEntriesActionEntryPoint(ActionEntryPoint):
         )
         from nomad_ml_workflows.actions.export_entries.workflows import (
             ExportEntriesWorkflow,
+            SearchPageWorkflow,
         )
 
         return Action(
             task_queue=self.task_queue,
             workflow=ExportEntriesWorkflow,
+            child_workflows=[SearchPageWorkflow],
             activities=[
                 create_artifact_subdirectory,
                 search,
