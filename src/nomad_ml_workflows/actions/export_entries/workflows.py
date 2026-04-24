@@ -150,19 +150,30 @@ class ExportEntriesWorkflow:
                 )
                 search_inputs.append(si)
 
-            # Run search for all pages in parallel as child workflows
-            search_results = await asyncio.gather(
-                *[
-                    workflow.execute_child_workflow(
-                        SearchPageWorkflow.run,
-                        si,
-                        id=f'{workflow.info().workflow_id}-search-page-{i + 1}',
-                        parent_close_policy=workflow.ParentClosePolicy.TERMINATE,
-                        retry_policy=retry_policy,
-                    )
-                    for i, si in enumerate(search_inputs)
+            # Run child workflows for each page with bounded concurrency to avoid
+            # overwhelming the Temporal server with too many concurrent searches.
+            search_results = []
+            for concurr_batch_start in range(
+                0, len(search_inputs), config.search_workflow_concurrency_limit
+            ):
+                concurr_batch_search_inputs = search_inputs[
+                    concurr_batch_start : concurr_batch_start
+                    + config.search_workflow_concurrency_limit
                 ]
-            )
+                concurr_batch_results = await asyncio.gather(
+                    *[
+                        workflow.execute_child_workflow(
+                            SearchPageWorkflow.run,
+                            si,
+                            id=f'{workflow.info().workflow_id}-search-page-'
+                            f'{concurr_batch_start + i + 1}',
+                            parent_close_policy=workflow.ParentClosePolicy.TERMINATE,
+                            retry_policy=retry_policy,
+                        )
+                        for i, si in enumerate(concurr_batch_search_inputs)
+                    ]
+                )
+                search_results.extend(concurr_batch_results)
 
             # Collect outputs preserving page order
             generated_file_paths = [
@@ -188,7 +199,7 @@ class ExportEntriesWorkflow:
                 retry_policy=retry_policy,
             )
 
-            # Pages ran in parallel so take the earliest start and latest end. ISO
+            # Pages ran concurrently so take the earliest start and latest end. ISO
             # timestamp strings can be compared lexicographically
             earliest_start = min(search_start_times)
             latest_end = max(search_end_times)
