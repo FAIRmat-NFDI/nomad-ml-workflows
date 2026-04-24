@@ -45,12 +45,7 @@ class SearchPageWorkflow:
         config = nomad_config.get_plugin_entry_point(
             'nomad_ml_workflows.actions:export_entries'
         )
-        retry_policy = RetryPolicy(
-            maximum_attempts=1,
-            initial_interval=timedelta(seconds=10),
-            maximum_interval=timedelta(minutes=1),
-            backoff_coefficient=2.0,
-        )
+        retry_policy = RetryPolicy(maximum_attempts=1)
         return await workflow.execute_activity(
             search,
             data,
@@ -77,12 +72,7 @@ class ExportEntriesWorkflow:
         Returns:
             str: Path to the saved dataset in the upload's `raw` folder.
         """
-        retry_policy = RetryPolicy(
-            maximum_attempts=1,
-            initial_interval=timedelta(seconds=10),
-            maximum_interval=timedelta(minutes=1),
-            backoff_coefficient=2.0,
-        )
+        retry_policy = RetryPolicy(maximum_attempts=1)
         artifact_subdirectory = await workflow.execute_activity(
             create_artifact_subdirectory,
             CreateArtifactSubdirectoryInput(subdir_name=workflow.info().workflow_id),
@@ -162,6 +152,8 @@ class ExportEntriesWorkflow:
                         SearchPageWorkflow.run,
                         si,
                         id=f'{workflow.info().workflow_id}-search-page-{i + 1}',
+                        parent_close_policy=workflow.ParentClosePolicy.TERMINATE,
+                        retry_policy=retry_policy,
                     )
                     for i, si in enumerate(search_inputs)
                 ]
