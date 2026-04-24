@@ -118,14 +118,15 @@ class ExportEntriesWorkflow:
                 start_to_close_timeout=timedelta(hours=2),
                 retry_policy=retry_policy,
             )
-
+            export_dataset_input.metadata.reached_max_entries_limit = (
+                cursors_output.num_entries_available > config.max_entries_export_limit
+            )
+            export_dataset_input.metadata.num_entries_available = (
+                cursors_output.num_entries_available
+            )
             if cursors_output.num_pages == 0:
                 # No pages to export, return early with an empty dataset
                 return
-
-            reached_max_entries_limit = (
-                cursors_output.num_entries_available > config.max_entries_export_limit
-            )
 
             # Build one SearchInput per page with the corresponding cursor and
             # export limit for that page
@@ -175,21 +176,16 @@ class ExportEntriesWorkflow:
                 )
                 search_outputs.extend(concurr_batch_outputs)
 
-            # Collect data for metadata export
             # Pages ran concurrently so take the earliest start and latest end. ISO
             # timestamp strings can be compared lexicographically
-            earliest_start = min([so.search_start_time for so in search_outputs])
-            latest_end = max([so.search_end_time for so in search_outputs])
-            total_num_entries_exported = sum(
+            export_dataset_input.metadata.num_entries_exported = sum(
                 so.num_entries_exported for so in search_outputs
             )
-            export_dataset_input.metadata = ExportDatasetMetadata(
-                num_entries_exported=total_num_entries_exported,
-                num_entries_available=cursors_output.num_entries_available,
-                reached_max_entries_limit=reached_max_entries_limit,
-                search_start_time=earliest_start,
-                search_end_time=latest_end,
-                user_input=data,
+            export_dataset_input.metadata.search_start_time = min(
+                [so.search_start_time for so in search_outputs]
+            )
+            export_dataset_input.metadata.search_end_time = max(
+                [so.search_end_time for so in search_outputs]
             )
 
             # Merge batch files into one file to be exported
