@@ -175,17 +175,27 @@ class ExportEntriesWorkflow:
                 )
                 search_results.extend(concurr_batch_results)
 
-            # Collect outputs preserving page order
+            # Collect data for metadata export
+            # Pages ran concurrently so take the earliest start and latest end. ISO
+            # timestamp strings can be compared lexicographically
             generated_file_paths = [
                 search_inputs[i].output_file_path
                 for i, result in enumerate(search_results)
                 if result.num_entries_exported > 0
             ]
+            earliest_start = min([so.search_start_time for so in search_outputs])
+            latest_end = max([so.search_end_time for so in search_outputs])
             total_num_entries_exported = sum(
-                result.num_entries_exported for result in search_results
+                so.num_entries_exported for so in search_outputs
             )
-            search_start_times = [result.search_start_time for result in search_results]
-            search_end_times = [result.search_end_time for result in search_results]
+            export_dataset_input.metadata = ExportDatasetMetadata(
+                num_entries_exported=total_num_entries_exported,
+                num_entries_available=cursors_output.num_entries_available,
+                reached_max_entries_limit=reached_max_entries_limit,
+                search_start_time=earliest_start,
+                search_end_time=latest_end,
+                user_input=data,
+            )
 
             # Merge batch files into one file to be exported
             merged_file_path = await workflow.execute_activity(
@@ -198,21 +208,7 @@ class ExportEntriesWorkflow:
                 start_to_close_timeout=timedelta(hours=2),
                 retry_policy=retry_policy,
             )
-
-            # Pages ran concurrently so take the earliest start and latest end. ISO
-            # timestamp strings can be compared lexicographically
-            earliest_start = min(search_start_times)
-            latest_end = max(search_end_times)
-
             export_dataset_input.source_paths = [merged_file_path]
-            export_dataset_input.metadata = ExportDatasetMetadata(
-                num_entries_exported=total_num_entries_exported,
-                num_entries_available=cursors_output.num_entries_available,
-                reached_max_entries_limit=reached_max_entries_limit,
-                search_start_time=earliest_start,
-                search_end_time=latest_end,
-                user_input=data,
-            )
 
         except Exception as e:
             # Capture error info to include in metadata
