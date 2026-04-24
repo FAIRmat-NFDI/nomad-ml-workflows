@@ -84,26 +84,16 @@ async def search(data: SearchInput) -> SearchOutput:
     end = datetime.now(timezone.utc).isoformat()
 
     # Limit the number of exported entries
-    if len(response.data) > data.max_entries_export_limit:
-        entry_list = response.data[: data.max_entries_export_limit]
-    else:
-        entry_list = response.data
+    entry_list = response.data[: data.max_entries_export_limit]
 
-    output = SearchOutput(
+    if entry_list:
+        write_dataset_file(path=data.output_file_path, data=entry_list)
+
+    return SearchOutput(
         search_start_time=start,
         search_end_time=end,
         num_entries_exported=len(entry_list),
-        num_entries_available=response.pagination.total,
-        pagination_next_page_after_value=response.pagination.next_page_after_value,
     )
-
-    if len(entry_list) == 0:
-        # skip writing empty files and stop subsequent searches
-        output.pagination_next_page_after_value = None
-    else:
-        write_dataset_file(path=data.output_file_path, data=entry_list)
-
-    return output
 
 
 @activity.defn

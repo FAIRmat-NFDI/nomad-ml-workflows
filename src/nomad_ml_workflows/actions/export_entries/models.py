@@ -147,20 +147,11 @@ class SearchOutput(BaseModel):
     num_entries_exported: int = Field(
         ..., description='Number of entries exported to the output file.'
     )
-    num_entries_available: int = Field(
-        ...,
-        description='Total number of entries available for the given search query.',
-    )
     search_start_time: str = Field(
         ..., description='UTC Timestamp (ISO) when the search started.'
     )
     search_end_time: str = Field(
         ..., description='UTC Timestamp (ISO) when the search completed.'
-    )
-    pagination_next_page_after_value: str | None = Field(
-        None,
-        description='The next_page_after_value from pagination, if more results are '
-        'available.',
     )
 
 
