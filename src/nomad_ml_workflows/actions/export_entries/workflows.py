@@ -1,3 +1,4 @@
+import asyncio
 from datetime import timedelta
 
 from temporalio import workflow
@@ -66,6 +67,11 @@ class ExportEntriesWorkflow:
         Workflow to search entries and export them into a datafile in the specified
         upload.
 
+        All search pages are fetched in parallel using child workflows. A lightweight
+        cursor-collection activity first walks the pagination to determine the
+        page_after_value for every page, then one SearchPageWorkflow child workflow
+        is launched per page and all are awaited concurrently.
+
         Args:
             data (ExportEntriesUserInput): Input data for the export entries workflow.
         Returns:
@@ -107,7 +113,7 @@ class ExportEntriesWorkflow:
             )
             page_size = data.search_settings.page_size
 
-            # -collect all page cursors with a lightweight serial walk ---
+            # Collect all page cursors with a lightweight serial walk
             cursors_output = await workflow.execute_activity(
                 collect_page_cursors,
                 CollectCursorsInput(
@@ -126,7 +132,7 @@ class ExportEntriesWorkflow:
                 num_entries_available > config.max_entries_export_limit
             )
 
-            # build one SearchInput per page with the corresponding cursor and
+            # Build one SearchInput per page with the corresponding cursor and
             # export limit for that page
             search_inputs: list[SearchInput] = []
             for page_index, cursor in enumerate(cursors_output.page_after_values):
@@ -149,6 +155,31 @@ class ExportEntriesWorkflow:
                 )
                 search_inputs.append(si)
 
+            # Run search for all pages in parallel as child workflows
+            search_results = await asyncio.gather(
+                *[
+                    workflow.execute_child_workflow(
+                        SearchPageWorkflow.run,
+                        si,
+                        id=f'{workflow.info().workflow_id}-search-page-{i + 1}',
+                    )
+                    for i, si in enumerate(search_inputs)
+                ]
+            )
+
+            # Collect outputs preserving page order
+            generated_file_paths = [
+                search_inputs[i].output_file_path
+                for i, result in enumerate(search_results)
+                if result.num_entries_exported > 0
+            ]
+            total_num_entries_exported = sum(
+                result.num_entries_exported for result in search_results
+            )
+            search_start_times = [result.search_start_time for result in search_results]
+            search_end_times = [result.search_end_time for result in search_results]
+
+            # Merge batch files into one file to be exported
             merged_file_path = await workflow.execute_activity(
                 merge_output_files,
                 MergeOutputFilesInput(
@@ -161,16 +192,19 @@ class ExportEntriesWorkflow:
             )
 
             # Prepare export dataset input and metadata
+            # Pages ran in parallel so take the earliest start and latest end.
+            earliest_start = min(search_start_times)
+            latest_end = max(search_end_times)
             export_dataset_input.exportable_dir_name = (
-                'export_entries_' + search_start_times[0].replace(':', '-')
+                'export_entries_' + earliest_start.replace(':', '-')
             )
             export_dataset_input.source_paths = [merged_file_path]
             export_dataset_input.metadata = ExportDatasetMetadata(
                 num_entries_exported=total_num_entries_exported,
                 num_entries_available=num_entries_available,
                 reached_max_entries_limit=reached_max_entries_limit,
-                search_start_time=search_start_times[0],
-                search_end_time=search_end_times[-1],
+                search_start_time=earliest_start,
+                search_end_time=latest_end,
                 user_input=data,
             )
 
