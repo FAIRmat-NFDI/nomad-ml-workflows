@@ -84,26 +84,16 @@ async def search(data: SearchInput) -> SearchOutput:
     end = datetime.now(timezone.utc).isoformat()
 
     # Limit the number of exported entries
-    if len(response.data) > data.max_entries_export_limit:
-        entry_list = response.data[: data.max_entries_export_limit]
-    else:
-        entry_list = response.data
+    entry_list = response.data[: data.max_entries_export_limit]
 
-    output = SearchOutput(
+    if entry_list:
+        write_dataset_file(path=data.output_file_path, data=entry_list)
+
+    return SearchOutput(
         search_start_time=start,
         search_end_time=end,
         num_entries_exported=len(entry_list),
-        num_entries_available=response.pagination.total,
-        pagination_next_page_after_value=response.pagination.next_page_after_value,
     )
-
-    if len(entry_list) == 0:
-        # skip writing empty files and stop subsequent searches
-        output.pagination_next_page_after_value = None
-    else:
-        write_dataset_file(path=data.output_file_path, data=entry_list)
-
-    return output
 
 
 @activity.defn
@@ -145,10 +135,16 @@ async def collect_page_cursors(data: CollectCursorsInput) -> CollectCursorsOutpu
         ceil(num_entries_to_export / data.page_size) if num_entries_to_export > 0 else 0
     )
 
-    page_after_values: list[str | None] = []
-    if num_pages > 0:
-        page_after_values.append(None)  # first page always starts at the beginning
+    if num_pages == 0:
+        return CollectCursorsOutput(
+            page_after_values=[],
+            num_entries_available=num_entries_available,
+            num_pages=num_pages,
+        )
 
+    # Collect the page_after_value cursor for each page.
+    # The first page starts with a None cursor.
+    page_after_values: list[str | None] = [None]
     cursor = response.pagination.next_page_after_value
     for _ in range(num_pages - 1):
         if cursor is None:
@@ -170,6 +166,7 @@ async def collect_page_cursors(data: CollectCursorsInput) -> CollectCursorsOutpu
     return CollectCursorsOutput(
         page_after_values=page_after_values,
         num_entries_available=num_entries_available,
+        num_pages=num_pages,
     )
 
 
