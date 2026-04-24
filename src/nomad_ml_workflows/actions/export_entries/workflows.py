@@ -119,8 +119,8 @@ class ExportEntriesWorkflow:
                 retry_policy=retry_policy,
             )
 
-            if cursors_output.num_entries_available == 0:
-                # No entries to export, return early with an empty dataset
+            if cursors_output.num_pages == 0:
+                # No pages to export, return early with an empty dataset
                 return
 
             reached_max_entries_limit = (

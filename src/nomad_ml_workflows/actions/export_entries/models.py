@@ -176,6 +176,11 @@ class CollectCursorsOutput(BaseModel):
         ...,
         description='Total number of entries available for the given search query.',
     )
+    num_pages: int = Field(
+        ...,
+        description='Total number of pages needed to export the entries, based on the '
+        'page size and max entries export limit.',
+    )
 
 
 class MergeOutputFilesInput(BaseModel):

@@ -136,7 +136,11 @@ async def collect_page_cursors(data: CollectCursorsInput) -> CollectCursorsOutpu
     )
 
     if num_pages == 0:
-        return CollectCursorsOutput(page_after_values=[], num_entries_available=0)
+        return CollectCursorsOutput(
+            page_after_values=[],
+            num_entries_available=num_entries_available,
+            num_pages=num_pages,
+        )
 
     # Collect the page_after_value cursor for each page.
     # The first page starts with a None cursor.
@@ -162,6 +166,7 @@ async def collect_page_cursors(data: CollectCursorsInput) -> CollectCursorsOutpu
     return CollectCursorsOutput(
         page_after_values=page_after_values,
         num_entries_available=num_entries_available,
+        num_pages=num_pages,
     )
 
 
