@@ -135,10 +135,12 @@ async def collect_page_cursors(data: CollectCursorsInput) -> CollectCursorsOutpu
         ceil(num_entries_to_export / data.page_size) if num_entries_to_export > 0 else 0
     )
 
-    page_after_values: list[str | None] = []
-    if num_pages > 0:
-        page_after_values.append(None)  # first page always starts at the beginning
+    if num_pages == 0:
+        return CollectCursorsOutput(page_after_values=[], num_entries_available=0)
 
+    # Collect the page_after_value cursor for each page.
+    # The first page starts with a None cursor.
+    page_after_values: list[str | None] = [None]
     cursor = response.pagination.next_page_after_value
     for _ in range(num_pages - 1):
         if cursor is None:
