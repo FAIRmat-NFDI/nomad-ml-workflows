@@ -188,8 +188,8 @@ class ExportEntriesWorkflow:
                 retry_policy=retry_policy,
             )
 
-            # Prepare export dataset input and metadata
-            # Pages ran in parallel so take the earliest start and latest end.
+            # Pages ran in parallel so take the earliest start and latest end. ISO
+            # timestamp strings can be compared lexicographically
             earliest_start = min(search_start_times)
             latest_end = max(search_end_times)
 

@@ -152,10 +152,10 @@ class SearchOutput(BaseModel):
         description='Total number of entries available for the given search query.',
     )
     search_start_time: str = Field(
-        ..., description='Timestamp when the search started.'
+        ..., description='UTC Timestamp (ISO) when the search started.'
     )
     search_end_time: str = Field(
-        ..., description='Timestamp when the search completed.'
+        ..., description='UTC Timestamp (ISO) when the search completed.'
     )
     pagination_next_page_after_value: str | None = Field(
         None,
@@ -178,7 +178,8 @@ class CollectCursorsOutput(BaseModel):
     page_after_values: list[str | None] = Field(
         ...,
         description='List of page_after_value cursors, one per page. '
-        'The first entry is always None (start of first page).',
+        'The first entry is None (start of first page) when at least one page is '
+        'available. If num_entries_available is 0, it is an empty list.',
     )
     num_entries_available: int = Field(
         ...,
@@ -219,11 +220,11 @@ class ExportDatasetMetadata(BaseModel):
     )
     search_start_time: str = Field(
         '',
-        description='Timestamp when the first search batch started.',
+        description='UTC Timestamp (ISO) when the first search batch started.',
     )
     search_end_time: str = Field(
         '',
-        description='Timestamp when the last search batch completed.',
+        description='UTC Timestamp (ISO) when the last search batch completed.',
     )
     user_input: ExportEntriesUserInput | None = Field(
         None, description='Original user input for the export entries workflow.'
