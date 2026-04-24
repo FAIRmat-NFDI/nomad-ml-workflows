@@ -119,9 +119,12 @@ class ExportEntriesWorkflow:
                 retry_policy=retry_policy,
             )
 
-            num_entries_available = cursors_output.num_entries_available
+            if cursors_output.num_entries_available == 0:
+                # No entries to export, return early with an empty dataset
+                return
+
             reached_max_entries_limit = (
-                num_entries_available > config.max_entries_export_limit
+                cursors_output.num_entries_available > config.max_entries_export_limit
             )
 
             # Build one SearchInput per page with the corresponding cursor and
@@ -193,7 +196,7 @@ class ExportEntriesWorkflow:
             export_dataset_input.source_paths = [merged_file_path]
             export_dataset_input.metadata = ExportDatasetMetadata(
                 num_entries_exported=total_num_entries_exported,
-                num_entries_available=num_entries_available,
+                num_entries_available=cursors_output.num_entries_available,
                 reached_max_entries_limit=reached_max_entries_limit,
                 search_start_time=earliest_start,
                 search_end_time=latest_end,
