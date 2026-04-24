@@ -152,7 +152,7 @@ class ExportEntriesWorkflow:
 
             # Run child workflows for each page with bounded concurrency to avoid
             # overwhelming the Temporal server with too many concurrent searches.
-            search_results = []
+            search_outputs: list[SearchOutput] = []
             for concurr_batch_start in range(
                 0, len(search_inputs), config.search_workflow_concurrency_limit
             ):
@@ -160,7 +160,7 @@ class ExportEntriesWorkflow:
                     concurr_batch_start : concurr_batch_start
                     + config.search_workflow_concurrency_limit
                 ]
-                concurr_batch_results = await asyncio.gather(
+                concurr_batch_outputs = await asyncio.gather(
                     *[
                         workflow.execute_child_workflow(
                             SearchPageWorkflow.run,
@@ -173,16 +173,11 @@ class ExportEntriesWorkflow:
                         for i, si in enumerate(concurr_batch_search_inputs)
                     ]
                 )
-                search_results.extend(concurr_batch_results)
+                search_outputs.extend(concurr_batch_outputs)
 
             # Collect data for metadata export
             # Pages ran concurrently so take the earliest start and latest end. ISO
             # timestamp strings can be compared lexicographically
-            generated_file_paths = [
-                search_inputs[i].output_file_path
-                for i, result in enumerate(search_results)
-                if result.num_entries_exported > 0
-            ]
             earliest_start = min([so.search_start_time for so in search_outputs])
             latest_end = max([so.search_end_time for so in search_outputs])
             total_num_entries_exported = sum(
@@ -198,6 +193,12 @@ class ExportEntriesWorkflow:
             )
 
             # Merge batch files into one file to be exported
+            # Only include paths where entries were actually written to disk
+            generated_file_paths = [
+                search_inputs[i].output_file_path
+                for i, so in enumerate(search_outputs)
+                if so.num_entries_exported > 0
+            ]
             merged_file_path = await workflow.execute_activity(
                 merge_output_files,
                 MergeOutputFilesInput(
