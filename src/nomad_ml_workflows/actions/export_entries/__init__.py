@@ -23,6 +23,7 @@ class ExportEntriesActionEntryPoint(ActionEntryPoint):
 
         from nomad_ml_workflows.actions.export_entries.activities import (
             cleanup_artifacts,
+            collect_page_cursors,
             create_artifact_subdirectory,
             export_dataset_to_upload,
             merge_output_files,
@@ -39,6 +40,7 @@ class ExportEntriesActionEntryPoint(ActionEntryPoint):
             child_workflows=[SearchPageWorkflow],
             activities=[
                 create_artifact_subdirectory,
+                collect_page_cursors,
                 search,
                 merge_output_files,
                 export_dataset_to_upload,

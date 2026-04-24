@@ -164,6 +164,28 @@ class SearchOutput(BaseModel):
     )
 
 
+class CollectCursorsInput(BaseModel):
+    user_id: str = Field(..., description='User ID performing the search.')
+    owner: OwnerLiteral = Field(..., description='Owner of the entries to be searched.')
+    query: Query = Field(..., description='Search query parameters.')
+    page_size: int = Field(..., description='Number of entries per page.')
+    max_entries_export_limit: int = Field(
+        ..., description='Maximum number of entries to be exported.'
+    )
+
+
+class CollectCursorsOutput(BaseModel):
+    page_after_values: list[str | None] = Field(
+        ...,
+        description='List of page_after_value cursors, one per page. '
+        'The first entry is always None (start of first page).',
+    )
+    num_entries_available: int = Field(
+        ...,
+        description='Total number of entries available for the given search query.',
+    )
+
+
 class MergeOutputFilesInput(BaseModel):
     artifact_subdirectory: str = Field(
         ...,
