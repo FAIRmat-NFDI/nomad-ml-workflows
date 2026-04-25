@@ -41,6 +41,13 @@ class SearchSettings(BaseModel):
         description='List of fields to exclude from the search results. For example: '
         'results.method.method_name',
     )
+    read_from_archive: bool = Field(
+        False,
+        description='If False, only the indexed data will be exported. If True, all the'
+        'data stored in the archive can be exported, including the non-indexed ones '
+        'like array quantities in `archive.data` section and quantities in '
+        '`archive.workflow` sections.',
+    )
 
 
 class OutputSettings(BaseModel):
@@ -77,8 +84,13 @@ class SearchInput(BaseModel):
     user_id: str = Field(..., description='User ID performing the search.')
     owner: OwnerLiteral = Field(..., description='Owner of the entries to be searched.')
     query: Query = Field(..., description='Search query parameters.')
-    required: MetadataRequired = Field(
+    es_required: MetadataRequired = Field(
         ..., description='Required fields for filtering the search results.'
+    )
+    archive_required: str | dict | None = Field(
+        None,
+        description='If set, archive data is fetched for each entry using the given '
+        'required specification. Mirrors the entries/archive API `required` field.',
     )
     pagination: MetadataPagination = Field(
         ..., description='Pagination settings for the search results.'
@@ -90,6 +102,25 @@ class SearchInput(BaseModel):
     max_entries_export_limit: int = Field(
         ..., description='Maximum number of entries to be exported.'
     )
+
+    @staticmethod
+    def _build_archive_required(
+        include_paths: list[str], exclude_paths: list[str], read_from_archive: bool
+    ) -> 'str | dict | None':
+        """
+        Convert a list of dot-separated field paths into a RequiredReader-compatible
+        required specification.
+
+        Examples::
+
+            ["data"]                   -> {"data": "*"}
+            ["data.results"]           -> {"data": {"results": "*"}}
+            ["data", "data.results"]   -> {"data": "*"}  (parent wins)
+            ["*"]                      -> "*"
+            []                         -> None
+        """
+        # TODO: make it general, use include and excludes
+        raise NotImplementedError
 
     @classmethod
     def from_user_input(
@@ -135,7 +166,12 @@ class SearchInput(BaseModel):
             user_id=user_input.user_id,
             owner=user_input.search_settings.owner,
             query=query,
-            required=required,
+            es_required=required,
+            archive_required=cls._build_archive_required(
+                user_input.search_settings.required_include,
+                user_input.search_settings.required_exclude,
+                user_input.search_settings.read_from_archive,
+            ),
             pagination=pagination,
             batch_file_type=batch_file_type,
             output_file_path=output_file_path,
