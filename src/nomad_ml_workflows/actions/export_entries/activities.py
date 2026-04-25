@@ -16,6 +16,7 @@ from nomad_ml_workflows.actions.export_entries.models import (
     CollectCursorsInput,
     CollectCursorsOutput,
     CreateArtifactSubdirectoryInput,
+    Entry,
     ExportDatasetInput,
     MergeOutputFilesInput,
     SearchInput,
@@ -23,6 +24,7 @@ from nomad_ml_workflows.actions.export_entries.models import (
 )
 from nomad_ml_workflows.actions.export_entries.utils import (
     merge_files,
+    read_archive_entries,
     write_json_file,
     write_parquet_file,
 )
@@ -72,22 +74,57 @@ async def search(data: SearchInput) -> SearchOutput:
     if write_dataset_file is None:
         raise ValueError(f'Unsupported batch file type "{data.batch_file_type}". ')
 
+    if data.archive_required is not None:
+        # When archives are to be accessed for certain required, then only
+        # entry_id/upload_id are needed from ES.
+        es_required = MetadataRequired(include=['entry_id', 'upload_id'])
+    else:
+        es_required = data.es_required
+
     start = datetime.now(timezone.utc).isoformat()
     response = nomad_search(
         user_id=data.user_id,
         owner=data.owner,
         query=data.query,
-        required=data.required,
+        required=es_required,
         pagination=data.pagination,
-        aggregations={},  # aggregations support can be added later
+        aggregations={},
     )
+    # Limit the number of exported entries
+    entries_to_export = response.data[: data.max_entries_export_limit]
+
+    if data.archive_required is not None:
+        # build list[Entry] and populate the Entry.archive using read_archive_entries
+        entry_list = [
+            Entry(
+                entry_id=entry['entry_id'],
+                upload_id=entry['upload_id'],
+            )
+            for entry in entries_to_export
+        ]
+        read_archive_entries(entry_list, data.archive_required, data.user_id)
+    else:
+        entry_list = []
+        for entry in entries_to_export:
+            archive = {}
+            for k in ['results', 'data', 'metadata', 'run', 'workflow2', 'workflow']:
+                if k in entry:
+                    archive[k] = entry[k]
+            entry_list.append(
+                Entry(
+                    entry_id=entry['entry_id'],
+                    archive=archive if archive else None,
+                )
+            )
     end = datetime.now(timezone.utc).isoformat()
 
-    # Limit the number of exported entries
-    entry_list = response.data[: data.max_entries_export_limit]
-
     if entry_list:
-        write_dataset_file(path=data.output_file_path, data=entry_list)
+        # convert the entry list into dicts
+        entries_l_of_d = []
+        for entry in entry_list:
+            entry.upload_id = None
+            entries_l_of_d.append(entry.model_dump(exclude_none=True))
+        write_dataset_file(path=data.output_file_path, data=entries_l_of_d)
 
     return SearchOutput(
         search_start_time=start,
