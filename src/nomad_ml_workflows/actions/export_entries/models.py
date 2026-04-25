@@ -300,3 +300,11 @@ class CleanupArtifactsInput(BaseModel):
     subdir_path: str = Field(
         ..., description='Path to the subdirectory to be cleaned up.'
     )
+
+
+class Entry(BaseModel):
+    entry_id: str = Field(..., description='ID of the entry.')
+    upload_id: str | None = Field(
+        None, description='ID of the Upload containing the entry.'
+    )
+    archive: dict | None = Field(None, description='Entry archive containing the data.')

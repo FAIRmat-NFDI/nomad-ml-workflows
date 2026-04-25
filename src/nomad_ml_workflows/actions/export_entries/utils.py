@@ -1,7 +1,12 @@
 import json
 
 import json_stream
-from nomad.utils import dict_to_dataframe
+from nomad import files as nomad_files
+from nomad.archive import ArchiveQueryError, RequiredReader, RequiredValidationError
+from nomad.datamodel.data import User
+from nomad.utils import dict_to_dataframe, get_logger
+
+from nomad_ml_workflows.actions.export_entries.models import Entry
 
 try:
     import pyarrow as pa
@@ -12,6 +17,8 @@ except ImportError as e:
     raise ImportError(
         'pyarrow is required. Install with: pip install nomad-ml-workflows[cpu-action]'
     ) from e
+
+nomad_logger = get_logger('nomad_ml_workflows')
 
 
 def _is_nested_type(dtype: pa.DataType) -> bool:
@@ -170,3 +177,81 @@ def merge_files(
 
     else:
         raise ValueError('Unsupported file type. Please use parquet, csv, or json.')
+
+
+def _group_entry_list_with_upload_id(entry_list: list[Entry]):
+    """
+    Inplace function that groups together the entries based on their upload IDs. Does
+    **not** sort the entry list.
+    """
+    if not entry_list:
+        return
+    upload_ids: dict[str, list[Entry]] = {}
+    for entry in entry_list:
+        if entry.upload_id in upload_ids:
+            upload_ids[entry.upload_id].append(entry)
+        else:
+            upload_ids[entry.upload_id] = [entry]
+
+    entry_list.clear()
+    for entries_per_upload in upload_ids.values():
+        entry_list.extend(entries_per_upload)
+
+
+def read_archive_entries(
+    entry_list: list[Entry], archive_required: str | dict, user_id: str
+):
+    """
+    Inplace function to read archive data for a list of entries and populate the
+    Entry.archive with required data from archive.
+
+    Entries for which the archive cannot be read (missing or query error) are
+    skipped.
+
+    Args:
+        entry_list: List of entries to read the archive for.
+        archive_required: The required specification passed to RequiredReader.
+        user_id: The user ID to use for authentication when reading the archive.
+    """
+    user = User.get(user_id=user_id)
+    try:
+        required_reader = RequiredReader(archive_required, user=user)
+    except RequiredValidationError as e:
+        raise ValueError(
+            f'Invalid archive_required specification: {e.msg} at {e.loc}'
+        ) from e
+
+    _group_entry_list_with_upload_id(entry_list)
+
+    current_upload_files = None
+    current_upload_id = None
+    try:
+        for entry in entry_list:
+            entry_id = entry.entry_id
+            upload_id = entry.upload_id
+
+            # Reuse opened upload files when consecutive entries share an upload.
+            if upload_id != current_upload_id:
+                if current_upload_files is not None:
+                    current_upload_files.close()
+                current_upload_files = nomad_files.UploadFiles.get(upload_id)
+                current_upload_id = upload_id
+
+            try:
+                with current_upload_files.read_archive(entry_id) as archive:
+                    entry.archive = required_reader.read(archive, entry_id, upload_id)
+            except ArchiveQueryError as e:
+                nomad_logger.error(
+                    'Failed to read archive for entry',
+                    entry_id=entry_id,
+                    error=str(e),
+                )
+            except KeyError as e:
+                nomad_logger.error(
+                    'Missing archive for entry',
+                    entry_id=entry_id,
+                    error=str(e),
+                )
+    finally:
+        if current_upload_files is not None:
+            current_upload_files.close()
