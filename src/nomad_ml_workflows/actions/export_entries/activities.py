@@ -248,7 +248,7 @@ async def export_dataset_to_upload(data: ExportDatasetInput) -> str:
                 arcname = os.path.basename(filepath)
                 zipf.write(filepath, arcname=arcname)
         # Add zip file to the NOMAD Upload
-        upload_files.add_rawfiles(path=zippath, auto_decompress=False)
+        upload_files.add_rawfiles(target_path=zippath, auto_decompress=False)
         return zipname
 
     # If not zipping, copy files to directory named exportable_dir_name
@@ -259,7 +259,7 @@ async def export_dataset_to_upload(data: ExportDatasetInput) -> str:
         shutil.copy2(filepath, temp_path)
         # Add directory to the NOMAD Upload
         upload_files.add_rawfiles(
-            path=exportable_dir_path, target_dir=exportable_dir_name
+            target_path=exportable_dir_path, target_dir=exportable_dir_name
         )
     return exportable_dir_name
 
