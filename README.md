@@ -5,7 +5,7 @@ A NOMAD plugin for managing ML workflows. Currently, it provides an action to ex
 ## 📦 Installation
 You can install the plugin using pip:
 ```sh
-pip install nomad-ml-workflows @ git+https://github.com/FAIRmat-NFDI/nomad-ml-workflows.git
+pip install nomad-ml-workflows
 ```
 
 However, to fully utilize the plugin, you need to add it to your NOMAD instance as described [below](#-adding-this-plugin-to-nomad).
