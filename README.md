@@ -16,7 +16,7 @@ However, to fully utilize the plugin, you need to add it to your NOMAD instance 
   - Search entries based on user-defined criteria.
   - Optionally include or exclude data fields from the entries.
   - Package the entries into tabular data files like CSV or Parquet (or as JSON)
-  - Export the files to a specified Project (or previously known as Upload) in NOAMD.
+  - Export the files to a specified Project (or previously known as Upload) in NOMAD.
 
   These can then be downloaded from the NOMAD web interface for local use.
 
