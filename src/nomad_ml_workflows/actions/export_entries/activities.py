@@ -178,8 +178,8 @@ async def collect_page_cursors(data: CollectCursorsInput) -> CollectCursorsOutpu
 async def read_archives(data: ReadArchivesInput) -> SearchPageOutput:
     """
     Activity to read archives of the searched entries. The required fields are read
-    and written to a file in the specified format (Parquet or JSON) in the
-    artifacts directory.
+    from the archives and written to a file in the specified format (Parquet or JSON)
+    in the artifacts directory.
 
     Args:
         data (ReadArchivesInput): Input data for the search activity.
@@ -200,7 +200,6 @@ async def read_archives(data: ReadArchivesInput) -> SearchPageOutput:
         query=data.query,
         required=MetadataRequired(include=['entry_id', 'upload_id']),
         pagination=data.pagination,
-        aggregations={},  # aggregations support can be added later
     )
     entries: list = [
         {
