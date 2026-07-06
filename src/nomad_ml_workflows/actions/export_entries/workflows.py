@@ -49,7 +49,7 @@ class SearchPageWorkflow:
         )
         retry_policy = RetryPolicy(maximum_attempts=1)
 
-        if data.read_from_archives:
+        if data.read_archives:
             rai = ReadArchivesInput.from_search_page_input(data)
             return await workflow.execute_activity(
                 read_archives,

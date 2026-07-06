@@ -44,6 +44,11 @@ class SearchSettings(BaseModel):
 
 
 class OutputSettings(BaseModel):
+    read_archives: bool = Field(
+        False,
+        description='Read full archive data, including non-indexed fields such as '
+        'n-dim arrays. Disable to export only indexed fields faster.',
+    )
     output_file_type: OutputFileTypeLiteral = Field(
         'parquet',
         description='Type of the output file.',
@@ -77,6 +82,11 @@ class SearchPageInput(BaseModel):
     user_id: str = Field(..., description='User ID performing the search.')
     owner: OwnerLiteral = Field(..., description='Owner of the entries to be searched.')
     query: Query = Field(..., description='Search query parameters.')
+    read_archives: bool = Field(
+        ...,
+        description='Read full archive data, including non-indexed fields such as '
+        'n-dim arrays.'
+    )
     required: MetadataRequired = Field(
         ..., description='Required fields for filtering the search results.'
     )
@@ -90,7 +100,6 @@ class SearchPageInput(BaseModel):
     max_entries_export_limit: int = Field(
         ..., description='Maximum number of entries to be exported.'
     )
-    read_from_archives: bool = Field(False)
 
     @classmethod
     def from_user_input(
