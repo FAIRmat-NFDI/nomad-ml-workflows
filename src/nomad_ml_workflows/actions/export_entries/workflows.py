@@ -110,7 +110,7 @@ class ExportEntriesWorkflow:
 
             # Build a representative SearchPageInput to resolve shared settings
             # (query, owner, required, batch_file_type) once.
-            template_spi = SearchPageInput.from_search_page_input(
+            template_spi = SearchPageInput.from_user_input(
                 data,
                 output_file_path='',  # placeholder, real paths are set per page below
                 max_entries_export_limit=config.max_entries_export_limit,

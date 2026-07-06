@@ -44,14 +44,14 @@ class SearchSettings(BaseModel):
 
 
 class OutputSettings(BaseModel):
+    output_file_type: OutputFileTypeLiteral = Field(
+        'parquet',
+        description='Type of the output file.',
+    )
     read_archives: bool = Field(
         False,
         description='Read full archive data, including non-indexed fields such as '
         'n-dim arrays. Disable to export only indexed fields faster.',
-    )
-    output_file_type: OutputFileTypeLiteral = Field(
-        'parquet',
-        description='Type of the output file.',
     )
     zip_output: bool = Field(
         True,
@@ -145,6 +145,7 @@ class SearchPageInput(BaseModel):
             user_id=user_input.user_id,
             owner=user_input.search_settings.owner,
             query=query,
+            read_archives=user_input.output_settings.read_archives,
             required=required,
             pagination=pagination,
             batch_file_type=batch_file_type,
