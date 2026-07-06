@@ -180,6 +180,28 @@ class ReadArchivesInput(SearchPageInput):
 
         # TODO: engage the conversion
 
+    @classmethod
+    def from_search_page_input(
+        cls,
+        spi: SearchPageInput,
+    ) -> 'ReadArchivesInput':
+        """Convert from SearchPageInput to ReadArchivesInput"""
+
+        required = ReadArchivesInput._build_archive_required(spi.required)
+
+        return cls(
+            user_id=spi.user_id,
+            owner=spi.search_settings.owner,
+            query=spi.query,
+            required=required,
+            pagination=spi.pagination,
+            batch_file_type=spi.batch_file_type,
+            output_file_path=spi.output_file_path,
+            max_entries_export_limit=spi.max_entries_export_limit,
+        )
+
+
+
 
 class SearchPageOutput(BaseModel):
     num_entries_exported: int = Field(
