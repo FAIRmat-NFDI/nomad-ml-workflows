@@ -192,7 +192,7 @@ class ReadArchivesInput(SearchPageInput):
 
         return cls(
             user_id=spi.user_id,
-            owner=spi.search_settings.owner,
+            owner=spi.owner,
             query=spi.query,
             required=required,
             pagination=spi.pagination,
