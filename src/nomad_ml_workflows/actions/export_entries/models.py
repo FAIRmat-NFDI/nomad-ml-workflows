@@ -73,7 +73,7 @@ class CreateArtifactSubdirectoryInput(BaseModel):
     subdir_name: str = Field(..., description='Name of the subdirectory to be created.')
 
 
-class SearchInput(BaseModel):
+class SearchPageInput(BaseModel):
     user_id: str = Field(..., description='User ID performing the search.')
     owner: OwnerLiteral = Field(..., description='Owner of the entries to be searched.')
     query: Query = Field(..., description='Search query parameters.')
@@ -98,8 +98,8 @@ class SearchInput(BaseModel):
         /,
         output_file_path: str,
         max_entries_export_limit: int,
-    ) -> 'SearchInput':
-        """Convert from ExportEntriesUserInput to SearchInput"""
+    ) -> 'SearchPageInput':
+        """Convert from ExportEntriesUserInput to SearchPageInput"""
 
         def _clean_field(field: str) -> str:
             """
@@ -143,15 +143,15 @@ class SearchInput(BaseModel):
         )
 
 
-class SearchOutput(BaseModel):
+class SearchPageOutput(BaseModel):
     num_entries_exported: int = Field(
         ..., description='Number of entries exported to the output file.'
     )
     search_start_time: str = Field(
-        ..., description='UTC Timestamp (ISO) when the search started.'
+        ..., description='UTC Timestamp (ISO) when the first search started.'
     )
     search_end_time: str = Field(
-        ..., description='UTC Timestamp (ISO) when the search completed.'
+        ..., description='UTC Timestamp (ISO) when the last search completed.'
     )
 
 

@@ -18,8 +18,8 @@ from nomad_ml_workflows.actions.export_entries.models import (
     CreateArtifactSubdirectoryInput,
     ExportDatasetInput,
     MergeOutputFilesInput,
-    SearchInput,
-    SearchOutput,
+    SearchPageInput,
+    SearchPageOutput,
 )
 from nomad_ml_workflows.actions.export_entries.utils import (
     merge_files,
@@ -52,11 +52,14 @@ async def create_artifact_subdirectory(data: CreateArtifactSubdirectoryInput) ->
 
 
 @activity.defn
-async def search(data: SearchInput) -> SearchOutput:
+async def search(data: SearchPageInput) -> SearchPageOutput:
     """
-    Activity to perform NOMAD search based on the provided input data. The search
-    results are written to a file in the specified format (Parquet or JSON) in the
-    artifacts directory.
+    Activity to perform NOMAD search based on the provided input data. The data indexed
+    in the ElasticSearch is read and written to a file in the specified format
+    (Parquet or JSON) in the artifacts directory.
+
+    No archives are read in this activity; non-indexed data like nd-arrays will not be
+    extrated.
 
     Args:
         data (SearchInput): Input data for the search activity.
@@ -89,7 +92,7 @@ async def search(data: SearchInput) -> SearchOutput:
     if entry_list:
         write_dataset_file(path=data.output_file_path, data=entry_list)
 
-    return SearchOutput(
+    return SearchPageOutput(
         search_start_time=start,
         search_end_time=end,
         num_entries_exported=len(entry_list),

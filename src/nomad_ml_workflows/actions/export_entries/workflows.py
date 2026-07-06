@@ -25,8 +25,8 @@ with workflow.unsafe.imports_passed_through():
         ExportDatasetMetadata,
         ExportEntriesUserInput,
         MergeOutputFilesInput,
-        SearchInput,
-        SearchOutput,
+        SearchPageInput,
+        SearchPageOutput,
     )
 
 
@@ -41,7 +41,7 @@ class SearchPageWorkflow:
     """
 
     @workflow.run
-    async def run(self, data: SearchInput) -> SearchOutput:
+    async def run(self, data: SearchPageInput) -> SearchPageOutput:
         config = nomad_config.get_plugin_entry_point(
             'nomad_ml_workflows.actions:export_entries'
         )
@@ -96,9 +96,9 @@ class ExportEntriesWorkflow:
                 'nomad_ml_workflows.actions:export_entries'
             )
 
-            # Build a representative SearchInput to resolve shared settings
+            # Build a representative SearchPageInput to resolve shared settings
             # (query, owner, required, batch_file_type) once.
-            template_search_input = SearchInput.from_user_input(
+            template_spi = SearchPageInput.from_search_page_input(
                 data,
                 output_file_path='',  # placeholder, real paths are set per page below
                 max_entries_export_limit=config.max_entries_export_limit,
@@ -111,7 +111,7 @@ class ExportEntriesWorkflow:
                 CollectCursorsInput(
                     user_id=data.user_id,
                     owner=data.search_settings.owner,
-                    query=template_search_input.query,
+                    query=template_spi.query,
                     page_size=page_size,
                     max_entries_export_limit=config.max_entries_export_limit,
                 ),
@@ -128,19 +128,19 @@ class ExportEntriesWorkflow:
                 # No pages to export, return early with an empty dataset
                 return
 
-            # Build one SearchInput per page with the corresponding cursor and
+            # Build one SearchPageInput per page with the corresponding cursor and
             # export limit for that page
-            search_inputs: list[SearchInput] = []
+            search_page_inputs: list[SearchPageInput] = []
             for page_index, cursor in enumerate(cursors_output.page_after_values):
                 entries_so_far = page_index * page_size
                 limit_for_page = min(
                     page_size, config.max_entries_export_limit - entries_so_far
                 )
-                si = template_search_input.model_copy(
+                spi = template_spi.model_copy(
                     update={
                         'output_file_path': (
                             f'{artifact_subdirectory}/{page_index + 1}'
-                            f'.{template_search_input.batch_file_type}'
+                            f'.{template_spi.batch_file_type}'
                         ),
                         'max_entries_export_limit': limit_for_page,
                         'pagination': MetadataPagination(
@@ -149,51 +149,51 @@ class ExportEntriesWorkflow:
                         ),
                     }
                 )
-                search_inputs.append(si)
+                search_page_inputs.append(spi)
 
             # Run child workflows for each page with bounded concurrency to avoid
-            # overwhelming the Temporal server with too many concurrent searches.
-            search_outputs: list[SearchOutput] = []
+            # overwhelming the Temporal server with too many concurrent workflows.
+            search_page_outputs: list[SearchPageOutput] = []
             for concurr_batch_start in range(
-                0, len(search_inputs), config.search_workflow_concurrency_limit
+                0, len(search_page_inputs), config.search_workflow_concurrency_limit
             ):
-                concurr_batch_search_inputs = search_inputs[
+                concurr_batch_spis = search_page_inputs[
                     concurr_batch_start : concurr_batch_start
                     + config.search_workflow_concurrency_limit
                 ]
-                concurr_batch_outputs = await asyncio.gather(
+                concurr_batch_spos = await asyncio.gather(
                     *[
                         workflow.execute_child_workflow(
                             SearchPageWorkflow.run,
-                            si,
+                            spi,
                             id=f'{workflow.info().workflow_id}-search-page-'
                             f'{concurr_batch_start + i + 1}',
                             parent_close_policy=workflow.ParentClosePolicy.TERMINATE,
                             retry_policy=retry_policy,
                         )
-                        for i, si in enumerate(concurr_batch_search_inputs)
+                        for i, spi in enumerate(concurr_batch_spis)
                     ]
                 )
-                search_outputs.extend(concurr_batch_outputs)
+                search_page_outputs.extend(concurr_batch_spos)
 
             # Pages ran concurrently so take the earliest start and latest end. ISO
             # timestamp strings can be compared lexicographically
             export_dataset_input.metadata.num_entries_exported = sum(
-                so.num_entries_exported for so in search_outputs
+                spo.num_entries_exported for spo in search_page_outputs
             )
             export_dataset_input.metadata.search_start_time = min(
-                [so.search_start_time for so in search_outputs]
+                [spo.search_start_time for spo in search_page_outputs]
             )
             export_dataset_input.metadata.search_end_time = max(
-                [so.search_end_time for so in search_outputs]
+                [spo.search_end_time for spo in search_page_outputs]
             )
 
             # Merge batch files into one file to be exported
             # Only include paths where entries were actually written to disk
             generated_file_paths = [
-                search_inputs[i].output_file_path
-                for i, so in enumerate(search_outputs)
-                if so.num_entries_exported > 0
+                search_page_inputs[i].output_file_path
+                for i, spo in enumerate(search_page_outputs)
+                if spo.num_entries_exported > 0
             ]
             merged_file_path = await workflow.execute_activity(
                 merge_output_files,
