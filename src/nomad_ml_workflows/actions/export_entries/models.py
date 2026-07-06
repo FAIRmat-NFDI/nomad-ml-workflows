@@ -194,6 +194,7 @@ class ReadArchivesInput(SearchPageInput):
             user_id=spi.user_id,
             owner=spi.owner,
             query=spi.query,
+            read_archives=spi.read_archives,
             required=required,
             pagination=spi.pagination,
             batch_file_type=spi.batch_file_type,
