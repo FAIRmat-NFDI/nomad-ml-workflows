@@ -15,6 +15,7 @@ with workflow.unsafe.imports_passed_through():
         create_artifact_subdirectory,
         export_dataset_to_upload,
         merge_output_files,
+        read_archives,
         search,
     )
     from nomad_ml_workflows.actions.export_entries.models import (
@@ -25,6 +26,7 @@ with workflow.unsafe.imports_passed_through():
         ExportDatasetMetadata,
         ExportEntriesUserInput,
         MergeOutputFilesInput,
+        ReadArchivesInput,
         SearchPageInput,
         SearchPageOutput,
     )
@@ -46,6 +48,16 @@ class SearchPageWorkflow:
             'nomad_ml_workflows.actions:export_entries'
         )
         retry_policy = RetryPolicy(maximum_attempts=1)
+
+        if data.read_from_archives:
+            rai = ReadArchivesInput.from_search_page_input(data)
+            return await workflow.execute_activity(
+                read_archives,
+                rai,
+                start_to_close_timeout=timedelta(seconds=config.search_batch_timeout),
+                retry_policy=retry_policy,
+            )
+
         return await workflow.execute_activity(
             search,
             data,

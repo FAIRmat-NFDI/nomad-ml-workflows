@@ -1,5 +1,5 @@
 import json
-from typing import Literal
+from typing import Any, Literal
 
 from nomad.app.v1.models.models import MetadataPagination, MetadataRequired, Query
 from pydantic import BaseModel, Field
@@ -90,6 +90,7 @@ class SearchPageInput(BaseModel):
     max_entries_export_limit: int = Field(
         ..., description='Maximum number of entries to be exported.'
     )
+    read_from_archives: bool = Field(False)
 
     @classmethod
     def from_user_input(
@@ -141,6 +142,34 @@ class SearchPageInput(BaseModel):
             output_file_path=output_file_path,
             max_entries_export_limit=max_entries_export_limit,
         )
+
+
+class ReadArchivesInput(SearchPageInput):
+    required: str | dict[str, Any] = Field(
+        '*',
+        description='Dictionary of required fields compatible with '
+        '`nomad.archive.required.RequiredReader` class.',
+    )
+
+    @staticmethod
+    def _build_archive_required(metadata_required: MetadataRequired) -> str | dict:
+        """
+        Convert dot-separated include and exclude paths into an ArchiveRequired
+        specification following the documented RequiredReader structure.
+
+        Examples::
+
+            ["data"]                   -> {"data": "*"}
+            ["data.results"]           -> {"data": {"results": "*"}}
+            ["data", "data.results"]   -> {"data": "*"}  (parent wins)
+            ["*"]                      -> "*"
+            [], ["data.results"]       -> {"*": "*", "data": {"*": "*", "results":"exclude"}}
+        """
+        if not metadata_required.include and metadata_required.exclude:
+            return '*'
+        return '*'
+
+        # TODO: engage the conversion
 
 
 class SearchPageOutput(BaseModel):
