@@ -403,10 +403,10 @@ class ExportEntriesOutput(BaseModel):
     exported_dir_path: str = Field(
         ...,
         description='Relative path, within the upload raw directory, of the '
-        'directory containing the exported dataset.'
+        'directory containing the exported dataset.',
     )
     workflow_duration: float = Field(
         ...,
         description='Total duration of the Export Entries workflow in seconds, '
-        'including any idle time.'
+        'including any idle time.',
     )
