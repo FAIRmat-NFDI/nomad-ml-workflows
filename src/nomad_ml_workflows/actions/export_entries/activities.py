@@ -210,8 +210,12 @@ async def read_archives(data: ReadArchivesInput) -> SearchPageOutput:
     ]
     entries = entries[: data.max_entries_export_limit]  #  Apply max limit
 
-    # setup required reader and archives list
-    required_reader = RequiredReader(data.required, user=User(user_id=data.user_id))
+    # setup required reader
+    required_reader = RequiredReader(
+        data.required,
+        resolve_inplace=True,
+        user=User(user_id=data.user_id),
+    )
     entry_archives = []
 
     # For each entry
