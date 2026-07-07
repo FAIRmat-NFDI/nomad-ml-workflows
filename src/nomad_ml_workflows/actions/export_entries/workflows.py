@@ -24,6 +24,7 @@ with workflow.unsafe.imports_passed_through():
         CreateArtifactSubdirectoryInput,
         ExportDatasetInput,
         ExportDatasetMetadata,
+        ExportEntriesOutput,
         ExportEntriesUserInput,
         MergeOutputFilesInput,
         ReadArchivesInput,
@@ -84,6 +85,7 @@ class ExportEntriesWorkflow:
         Returns:
             str: Path to the saved dataset in the upload's `raw` folder.
         """
+        starttime = workflow.time()
         retry_policy = RetryPolicy(maximum_attempts=1)
         artifact_subdirectory = await workflow.execute_activity(
             create_artifact_subdirectory,
@@ -109,7 +111,7 @@ class ExportEntriesWorkflow:
             )
 
             # Build a representative SearchPageInput to resolve shared settings
-            # (query, owner, required, batch_file_type) once.
+            # (query, owner, required, batch_file_format) once.
             template_spi = SearchPageInput.from_user_input(
                 data,
                 output_file_path='',  # placeholder, real paths are set per page below
@@ -152,7 +154,7 @@ class ExportEntriesWorkflow:
                     update={
                         'output_file_path': (
                             f'{artifact_subdirectory}/{page_index + 1}'
-                            f'.{template_spi.batch_file_type}'
+                            f'.{template_spi.batch_file_format}'
                         ),
                         'max_entries_export_limit': limit_for_page,
                         'pagination': MetadataPagination(
@@ -211,7 +213,7 @@ class ExportEntriesWorkflow:
                 merge_output_files,
                 MergeOutputFilesInput(
                     artifact_subdirectory=artifact_subdirectory,
-                    output_file_type=data.output_settings.output_file_type,
+                    output_file_format=data.output_settings.output_file_format,
                     generated_file_paths=generated_file_paths,
                 ),
                 start_to_close_timeout=timedelta(hours=2),
@@ -229,7 +231,7 @@ class ExportEntriesWorkflow:
             ) from e
 
         finally:
-            saved_dataset_path = await workflow.execute_activity(
+            exported_dir_path = await workflow.execute_activity(
                 export_dataset_to_upload,
                 export_dataset_input,
                 start_to_close_timeout=timedelta(hours=2),
@@ -243,4 +245,9 @@ class ExportEntriesWorkflow:
                 retry_policy=retry_policy,
             )
 
-        return saved_dataset_path
+            output = ExportEntriesOutput(
+                exported_dir_path=exported_dir_path,
+                workflow_duration=round(workflow.time() - starttime, 6),
+            )
+
+        return output
