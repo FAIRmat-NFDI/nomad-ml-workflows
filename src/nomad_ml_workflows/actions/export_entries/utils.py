@@ -60,7 +60,7 @@ def write_parquet_file(path: str, data: list[dict]):
         data (list[dict]): The list of NOMAD entry dicts to be written to the file.
     """
     if not path.endswith('parquet'):
-        raise ValueError('Unsupported file type. Please use parquet.')
+        raise ValueError('Unsupported file format. Please use parquet.')
 
     df = dict_to_dataframe(data)
 
@@ -82,24 +82,24 @@ def write_json_file(path: str, data: list[dict]):
         data (list[dict]): The list of NOMAD entry dicts to be written to the file.
     """
     if not path.endswith('json'):
-        raise ValueError('Unsupported file type. Please use json.')
+        raise ValueError('Unsupported file format. Please use json.')
 
     with open(path, 'w') as f:
         json.dump(data, f, indent=4)
 
 
 def merge_files(
-    input_file_paths: list[str], output_file_type: str, output_file_path: str
+    input_file_paths: list[str], output_file_format: str, output_file_path: str
 ):
     """Merges multiple Parquet or JSON files into a single file.
 
     Args:
         input_file_paths (list[str]): List of file paths to be merged.
-        output_file_type (str): The type of the output file ('parquet', 'csv', or
+        output_file_format (str): The format of the output file ('parquet', 'csv', or
             'json').
         output_file_path (str): Path of the merged output file.
     """
-    if output_file_type == 'parquet':
+    if output_file_format == 'parquet':
         # Creates a logical dataset from the input files, not loading all data into
         # memory. Also, unifies the schema across the files.
         dataset = ds.dataset(input_file_paths, format='parquet')
@@ -115,7 +115,7 @@ def merge_files(
             for batch in dataset.to_batches():
                 writer.write_batch(batch)
 
-    elif output_file_type == 'csv':
+    elif output_file_format == 'csv':
         # Creates a logical dataset from the input files, not loading all data into
         # memory. Also, unifies the schema across the files.
         # The batch files for `csv` are written in Parquet format for efficiency,
@@ -132,7 +132,7 @@ def merge_files(
                 csv_batch = _stringify_nested_columns(batch)
                 writer.write_batch(csv_batch)
 
-    elif output_file_type == 'json':
+    elif output_file_format == 'json':
 
         def _json_stream_files(input_file_paths):
             """Generator that streams one entry dict at a time from multiple files."""
@@ -154,4 +154,4 @@ def merge_files(
             f.write('\n]')
 
     else:
-        raise ValueError('Unsupported file type. Please use parquet, csv, or json.')
+        raise ValueError('Unsupported file format. Please use parquet, csv, or json.')

@@ -72,9 +72,9 @@ async def search(data: SearchPageInput) -> SearchPageOutput:
     write_dataset_file = {
         'parquet': write_parquet_file,
         'json': write_json_file,
-    }.get(data.batch_file_type)
+    }.get(data.batch_file_format)
     if write_dataset_file is None:
-        raise ValueError(f'Unsupported batch file type "{data.batch_file_type}". ')
+        raise ValueError(f'Unsupported batch file format "{data.batch_file_format}". ')
 
     start = datetime.now(timezone.utc).isoformat()
     response = nomad_search(
@@ -229,7 +229,7 @@ async def read_archives(data: ReadArchivesInput) -> SearchPageOutput:
         write_file_func = {
             'parquet': write_parquet_file,
             'json': write_json_file,
-        }.get(data.batch_file_type)
+        }.get(data.batch_file_format)
         write_file_func(path=data.output_file_path, data=entry_archives)
 
     return SearchPageOutput(
@@ -255,10 +255,10 @@ async def merge_output_files(data: MergeOutputFilesInput) -> str | None:
         raise ValueError('No generated file paths provided for merging.')
 
     merged_file_path = os.path.join(
-        data.artifact_subdirectory, 'data.' + data.output_file_type
+        data.artifact_subdirectory, 'data.' + data.output_file_format
     )
 
-    merge_files(data.generated_file_paths, data.output_file_type, merged_file_path)
+    merge_files(data.generated_file_paths, data.output_file_format, merged_file_path)
 
     return merged_file_path
 

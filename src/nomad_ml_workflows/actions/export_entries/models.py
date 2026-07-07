@@ -5,8 +5,8 @@ from nomad.app.v1.models.models import MetadataPagination, MetadataRequired, Que
 from pydantic import BaseModel, Field
 
 OwnerLiteral = Literal['public', 'visible', 'shared', 'user', 'staging']
-BatchFileTypeLiteral = Literal['parquet', 'json']
-OutputFileTypeLiteral = Literal['parquet', 'csv', 'json']
+BatchFileFormatLiteral = Literal['parquet', 'json']
+OutputFileFormatLiteral = Literal['parquet', 'csv', 'json']
 
 
 class SearchSettings(BaseModel):
@@ -53,9 +53,9 @@ class SearchSettings(BaseModel):
 
 
 class OutputSettings(BaseModel):
-    output_file_type: OutputFileTypeLiteral = Field(
+    output_file_format: OutputFileFormatLiteral = Field(
         'parquet',
-        description='Type of the output file.',
+        description='Format of the output file.',
     )
     zip_output: bool = Field(
         True,
@@ -106,8 +106,8 @@ class SearchPageInput(BaseModel):
     pagination: MetadataPagination = Field(
         ..., description='Pagination settings for the search results.'
     )
-    batch_file_type: BatchFileTypeLiteral = Field(
-        ..., description='Type of the output file.'
+    batch_file_format: BatchFileFormatLiteral = Field(
+        ..., description='Format of the output file.'
     )
     output_file_path: str = Field(..., description='Path to the generated output file.')
     max_entries_export_limit: int = Field(
@@ -156,9 +156,9 @@ class SearchPageInput(BaseModel):
 
         pagination = MetadataPagination(page_size=user_input.search_settings.page_size)
 
-        batch_file_type = user_input.output_settings.output_file_type
-        if batch_file_type == 'csv':
-            batch_file_type = 'parquet'  # use parquet batches for csv
+        batch_file_format = user_input.output_settings.output_file_format
+        if batch_file_format == 'csv':
+            batch_file_format = 'parquet'  # use parquet batches for csv
 
         return cls(
             user_id=user_input.user_id,
@@ -167,7 +167,7 @@ class SearchPageInput(BaseModel):
             read_archives=user_input.search_settings.read_archives,
             required=required,
             pagination=pagination,
-            batch_file_type=batch_file_type,
+            batch_file_format=batch_file_format,
             output_file_path=output_file_path,
             max_entries_export_limit=max_entries_export_limit,
         )
@@ -270,7 +270,7 @@ class ReadArchivesInput(SearchPageInput):
             read_archives=spi.read_archives,
             required=required,
             pagination=spi.pagination,
-            batch_file_type=spi.batch_file_type,
+            batch_file_format=spi.batch_file_format,
             output_file_path=spi.output_file_path,
             max_entries_export_limit=spi.max_entries_export_limit,
         )
@@ -321,9 +321,9 @@ class MergeOutputFilesInput(BaseModel):
         ...,
         description='Subdirectory where the merged output file will be stored.',
     )
-    output_file_type: OutputFileTypeLiteral = Field(
+    output_file_format: OutputFileFormatLiteral = Field(
         ...,
-        description='Type of the output file.',
+        description='Format of the output file.',
     )
     generated_file_paths: list[str] = Field(
         ...,

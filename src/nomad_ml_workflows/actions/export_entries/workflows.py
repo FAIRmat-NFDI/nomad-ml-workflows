@@ -111,7 +111,7 @@ class ExportEntriesWorkflow:
             )
 
             # Build a representative SearchPageInput to resolve shared settings
-            # (query, owner, required, batch_file_type) once.
+            # (query, owner, required, batch_file_format) once.
             template_spi = SearchPageInput.from_user_input(
                 data,
                 output_file_path='',  # placeholder, real paths are set per page below
@@ -154,7 +154,7 @@ class ExportEntriesWorkflow:
                     update={
                         'output_file_path': (
                             f'{artifact_subdirectory}/{page_index + 1}'
-                            f'.{template_spi.batch_file_type}'
+                            f'.{template_spi.batch_file_format}'
                         ),
                         'max_entries_export_limit': limit_for_page,
                         'pagination': MetadataPagination(
@@ -213,7 +213,7 @@ class ExportEntriesWorkflow:
                 merge_output_files,
                 MergeOutputFilesInput(
                     artifact_subdirectory=artifact_subdirectory,
-                    output_file_type=data.output_settings.output_file_type,
+                    output_file_format=data.output_settings.output_file_format,
                     generated_file_paths=generated_file_paths,
                 ),
                 start_to_close_timeout=timedelta(hours=2),
