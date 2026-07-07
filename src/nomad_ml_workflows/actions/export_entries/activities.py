@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from math import ceil
 
 from nomad.actions.manager import action_artifacts_dir, get_upload_files
-from nomad.app.v1.models.models import MetadataPagination, MetadataRequired
+from nomad.app.v1.models.models import MetadataPagination, MetadataRequired, User
 from nomad.files import StagingUploadFiles
 from nomad.search import search as nomad_search
 from temporalio import activity
@@ -18,8 +18,9 @@ from nomad_ml_workflows.actions.export_entries.models import (
     CreateArtifactSubdirectoryInput,
     ExportDatasetInput,
     MergeOutputFilesInput,
-    SearchInput,
-    SearchOutput,
+    ReadArchivesInput,
+    SearchPageInput,
+    SearchPageOutput,
 )
 from nomad_ml_workflows.actions.export_entries.utils import (
     merge_files,
@@ -52,11 +53,14 @@ async def create_artifact_subdirectory(data: CreateArtifactSubdirectoryInput) ->
 
 
 @activity.defn
-async def search(data: SearchInput) -> SearchOutput:
+async def search(data: SearchPageInput) -> SearchPageOutput:
     """
-    Activity to perform NOMAD search based on the provided input data. The search
-    results are written to a file in the specified format (Parquet or JSON) in the
-    artifacts directory.
+    Activity to perform NOMAD search based on the provided input data. The data indexed
+    in the ElasticSearch is read and written to a file in the specified format
+    (Parquet or JSON) in the artifacts directory.
+
+    No archives are read in this activity; non-indexed data like nd-arrays will not be
+    extrated.
 
     Args:
         data (SearchInput): Input data for the search activity.
@@ -89,7 +93,7 @@ async def search(data: SearchInput) -> SearchOutput:
     if entry_list:
         write_dataset_file(path=data.output_file_path, data=entry_list)
 
-    return SearchOutput(
+    return SearchPageOutput(
         search_start_time=start,
         search_end_time=end,
         num_entries_exported=len(entry_list),
@@ -167,6 +171,71 @@ async def collect_page_cursors(data: CollectCursorsInput) -> CollectCursorsOutpu
         page_after_values=page_after_values,
         num_entries_available=num_entries_available,
         num_pages=num_pages,
+    )
+
+
+@activity.defn
+async def read_archives(data: ReadArchivesInput) -> SearchPageOutput:
+    """
+    Activity to read archives of the searched entries. The required fields are read
+    from the archives and written to a file in the specified format (Parquet or JSON)
+    in the artifacts directory.
+
+    Args:
+        data (ReadArchivesInput): Input data for the search activity.
+
+    Returns:
+        SearchPageOutput: Output data from the search and read archives activity.
+    """
+    from nomad.app.v1.routers.entries import _read_entry_from_archive, _Uploads
+    from nomad.archive.required import RequiredReader
+
+    start = datetime.now(timezone.utc).isoformat()
+
+    # Find entries whose archives are to be read
+    response = nomad_search(
+        user_id=data.user_id,
+        owner=data.owner,
+        query=data.query,
+        required=MetadataRequired(include=['entry_id', 'upload_id']),
+        pagination=data.pagination,
+    )
+    entries: list = [
+        {
+            'entry_id': entry['entry_id'],
+            'upload_id': entry['upload_id'],
+        }
+        for entry in response.data
+    ]
+    entries = entries[: data.max_entries_export_limit]  #  Apply max limit
+
+    # setup required reader
+    required_reader = RequiredReader(
+        data.required,
+        resolve_inplace=True,
+        user=User(user_id=data.user_id),
+    )
+    entry_archives = []
+
+    # For each entry
+    with _Uploads() as uploads:
+        for entry in entries:
+            entry_archive = _read_entry_from_archive(entry, uploads, required_reader)
+            entry_archives.append(entry_archive)
+
+    end = datetime.now(timezone.utc).isoformat()
+
+    if entry_archives:
+        write_file_func = {
+            'parquet': write_parquet_file,
+            'json': write_json_file,
+        }.get(data.batch_file_type)
+        write_file_func(path=data.output_file_path, data=entry_archives)
+
+    return SearchPageOutput(
+        search_start_time=start,
+        search_end_time=end,
+        num_entries_exported=len(entry_archives),
     )
 
 
