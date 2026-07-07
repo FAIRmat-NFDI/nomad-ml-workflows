@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from math import ceil
 
 from nomad.actions.manager import action_artifacts_dir, get_upload_files
-from nomad.app.v1.models.models import MetadataPagination, MetadataRequired
+from nomad.app.v1.models.models import MetadataPagination, MetadataRequired, User
 from nomad.files import StagingUploadFiles
 from nomad.search import search as nomad_search
 from temporalio import activity
@@ -187,7 +187,6 @@ async def read_archives(data: ReadArchivesInput) -> SearchPageOutput:
     Returns:
         SearchPageOutput: Output data from the search and read archives activity.
     """
-    from nomad.app.v1.models import User
     from nomad.app.v1.routers.entries import _read_entry_from_archive, _Uploads
     from nomad.archive.required import RequiredReader
 
