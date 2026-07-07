@@ -74,21 +74,6 @@ def write_parquet_file(path: str, data: list[dict]):
         writer.write_table(table)
 
 
-def write_csv_file(path: str, data: list[dict]):
-    """Writes a list of NOMAD entry dicts to a CSV file.
-
-    Args:
-        path (str): The path where the file will be saved.
-        data (list[dict]): The list of NOMAD entry dicts to be written to the file.
-    """
-    if not path.endswith('csv'):
-        raise ValueError('Unsupported file type. Please use csv.')
-
-    df = dict_to_dataframe(data)
-
-    df.to_csv(path, index=False, mode='w', header=True)
-
-
 def write_json_file(path: str, data: list[dict]):
     """Writes a list of NOMAD entry dicts to a JSON file.
 

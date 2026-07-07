@@ -7,7 +7,6 @@ from pydantic import BaseModel, Field
 OwnerLiteral = Literal['public', 'visible', 'shared', 'user', 'staging']
 BatchFileTypeLiteral = Literal['parquet', 'json']
 OutputFileTypeLiteral = Literal['parquet', 'csv', 'json']
-IndexLiteral = Literal['entries', 'datasets', 'models', 'spaces']
 
 
 class SearchSettings(BaseModel):
