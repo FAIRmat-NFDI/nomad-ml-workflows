@@ -41,6 +41,11 @@ class SearchSettings(BaseModel):
         description='List of fields to include in the search results. For example: '
         'results*, data.results*',
     )
+    required_include_resolved: list[str] = Field(
+        [],
+        description='Paths to include, along with resolved referencs, in the exported '
+        'dataset. For example: results*, data.results*',
+    )
     required_exclude: list[str] = Field(
         [],
         description='List of fields to exclude from the search results. For example: '
@@ -78,6 +83,15 @@ class CreateArtifactSubdirectoryInput(BaseModel):
     subdir_name: str = Field(..., description='Name of the subdirectory to be created.')
 
 
+class Required(MetadataRequired):
+    include_resolved: list[str] | None = Field(
+        None,
+        description='Quantities to include for each result. If the quantities include '
+        'references to other sections, the references will be resolved.'
+        'For example: results*, data.results*',
+    )
+
+
 class SearchPageInput(BaseModel):
     user_id: str = Field(..., description='User ID performing the search.')
     owner: OwnerLiteral = Field(..., description='Owner of the entries to be searched.')
@@ -85,9 +99,9 @@ class SearchPageInput(BaseModel):
     read_archives: bool = Field(
         ...,
         description='Read full archive data, including non-indexed fields such as '
-        'n-dim arrays.'
+        'n-dim arrays.',
     )
-    required: MetadataRequired = Field(
+    required: Required = Field(
         ..., description='Required fields for filtering the search results.'
     )
     pagination: MetadataPagination = Field(
@@ -121,13 +135,19 @@ class SearchPageInput(BaseModel):
             _clean_field(user_input.search_settings.query).replace("'", '"')
         )
 
-        required = MetadataRequired()
+        required = Required()
         if user_input.search_settings.required_include:
             include = [
                 _clean_field(field)
                 for field in user_input.search_settings.required_include
             ]
             required.include = include if include else None
+        if user_input.search_settings.required_include_resolved:
+            include_resolved = [
+                _clean_field(field)
+                for field in user_input.search_settings.required_include_resolved
+            ]
+            required.include_resolved = include_resolved if include_resolved else None
         if user_input.search_settings.required_exclude:
             exclude = [
                 _clean_field(field)
@@ -157,29 +177,83 @@ class SearchPageInput(BaseModel):
 class ReadArchivesInput(SearchPageInput):
     required: str | dict[str, Any] = Field(
         '*',
-        description='Dictionary of required fields compatible with '
+        description='Dictionary of required fields and directives compatible with '
         '`nomad.archive.required.RequiredReader` class.',
     )
 
     @staticmethod
-    def _build_archive_required(metadata_required: MetadataRequired) -> str | dict:
+    def build_archive_required(required: Required) -> str | dict:
         """
-        Convert dot-separated include and exclude paths into an ArchiveRequired
-        specification following the documented RequiredReader structure.
+        Convert dot-separated required paths into a nested-dict structure with
+        directives on the leaf. Output can be used when instantiating the
+        `nomad.archive.required.RequiredReader` class.
 
-        Examples::
+        Adds the following directives at the dict nodes:
+            - "include"             (for `required.include` list)
+            - "include-resolved"    (for `required.include_resolved` list)
 
-            ["data"]                   -> {"data": "*"}
-            ["data.results"]           -> {"data": {"results": "*"}}
-            ["data", "data.results"]   -> {"data": "*"}  (parent wins)
-            ["*"]                      -> "*"
-            [], ["data.results"]       -> {"*": "*", "data": {"*": "*", "results":"exclude"}}
+        Ignores the `required.exclude` list, since there is no support for
+        "exclude" directives.
+
+        If the required lists are empty, returns "*", meaning to include everything.
+
+        Examples:
+            - When required.include is:
+                []                         -> "*"
+                ["data"]                   -> {"data": "include"}
+                ["data.num_val"]           -> {"data": {"num_val": "include"}}
+                ["data.sub_sec"]           -> {"data": {"sub_sec": "include"}}
+                ["data.sub_sec*"]          -> {"data": {"sub_sec": "include"}}
+                                            (remove trailing *)
+                ["data", "data.sub_sec"]   -> {"data": "*"}
+                                            (parent wins)
+
+        For `required.include_resolved`, the directive changes to "include-resolved",
+        but the conversion follows the same logic.
+
+        When same fields are present in `required.include` and
+        `required.include_resolved`, "include-resolved" directive takes priority.
         """
-        if not metadata_required.include and metadata_required.exclude:
-            return '*'
-        return '*'
+        include = required.include or []
+        include_resolved = required.include_resolved or []
 
-        # TODO: engage the conversion
+        if not include and not include_resolved:
+            return '*'  # include everything
+
+        def _remove_wildcard(require_list: list) -> list:
+            return [el[:-1] if el.endswith('*') else el for el in require_list]
+
+        def _path_parts(path: str) -> list[str]:
+            return [part for part in path.split('.') if part]
+
+        def _add_include(
+            target: dict[str, Any], path: str, directive='include'
+        ) -> None:
+            node = target
+            parts = _path_parts(path)
+            for index, part in enumerate(parts):
+                is_leaf = index == len(parts) - 1
+                if is_leaf:
+                    node[part] = directive
+                    return
+                child = node.get(part)
+                if child == directive:
+                    return
+                if not isinstance(child, dict):
+                    child = {}
+                    node[part] = child
+                node = child
+
+        include = _remove_wildcard(include)
+        include_resolved = _remove_wildcard(include_resolved)
+
+        archive_required = {}
+        for path in include:
+            _add_include(archive_required, path, directive='include')
+        for path in include_resolved:
+            _add_include(archive_required, path, directive='include-resolved')
+
+        return archive_required
 
     @classmethod
     def from_search_page_input(
@@ -188,7 +262,7 @@ class ReadArchivesInput(SearchPageInput):
     ) -> 'ReadArchivesInput':
         """Convert from SearchPageInput to ReadArchivesInput"""
 
-        required = ReadArchivesInput._build_archive_required(spi.required)
+        required = ReadArchivesInput.build_archive_required(spi.required)
 
         return cls(
             user_id=spi.user_id,
@@ -201,8 +275,6 @@ class ReadArchivesInput(SearchPageInput):
             output_file_path=spi.output_file_path,
             max_entries_export_limit=spi.max_entries_export_limit,
         )
-
-
 
 
 class SearchPageOutput(BaseModel):
