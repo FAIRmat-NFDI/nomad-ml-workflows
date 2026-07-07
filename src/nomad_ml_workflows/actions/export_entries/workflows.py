@@ -25,6 +25,7 @@ with workflow.unsafe.imports_passed_through():
         ExportDatasetInput,
         ExportDatasetMetadata,
         ExportEntriesUserInput,
+        ExportEntriesOutput,
         MergeOutputFilesInput,
         ReadArchivesInput,
         SearchPageInput,
@@ -84,6 +85,7 @@ class ExportEntriesWorkflow:
         Returns:
             str: Path to the saved dataset in the upload's `raw` folder.
         """
+        starttime = workflow.time()
         retry_policy = RetryPolicy(maximum_attempts=1)
         artifact_subdirectory = await workflow.execute_activity(
             create_artifact_subdirectory,
@@ -229,7 +231,7 @@ class ExportEntriesWorkflow:
             ) from e
 
         finally:
-            saved_dataset_path = await workflow.execute_activity(
+            exported_dir_path = await workflow.execute_activity(
                 export_dataset_to_upload,
                 export_dataset_input,
                 start_to_close_timeout=timedelta(hours=2),
@@ -243,4 +245,9 @@ class ExportEntriesWorkflow:
                 retry_policy=retry_policy,
             )
 
-        return saved_dataset_path
+            output = ExportEntriesOutput(
+                exported_dir_path=exported_dir_path,
+                workflow_duration=round(workflow.time() - starttime, 6),
+            )
+
+        return output
