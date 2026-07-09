@@ -1,7 +1,10 @@
 import json
+import importlib
+from functools import lru_cache
 
 import json_stream
-from nomad.utils import dict_to_dataframe
+import pandas as pd
+from nomad.metainfo.metainfo import MSectionReference, Section
 
 try:
     import pyarrow as pa
@@ -12,6 +15,192 @@ except ImportError as e:
     raise ImportError(
         'pyarrow is required. Install with: pip install nomad-ml-workflows[cpu-action]'
     ) from e
+
+
+def _join_path(prefix: str, key: str) -> str:
+    return f'{prefix}.{key}' if prefix else key
+
+
+@lru_cache
+def _resolve_section_def(m_def: str | None) -> Section | None:
+    if not m_def:
+        return None
+
+    if '.' in m_def:
+        package_name, section_name = m_def.rsplit('.', 1)
+        try:
+            module = importlib.import_module(package_name)
+        except ImportError:
+            module = None
+
+        if module is not None:
+            section = getattr(module, section_name, None)
+            section_def = getattr(section, 'm_def', None)
+            if isinstance(section_def, Section):
+                return section_def
+
+    try:
+        resolved = MSectionReference().normalize(m_def).m_resolved()
+    except Exception:
+        return None
+
+    return resolved if isinstance(resolved, Section) else None
+
+
+def _flatten_generic(value, prefix: str, row: dict):
+    """Flatten generic nested data while keeping non-dict lists as leaf values."""
+    if isinstance(value, dict):
+        for key, item in value.items():
+            _flatten_generic(item, _join_path(prefix, key), row)
+    elif isinstance(value, list):
+        if all(isinstance(item, dict) for item in value):
+            for index, item in enumerate(value):
+                _flatten_generic(item, _join_path(prefix, str(index)), row)
+        else:
+            row[prefix] = value
+    else:
+        row[prefix] = value
+
+
+def _store_leaf_value(row: dict, prefix: str, value):
+    """Store a value as one opaque DataFrame cell."""
+    row[prefix] = value
+
+
+def _flatten_archive_data_section(
+    section_data: dict, section_def: Section, prefix: str, row: dict
+):
+    """Flatten one NOMAD section by metainfo property boundaries.
+
+    This traversal is schema-guided:
+    - quantities are always opaque leaf values
+    - repeated and non-repeated subsections are the only recursive branches
+    - arrays, nested lists, and JSON payloads stored in quantities are never flattened
+
+    This keeps the DataFrame aligned with NOMAD metainfo semantics instead of the raw
+    JSON shape of serialized values.
+    """
+    handled_keys = set()
+
+    for quantity_name in section_def.all_quantities:
+        if quantity_name not in section_data:
+            continue
+        handled_keys.add(quantity_name)
+        _store_leaf_value(
+            row,
+            _join_path(prefix, quantity_name),
+            section_data[quantity_name],
+        )
+
+    for sub_section_name, sub_section_def in section_def.all_sub_sections.items():
+        if sub_section_name not in section_data:
+            continue
+
+        handled_keys.add(sub_section_name)
+        sub_section_value = section_data[sub_section_name]
+        sub_section_prefix = _join_path(prefix, sub_section_name)
+        child_section_def = sub_section_def.sub_section.m_resolved()
+
+        if sub_section_value is None:
+            _store_leaf_value(row, sub_section_prefix, None)
+            continue
+
+        if sub_section_def.repeats:
+            if not isinstance(sub_section_value, list):
+                _store_leaf_value(row, sub_section_prefix, sub_section_value)
+                continue
+
+            for index, item in enumerate(sub_section_value):
+                item_prefix = _join_path(sub_section_prefix, str(index))
+                if not isinstance(item, dict):
+                    _store_leaf_value(row, item_prefix, item)
+                    continue
+
+                item_section_def = _resolve_section_def(item.get('m_def'))
+                _flatten_archive_data_section(
+                    item,
+                    item_section_def or child_section_def,
+                    item_prefix,
+                    row,
+                )
+        else:
+            if not isinstance(sub_section_value, dict):
+                _store_leaf_value(row, sub_section_prefix, sub_section_value)
+                continue
+
+            item_section_def = _resolve_section_def(sub_section_value.get('m_def'))
+            _flatten_archive_data_section(
+                sub_section_value,
+                item_section_def or child_section_def,
+                sub_section_prefix,
+                row,
+            )
+
+    # Unknown keys are stored as opaque leaf values. This avoids accidental
+    # structural flattening when the serialized branch does not map cleanly to
+    # the resolved section definition.
+    for key, value in section_data.items():
+        if key in handled_keys:
+            continue
+        _store_leaf_value(row, _join_path(prefix, key), value)
+
+
+def archives_to_dataframe(archives: list[dict] | dict) -> pd.DataFrame:
+    """Convert serialized entries to a DataFrame with section-aware flattening.
+
+    The ``archive.data`` branch is flattened using NOMAD metainfo definitions:
+    recursion only follows declared subsections, while every quantity is treated as
+    an opaque leaf value. This means scalar values, arrays, nested lists, and JSON
+    payloads from quantities each end up in a single DataFrame cell.
+
+    Outside ``archive.data`` the function keeps the older generic flattening behavior,
+    because this first implementation only relies on schema guarantees for
+    ``archive.data``.
+    """
+    if isinstance(archives, dict):
+        archives = [archives]
+    elif not isinstance(archives, list):
+        raise ValueError(
+            'Input must be a dictionary (JSON object) or a list of dictionaries (JSON objects)'
+        )
+
+    rows = []
+    for item in archives:
+        if not isinstance(item, dict):
+            raise ValueError(
+                'Input must be a dictionary (JSON object) or a list of dictionaries (JSON objects)'
+            )
+
+        row = {}
+        for key, value in item.items():
+            prefix = key
+            if key != 'archive' or not isinstance(value, dict):
+                _flatten_generic(value, prefix, row)
+                continue
+
+            for archive_key, archive_value in value.items():
+                archive_prefix = _join_path(prefix, archive_key)
+
+                if archive_key != 'data' or not isinstance(archive_value, dict):
+                    _flatten_generic(archive_value, archive_prefix, row)
+                    continue
+
+                section_def = _resolve_section_def(archive_value.get('m_def'))
+                if section_def is None:
+                    _flatten_generic(archive_value, archive_prefix, row)
+                    continue
+
+                _flatten_archive_data_section(
+                    archive_value,
+                    section_def,
+                    archive_prefix,
+                    row,
+                )
+
+        rows.append(row)
+
+    result = pd.DataFrame(rows)
+    return result.reindex(sorted(result.columns), axis=1)
 
 
 def _is_nested_type(dtype: pa.DataType) -> bool:
@@ -52,6 +241,34 @@ def _stringify_nested_columns(batch: pa.RecordBatch) -> pa.RecordBatch:
     )
 
 
+def _make_dataframe_arrow_compatible(df: pd.DataFrame) -> pd.DataFrame:
+    """Stringify only object columns that Arrow cannot encode as a single type."""
+    normalized_df = df.copy()
+
+    for column_name in normalized_df.columns:
+        column = normalized_df[column_name]
+        if column.dtype != 'object':
+            continue
+
+        values = column.dropna().tolist()
+        if not values:
+            continue
+
+        try:
+            pa.array(values)
+        except (pa.ArrowInvalid, pa.ArrowTypeError, TypeError, ValueError):
+            normalized_df[column_name] = column.map(
+                lambda value: (
+                    json.dumps(value, sort_keys=True)
+                    if value is not None
+                    and not (isinstance(value, float) and pd.isna(value))
+                    else None
+                )
+            )
+
+    return normalized_df
+
+
 def write_parquet_file(path: str, data: list[dict]):
     """Writes a list of NOMAD entry dicts to a parquet file.
 
@@ -62,7 +279,7 @@ def write_parquet_file(path: str, data: list[dict]):
     if not path.endswith('parquet'):
         raise ValueError('Unsupported file format. Please use parquet.')
 
-    df = dict_to_dataframe(data)
+    df = _make_dataframe_arrow_compatible(archives_to_dataframe(data))
 
     table = pa.Table.from_pandas(df)
     with pq.ParquetWriter(
