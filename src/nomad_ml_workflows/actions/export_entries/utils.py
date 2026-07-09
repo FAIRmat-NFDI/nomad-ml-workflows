@@ -22,7 +22,7 @@ def _join_path(prefix: str, key: str) -> str:
     return f'{prefix}.{key}' if prefix else key
 
 
-@lru_cache
+@lru_cache(maxsize=256)
 def _resolve_section_def(m_def: str | None) -> Section | None:
     if not m_def:
         return None
@@ -68,18 +68,15 @@ def _store_leaf_value(row: dict, prefix: str, value):
     row[prefix] = value
 
 
-def _flatten_archive_section(
+def _flatten_section(
     section_data: dict, section_def: Section, prefix: str, row: dict
 ):
-    """Flatten one NOMAD section by metainfo property boundaries.
+    """
+    Flatten one serialized NOMAD section using its metainfo definition.
 
-    This traversal is schema-guided:
-    - quantities are always opaque leaf values
-    - repeated and non-repeated subsections are the only recursive branches
-    - arrays, nested lists, and JSON payloads stored in quantities are never flattened
-
-    This keeps the DataFrame aligned with NOMAD metainfo semantics instead of the raw
-    JSON shape of serialized values.
+    The traversal only recurses through declared subsections. Every quantity is
+    treated as an opaque leaf value, regardless of whether it stores a scalar,
+    array, nested list, or JSON payload.
     """
     handled_keys = set()
 
@@ -109,25 +106,31 @@ def _flatten_archive_section(
         if sub_section_def.repeats:
             for index, item in enumerate(sub_section_value):
                 item_prefix = _join_path(sub_section_prefix, str(index))
+                # Of m_def is available in the dict, get a section_def based on it.
+                # Useful when available data uses a child section of the subsection's
+                # original section_def.
                 item_section_def = _resolve_section_def(item.get('m_def'))
-                _flatten_archive_section(
+                _flatten_section(
                     item,
                     item_section_def or child_section_def,
                     item_prefix,
                     row,
                 )
         else:
+            # If m_def is available in the dict, get a section_def based on it.
+            # Useful when available data uses a child section of the subsection's
+            # original section_def.
             item_section_def = _resolve_section_def(sub_section_value.get('m_def'))
-            _flatten_archive_section(
+            _flatten_section(
                 sub_section_value,
                 item_section_def or child_section_def,
                 sub_section_prefix,
                 row,
             )
 
-    # Unknown keys are stored as opaque leaf values. This avoids accidental
-    # structural flattening when the serialized branch does not map cleanly to
-    # the resolved section definition.
+    # Keep serialization-only fields such as m_def/m_def_id as leaf values instead of
+    # flattening them structurally. This preserves the "quantities opaque, only
+    # subsections recursive" rule for keys outside the resolved section definition.
     for key, value in section_data.items():
         if key in handled_keys:
             continue
@@ -135,67 +138,56 @@ def _flatten_archive_section(
 
 
 def archives_to_dataframe(archives: list[dict] | dict) -> pd.DataFrame:
-    """Convert serialized entries to a DataFrame with section-aware flattening.
+    """
+    Convert exported entries to a DataFrame.
 
-    If `archives` is a list, it should have the following structure:
+    Each input item is expected to be a dict containing a serialized `archive`
+    entry alongside optional top-level metadata fields. For example,
 
     ```python
-    [
-        {
-            param1: val,
-            param2: val,
-            ...
-            archive: {...}  # serialized EntryArchive instance 1
-        },
-        {
-            param1: val,
-            param2: val,
-            ...
-            archive: {...}  # serialized EntryArchive instance 2
-        },
-        ...
-    ]
+    {
+        entry_id: ...,
+        upload_id: ...,
+        archive: {...}  # serialized EntryArchive instance 1
+    }
     ```
 
-    Else if it is a dict, it should correspond to one of the list elements shown above.
-
-    The ``archive.data`` branch is flattened using NOMAD metainfo definitions:
-    recursion only follows declared subsections, while every quantity is treated as
-    an opaque leaf value. This means scalar values, arrays, nested lists, and JSON
-    payloads from quantities each end up in a single DataFrame cell.
-
-    Outside ``archive.data`` the function keeps the older generic flattening behavior,
-    because this first implementation only relies on schema guarantees for
-    ``archive.data``.
+    The `archive` value is flattened using `EntryArchive` metainfo definitions;
+    recursion only follows subsections and every quantity becomes one DataFrame cell.
+    This keeps the DataFrame aligned with NOMAD section boundaries across the whole
+    archive, including `archive.data` where plugin-provided `m_def` values are
+    used to resolve the concrete section definition.
     """
     if isinstance(archives, dict):
         archives = [archives]
     elif not isinstance(archives, list):
         raise ValueError(
-            'Input must be a dictionary (JSON object) or a list of dictionaries (JSON objects)'
+            'Input must be a dictionary (JSON object) or a list of dictionaries '
+            '(JSON objects)'
         )
 
     rows = []
     for item in archives:
         if not isinstance(item, dict):
             raise ValueError(
-                'Input must be a dictionary (JSON object) or a list of dictionaries (JSON objects)'
+                'Input must be a dictionary (JSON object).'
             )
 
         row = {}
         for key, value in item.items():
-            prefix = key
-
             if key != 'archive':
-                _flatten_generic(value, prefix, row)
+                _flatten_generic(value, key, row)
                 continue
 
-            _flatten_archive_section(value, EntryArchive.m_, prefix, row)
+            # `archive` always starts from the fixed EntryArchive definition.
+            _flatten_section(value, EntryArchive.m_def, key, row)
 
         rows.append(row)
 
-    result = pd.DataFrame(rows)
-    return result.reindex(sorted(result.columns), axis=1)
+    df = pd.DataFrame(rows)
+    sorted_df = df.reindex(sorted(df.columns), axis=1)
+
+    return sorted_df
 
 
 def _is_nested_type(dtype: pa.DataType) -> bool:
