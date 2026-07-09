@@ -4,6 +4,7 @@ from functools import lru_cache
 
 import json_stream
 import pandas as pd
+from nomad.datamodel.datamodel import EntryArchive
 from nomad.metainfo.metainfo import MSectionReference, Section
 
 try:
@@ -67,7 +68,7 @@ def _store_leaf_value(row: dict, prefix: str, value):
     row[prefix] = value
 
 
-def _flatten_archive_data_section(
+def _flatten_archive_section(
     section_data: dict, section_def: Section, prefix: str, row: dict
 ):
     """Flatten one NOMAD section by metainfo property boundaries.
@@ -106,30 +107,18 @@ def _flatten_archive_data_section(
             continue
 
         if sub_section_def.repeats:
-            if not isinstance(sub_section_value, list):
-                _store_leaf_value(row, sub_section_prefix, sub_section_value)
-                continue
-
             for index, item in enumerate(sub_section_value):
                 item_prefix = _join_path(sub_section_prefix, str(index))
-                if not isinstance(item, dict):
-                    _store_leaf_value(row, item_prefix, item)
-                    continue
-
                 item_section_def = _resolve_section_def(item.get('m_def'))
-                _flatten_archive_data_section(
+                _flatten_archive_section(
                     item,
                     item_section_def or child_section_def,
                     item_prefix,
                     row,
                 )
         else:
-            if not isinstance(sub_section_value, dict):
-                _store_leaf_value(row, sub_section_prefix, sub_section_value)
-                continue
-
             item_section_def = _resolve_section_def(sub_section_value.get('m_def'))
-            _flatten_archive_data_section(
+            _flatten_archive_section(
                 sub_section_value,
                 item_section_def or child_section_def,
                 sub_section_prefix,
@@ -147,6 +136,28 @@ def _flatten_archive_data_section(
 
 def archives_to_dataframe(archives: list[dict] | dict) -> pd.DataFrame:
     """Convert serialized entries to a DataFrame with section-aware flattening.
+
+    If `archives` is a list, it should have the following structure:
+
+    ```python
+    [
+        {
+            param1: val,
+            param2: val,
+            ...
+            archive: {...}  # serialized EntryArchive instance 1
+        },
+        {
+            param1: val,
+            param2: val,
+            ...
+            archive: {...}  # serialized EntryArchive instance 2
+        },
+        ...
+    ]
+    ```
+
+    Else if it is a dict, it should correspond to one of the list elements shown above.
 
     The ``archive.data`` branch is flattened using NOMAD metainfo definitions:
     recursion only follows declared subsections, while every quantity is treated as
@@ -174,28 +185,12 @@ def archives_to_dataframe(archives: list[dict] | dict) -> pd.DataFrame:
         row = {}
         for key, value in item.items():
             prefix = key
-            if key != 'archive' or not isinstance(value, dict):
+
+            if key != 'archive':
                 _flatten_generic(value, prefix, row)
                 continue
 
-            for archive_key, archive_value in value.items():
-                archive_prefix = _join_path(prefix, archive_key)
-
-                if archive_key != 'data' or not isinstance(archive_value, dict):
-                    _flatten_generic(archive_value, archive_prefix, row)
-                    continue
-
-                section_def = _resolve_section_def(archive_value.get('m_def'))
-                if section_def is None:
-                    _flatten_generic(archive_value, archive_prefix, row)
-                    continue
-
-                _flatten_archive_data_section(
-                    archive_value,
-                    section_def,
-                    archive_prefix,
-                    row,
-                )
+            _flatten_archive_section(value, EntryArchive.m_, prefix, row)
 
         rows.append(row)
 
