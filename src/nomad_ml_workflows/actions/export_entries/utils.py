@@ -229,7 +229,9 @@ def _stringify_nested_columns(batch: pa.RecordBatch) -> pa.RecordBatch:
 
 
 def _make_dataframe_arrow_compatible(df: pd.DataFrame) -> pd.DataFrame:
-    """Stringify only object columns that Arrow cannot encode as a single type."""
+    """
+    Stringify object columns that cannot be written to Parquet as-is.
+    """
     normalized_df = df.copy()
 
     for column_name in normalized_df.columns:
@@ -242,8 +244,18 @@ def _make_dataframe_arrow_compatible(df: pd.DataFrame) -> pd.DataFrame:
             continue
 
         try:
-            pa.array(values)
-        except (pa.ArrowInvalid, pa.ArrowTypeError, TypeError, ValueError):
+            arrow_array = pa.array(values)
+            if pa.types.is_struct(arrow_array.type) and len(arrow_array.type) == 0:
+                # Parquet cannot write empty struct columns and PyArrow raises
+                # `ArrowNotImplementedError` in this case.
+                raise pa.ArrowNotImplementedError
+        except (
+            pa.ArrowInvalid,
+            pa.ArrowTypeError,
+            pa.ArrowNotImplementedError,
+            TypeError,
+            ValueError,
+        ):
             normalized_df[column_name] = column.map(
                 lambda value: (
                     json.dumps(value, sort_keys=True)
