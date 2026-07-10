@@ -4,8 +4,10 @@ from functools import lru_cache
 
 import json_stream
 import pandas as pd
+from nomad.datamodel import all_metainfo_packages
 from nomad.datamodel.datamodel import EntryArchive
-from nomad.metainfo.metainfo import MSectionReference, Section
+from nomad.metainfo import Package
+from nomad.metainfo.metainfo import Section
 
 try:
     import pyarrow as pa
@@ -24,28 +26,36 @@ def _join_path(prefix: str, key: str) -> str:
 
 @lru_cache(maxsize=256)
 def _resolve_section_def(m_def: str | None) -> Section | None:
+    """
+    Get a section def (Section.m_def) for given `m_def` string by importing the
+    associated section class.
+    """
     if not m_def:
         return None
 
-    if '.' in m_def:
-        package_name, section_name = m_def.rsplit('.', 1)
-        try:
-            module = importlib.import_module(package_name)
-        except ImportError:
-            module = None
-
-        if module is not None:
-            section = getattr(module, section_name, None)
-            section_def = getattr(section, 'm_def', None)
-            if isinstance(section_def, Section):
-                return section_def
-
-    try:
-        resolved = MSectionReference().normalize(m_def).m_resolved()
-    except Exception:
+    if '.' not in m_def:
         return None
 
-    return resolved if isinstance(resolved, Section) else None
+    package_name, section_name = m_def.rsplit('.', 1)
+    try:
+        module = importlib.import_module(package_name)
+    except ImportError:
+        module = None
+
+    if module is not None:
+        section = getattr(module, section_name, None)
+        section_def = getattr(section, 'm_def', None)
+        if isinstance(section_def, Section):
+            return section_def
+
+    # # all_metainfo_packages()  # leads to circular imports
+    # package_name, section_name = m_def.rsplit('.', 1)
+    # package = Package.registry.get(package_name)
+    # if package is None:
+    #     return None
+
+    # definition = package.all_definitions.get(section_name)
+    # return definition if isinstance(definition, Section) else None
 
 
 def _flatten_generic(value, prefix: str, row: dict):
