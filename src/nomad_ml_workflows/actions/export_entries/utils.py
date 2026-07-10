@@ -229,9 +229,7 @@ def _stringify_nested_columns(batch: pa.RecordBatch) -> pa.RecordBatch:
 
 
 def _make_dataframe_arrow_compatible(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Stringify object columns that cannot be written to Parquet as-is.
-    """
+    """Stringify object columns that cannot be written to Parquet as-is."""
     normalized_df = df.copy()
 
     for column_name in normalized_df.columns:
@@ -269,7 +267,8 @@ def _make_dataframe_arrow_compatible(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def write_parquet_file(path: str, data: list[dict]):
-    """Writes a list of NOMAD entry dicts to a parquet file.
+    """
+    Writes a list of NOMAD entry dicts to a parquet file.
 
     Args:
         path (str): The path where the file will be saved.
@@ -291,7 +290,8 @@ def write_parquet_file(path: str, data: list[dict]):
 
 
 def write_json_file(path: str, data: list[dict]):
-    """Writes a list of NOMAD entry dicts to a JSON file.
+    """
+    Writes a list of NOMAD entry dicts to a JSON file.
 
     Args:
         path (str): The path where the file will be saved.
@@ -307,7 +307,8 @@ def write_json_file(path: str, data: list[dict]):
 def merge_files(
     input_file_paths: list[str], output_file_format: str, output_file_path: str
 ):
-    """Merges multiple Parquet or JSON files into a single file.
+    """
+    Merges multiple Parquet or JSON files into a single file.
 
     Args:
         input_file_paths (list[str]): List of file paths to be merged.
