@@ -1,12 +1,11 @@
-import json
 import importlib
+import json
+from collections import Counter
 from functools import lru_cache
 
 import json_stream
 import pandas as pd
-from nomad.datamodel import all_metainfo_packages
 from nomad.datamodel.datamodel import EntryArchive
-from nomad.metainfo import Package
 from nomad.metainfo.metainfo import Section
 
 try:
@@ -19,6 +18,7 @@ except ImportError as e:
         'pyarrow is required. Install with: pip install nomad-ml-workflows[cpu-action]'
     ) from e
 
+IGNORED_KEYS = ['m_def', 'm_def_id', 'm_ref_archives']
 
 def _join_path(prefix: str, key: str) -> str:
     return f'{prefix}.{key}' if prefix else key
@@ -73,13 +73,16 @@ def _flatten_generic(value, prefix: str, row: dict):
         row[prefix] = value
 
 
-def _store_leaf_value(row: dict, prefix: str, value):
+def _store_leaf_value(row: dict, col: str, value):
     """Store a value as one opaque DataFrame cell."""
-    row[prefix] = value
-
+    row[col] = value
 
 def _flatten_section(
-    section_data: dict, section_def: Section, prefix: str, row: dict
+    section_data: dict,
+    section_def: Section,
+    prefix: str,
+    row: dict,
+    unhandled_keys: Counter,
 ):
     """
     Flatten one serialized NOMAD section using its metainfo definition.
@@ -94,11 +97,8 @@ def _flatten_section(
         if quantity_name not in section_data:
             continue
         handled_keys.add(quantity_name)
-        _store_leaf_value(
-            row,
-            _join_path(prefix, quantity_name),
-            section_data[quantity_name],
-        )
+        col = _join_path(prefix, quantity_name) + '#' + section_def.qualified_name()
+        _store_leaf_value(row, col, section_data[quantity_name])
 
     for sub_section_name, sub_section_def in section_def.all_sub_sections.items():
         if sub_section_name not in section_data:
@@ -106,12 +106,11 @@ def _flatten_section(
 
         handled_keys.add(sub_section_name)
         sub_section_value = section_data[sub_section_name]
+        if sub_section_value is None:
+            continue
+
         sub_section_prefix = _join_path(prefix, sub_section_name)
         child_section_def = sub_section_def.sub_section.m_resolved()
-
-        if sub_section_value is None:
-            _store_leaf_value(row, sub_section_prefix, None)
-            continue
 
         if sub_section_def.repeats:
             for index, item in enumerate(sub_section_value):
@@ -125,6 +124,7 @@ def _flatten_section(
                     item_section_def or child_section_def,
                     item_prefix,
                     row,
+                    unhandled_keys,
                 )
         else:
             # If m_def is available in the dict, get a section_def based on it.
@@ -136,18 +136,17 @@ def _flatten_section(
                 item_section_def or child_section_def,
                 sub_section_prefix,
                 row,
+                unhandled_keys,
             )
 
-    # Keep serialization-only fields such as m_def/m_def_id as leaf values instead of
-    # flattening them structurally. This preserves the "quantities opaque, only
-    # subsections recursive" rule for keys outside the resolved section definition.
-    for key, value in section_data.items():
-        if key in handled_keys:
-            continue
-        _store_leaf_value(row, _join_path(prefix, key), value)
+    # Add the unhandled keys to the counter. These point to the obsolete data in the
+    # archives that do not correspond to a subsection/quantity in the current schema
+    for key, _ in section_data.items():
+        if key not in [*handled_keys, *IGNORED_KEYS]:
+            unhandled_keys.update([f'{prefix}.{key}#{section_def.qualified_name()}'])
 
 
-def archives_to_dataframe(archives: list[dict] | dict) -> pd.DataFrame:
+def archives_to_dataframe(archives: list[dict] | dict) -> tuple[pd.DataFrame, Counter]:
     """
     Convert exported entries to a DataFrame.
 
@@ -177,27 +176,32 @@ def archives_to_dataframe(archives: list[dict] | dict) -> pd.DataFrame:
         )
 
     rows = []
+    unhandled_keys = Counter()
     for item in archives:
         if not isinstance(item, dict):
-            raise ValueError(
-                'Input must be a dictionary (JSON object).'
-            )
+            raise ValueError('Input must be a dictionary (JSON object).')
 
         row = {}
         for key, value in item.items():
             if key != 'archive':
-                _flatten_generic(value, key, row)
+                _flatten_generic(value, key, row)  #  TODO: remove this support, require list[archive]
                 continue
 
             # `archive` always starts from the fixed EntryArchive definition.
-            _flatten_section(value, EntryArchive.m_def, key, row)
+            _flatten_section(
+                section_data=value,
+                section_def=EntryArchive.m_def,
+                prefix='',
+                row=row,
+                unhandled_keys=unhandled_keys,
+            )
 
         rows.append(row)
 
     df = pd.DataFrame(rows)
     sorted_df = df.reindex(sorted(df.columns), axis=1)
 
-    return sorted_df
+    return sorted_df, unhandled_keys
 
 
 def _is_nested_type(dtype: pa.DataType) -> bool:
