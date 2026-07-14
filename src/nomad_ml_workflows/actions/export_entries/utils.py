@@ -44,6 +44,8 @@ def _resolve_section_def(m_def: str | None) -> Section | None:
     """
     Get a section def (Section.m_def) for given `m_def` string by importing the
     associated section class.
+
+    TODO: Add support for resolving sections defined using YAML schema.
     """
     if not m_def:
         return None
@@ -62,15 +64,6 @@ def _resolve_section_def(m_def: str | None) -> Section | None:
         section_def = getattr(section, 'm_def', None)
         if isinstance(section_def, Section):
             return section_def
-
-    # # all_metainfo_packages()  # leads to circular imports
-    # package_name, section_name = m_def.rsplit('.', 1)
-    # package = Package.registry.get(package_name)
-    # if package is None:
-    #     return None
-
-    # definition = package.all_definitions.get(section_name)
-    # return definition if isinstance(definition, Section) else None
 
 
 def _quantity_to_arrow_column_config(quantity_def: Quantity) -> _ArrowColumnConfig:
@@ -457,8 +450,7 @@ def _stringify_nested_columns(batch: pa.RecordBatch) -> pa.RecordBatch:
 
 
 def write_parquet_file(path: str, data: list[dict]):
-    """
-    Writes a list of NOMAD entry dicts to a parquet file.
+    """Writes a list of NOMAD entry dicts to a parquet file.
 
     Args:
         path (str): The path where the file will be saved.
@@ -478,8 +470,7 @@ def write_parquet_file(path: str, data: list[dict]):
 
 
 def write_json_file(path: str, data: list[dict]):
-    """
-    Writes a list of NOMAD entry dicts to a JSON file.
+    """Writes a list of NOMAD entry dicts to a JSON file.
 
     Args:
         path (str): The path where the file will be saved.
@@ -488,15 +479,14 @@ def write_json_file(path: str, data: list[dict]):
     if not path.endswith('json'):
         raise ValueError('Unsupported file format. Please use json.')
 
-    with open(path, 'w') as f:
-        json.dump(data, f, indent=4)
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2)
 
 
 def merge_files(
     input_file_paths: list[str], output_file_format: str, output_file_path: str
 ):
-    """
-    Merges multiple Parquet or JSON files into a single file.
+    """Merges multiple Parquet or JSON files into a single file.
 
     Args:
         input_file_paths (list[str]): List of file paths to be merged.
