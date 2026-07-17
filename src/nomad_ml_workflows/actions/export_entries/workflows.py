@@ -114,6 +114,7 @@ class ExportEntriesWorkflow:
             # (query, owner, required, batch_file_format) once.
             template_spi = SearchPageInput.from_user_input(
                 data,
+                page_num=0,
                 output_file_path='',  # placeholder, real paths are set per page below
                 max_entries_export_limit=config.max_entries_export_limit,
             )
@@ -145,15 +146,17 @@ class ExportEntriesWorkflow:
             # Build one SearchPageInput per page with the corresponding cursor and
             # export limit for that page
             search_page_inputs: list[SearchPageInput] = []
-            for page_index, cursor in enumerate(cursors_output.page_after_values):
-                entries_so_far = page_index * page_size
+            for page_iter, cursor in enumerate(cursors_output.page_after_values):
+                page_num = page_iter + 1
+                entries_so_far = page_iter * page_size
                 limit_for_page = min(
                     page_size, config.max_entries_export_limit - entries_so_far
                 )
                 spi = template_spi.model_copy(
                     update={
+                        'page_num': page_num,
                         'output_file_path': (
-                            f'{artifact_subdirectory}/{page_index + 1}'
+                            f'{artifact_subdirectory}/{page_num}'
                             f'.{template_spi.batch_file_format}'
                         ),
                         'max_entries_export_limit': limit_for_page,
@@ -181,11 +184,11 @@ class ExportEntriesWorkflow:
                             SearchPageWorkflow.run,
                             spi,
                             id=f'{workflow.info().workflow_id}-search-page-'
-                            f'{concurr_batch_start + i + 1}',
+                            f'{spi.page_num}',
                             parent_close_policy=workflow.ParentClosePolicy.TERMINATE,
                             retry_policy=retry_policy,
                         )
-                        for i, spi in enumerate(concurr_batch_spis)
+                        for spi in concurr_batch_spis
                     ]
                 )
                 search_page_outputs.extend(concurr_batch_spos)
