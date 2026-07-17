@@ -70,7 +70,7 @@ class SearchPageWorkflow:
 @workflow.defn
 class ExportEntriesWorkflow:
     @workflow.run
-    async def run(self, data: ExportEntriesUserInput) -> str:
+    async def run(self, data: ExportEntriesUserInput) -> ExportEntriesOutput:
         """
         Workflow to search entries and export them into a datafile in the specified
         upload.
@@ -141,7 +141,7 @@ class ExportEntriesWorkflow:
             )
             if cursors_output.num_pages == 0:
                 # No pages to export, return early with an empty dataset
-                return
+                return ExportEntriesOutput(exported_dir_path='', workflow_duration=0.0)
 
             # Build one SearchPageInput per page with the corresponding cursor and
             # export limit for that page
