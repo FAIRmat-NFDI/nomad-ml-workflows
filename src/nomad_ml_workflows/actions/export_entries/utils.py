@@ -30,9 +30,10 @@ class _ArrowColumnConfig:
 
 
 @dataclass
-class _FlattenContext:
+class _FlattenEntryContext:
+    row: dict[str, str | int | float | bool | dict | list | None]
     columns_quantity_def: dict[str, Quantity]
-    unhandled_keys: Counter
+    unhandled_keys: list[str]
 
 
 def _join_path(prefix: str, key: str) -> str:
@@ -212,31 +213,16 @@ def _infer_arrow_column(values: list, column_name: str) -> pa.Array:
             ) from error
 
 
-def _flatten_generic(value, prefix: str, row: dict):
-    """Flatten generic nested data while keeping non-dict lists as leaf values."""
-    if isinstance(value, dict):
-        for key, item in value.items():
-            _flatten_generic(item, _join_path(prefix, key), row)
-    elif isinstance(value, list):
-        if all(isinstance(item, dict) for item in value):
-            for index, item in enumerate(value):
-                _flatten_generic(item, _join_path(prefix, str(index)), row)
-        else:
-            row[prefix] = value
-    else:
-        row[prefix] = value
-
-
 def _store_leaf_value(row: dict, col: str, value):
     """Store a value as one opaque DataFrame cell."""
     row[col] = value
+
 
 def _flatten_section(
     section_data: dict,
     section_def: Section,
     prefix: str,
-    row: dict,
-    context: _FlattenContext,
+    context: _FlattenEntryContext,
 ):
     """
     Flatten one serialized NOMAD section using its metainfo definition.
@@ -251,9 +237,9 @@ def _flatten_section(
         if quantity_name not in section_data:
             continue
         handled_keys.add(quantity_name)
-        col = _join_path(prefix, quantity_name) + '#' + section_def.qualified_name()
+        col = f'{_join_path(prefix, quantity_name)}#{section_def.qualified_name()}'
         context.columns_quantity_def.setdefault(col, quantity_def)
-        _store_leaf_value(row, col, section_data[quantity_name])
+        _store_leaf_value(context.row, col, section_data[quantity_name])
 
     for sub_section_name, sub_section_def in section_def.all_sub_sections.items():
         if sub_section_name not in section_data:
@@ -278,7 +264,6 @@ def _flatten_section(
                     item,
                     item_section_def or child_section_def,
                     item_prefix,
-                    row,
                     context,
                 )
         else:
@@ -290,16 +275,15 @@ def _flatten_section(
                 sub_section_value,
                 item_section_def or child_section_def,
                 sub_section_prefix,
-                row,
                 context,
             )
 
-    # Add the unhandled keys to the counter. These point to the obsolete data in the
+    # Add the unhandled keys to a list. These point to the obsolete data in the
     # archives that do not correspond to a subsection/quantity in the current schema
     for key, _ in section_data.items():
         if key not in [*handled_keys, *IGNORED_KEYS]:
-            context.unhandled_keys.update(
-                [f'{prefix}.{key}#{section_def.qualified_name()}']
+            context.unhandled_keys.append(
+                f'{prefix}.{key}#{section_def.qualified_name()}'
             )
 
 
@@ -319,32 +303,41 @@ def _archives_to_rows(
         )
 
     rows = []
-    context = _FlattenContext(columns_quantity_def={}, unhandled_keys=Counter())
+    columns_quantity_def: dict[str, Quantity] = {}
     for item in archives:
         if not isinstance(item, dict):
             raise ValueError('Input must be a dictionary (JSON object).')
 
-        row = {}
-        for key, value in item.items():
-            if key != 'archive':
-                # TODO: remove this support and require list[archive].
-                _flatten_generic(value, key, row)
-                continue
-
+        context = _FlattenEntryContext(
+            row={},
+            columns_quantity_def=columns_quantity_def,
+            unhandled_keys=[],
+        )
+        try:
             _flatten_section(
-                section_data=value,
+                section_data=item,
                 section_def=EntryArchive.m_def,
                 prefix='',
-                row=row,
                 context=context,
             )
+            rows.append(context.row)
+            columns_quantity_def.update(context.columns_quantity_def)
+            if context.unhandled_keys and logger:
+                logger.warning(
+                    'unhandled keys',
+                    entry_id=item['entry_id'],
+                    unhandled_keys=context.unhandled_keys,
+                )
+        except Exception as e:
+            if logger:
+                logger.error(
+                    'failed to flatten archive', entry_id=item['entry_id'], exc_info=e
+                )
 
-        rows.append(row)
-
-    return rows, context.columns_quantity_def, context.unhandled_keys
+    return rows, columns_quantity_def
 
 
-def archives_to_dataframe(archives: list[dict] | dict) -> tuple[pd.DataFrame, Counter]:
+def archives_to_dataframe(archives: list[dict] | dict, logger=None) -> pd.DataFrame:
     """
     Convert serialized NOMAD entries into a flattened pandas DataFrame.
 
@@ -358,20 +351,17 @@ def archives_to_dataframe(archives: list[dict] | dict) -> tuple[pd.DataFrame, Co
             entry may contain an ``archive`` dictionary and optional top-level data.
 
     Returns:
-        A tuple containing the flattened DataFrame and a counter of serialized archive
-        keys that are not quantities or subsections in the resolved NOMAD schemas.
+        A flattened DataFrame.
     """
-    rows, _, unhandled_keys = _archives_to_rows(archives)
+    rows, _ = _archives_to_rows(archives, logger=logger)
 
     df = pd.DataFrame(rows)
     sorted_df = df.reindex(sorted(df.columns), axis=1)
 
-    return sorted_df, unhandled_keys
+    return sorted_df
 
 
-def archives_to_arrow_table(
-    archives: list[dict] | dict,
-) -> tuple[pa.Table, Counter]:
+def archives_to_arrow_table(archives: list[dict] | dict, logger=None) -> pa.Table:
     """
     Convert serialized NOMAD entries into a schema-typed Arrow table.
 
@@ -387,8 +377,7 @@ def archives_to_arrow_table(
             entry may contain an ``archive`` dictionary and optional top-level data.
 
     Returns:
-        A tuple containing the schema-typed Arrow table and a counter of serialized
-        archive keys that are not quantities or subsections in the resolved schemas.
+        A schema-typed Arrow table.
     """
     rows, column_quantities, unhandled_keys = _archives_to_rows(archives)
     column_names = sorted({column for row in rows for column in row})
@@ -396,7 +385,7 @@ def archives_to_arrow_table(
     arrays = []
     for column_name in column_names:
         values = [row.get(column_name) for row in rows]
-        quantity_def = column_quantities.get(column_name)
+        quantity_def = columns_quantity_def.get(column_name)
         if quantity_def is None:
             array = _infer_arrow_column(values, column_name)
         else:
@@ -408,7 +397,7 @@ def archives_to_arrow_table(
             )
         arrays.append(array)
 
-    return pa.Table.from_arrays(arrays, names=column_names), unhandled_keys
+    return pa.Table.from_arrays(arrays, names=column_names)
 
 
 def _is_nested_type(dtype: pa.DataType) -> bool:
@@ -449,7 +438,7 @@ def _stringify_nested_columns(batch: pa.RecordBatch) -> pa.RecordBatch:
     )
 
 
-def write_parquet_file(path: str, data: list[dict]):
+def write_parquet_file(path: str, data: list[dict], logger=None):
     """Writes a list of NOMAD entry dicts to a parquet file.
 
     Args:
@@ -459,7 +448,7 @@ def write_parquet_file(path: str, data: list[dict]):
     if not path.endswith('parquet'):
         raise ValueError('Unsupported file format. Please use parquet.')
 
-    table, _ = archives_to_arrow_table(data)
+    table = archives_to_arrow_table(data, logger)
     with pq.ParquetWriter(
         path,
         table.schema,
@@ -469,7 +458,7 @@ def write_parquet_file(path: str, data: list[dict]):
         writer.write_table(table)
 
 
-def write_json_file(path: str, data: list[dict]):
+def write_json_file(path: str, data: list[dict], logger=None):
     """Writes a list of NOMAD entry dicts to a JSON file.
 
     Args:
