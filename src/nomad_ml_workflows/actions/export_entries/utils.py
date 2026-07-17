@@ -57,7 +57,10 @@ def _resolve_section_def(m_def: str | None) -> Section | None:
     package_name, section_name = m_def.rsplit('.', 1)
     try:
         module = importlib.import_module(package_name)
-    except ImportError:
+    except (ImportError, TypeError):
+        # skip section resolution when module is not found
+        # or when the module is not a valid Python module
+        # which happens entry uses a YAML schema
         module = None
 
     if module is not None:
