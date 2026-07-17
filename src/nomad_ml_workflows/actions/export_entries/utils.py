@@ -301,7 +301,8 @@ def _archives_to_rows(
     Flatten list of archive dicts into list of row dicts. Also returns column definition
     and a count of unhandled archive dict keys.
 
-    Shape of one archive dict corresponds to serialization of EntryArchive::
+    Each element in the `archives` list should have the following structure, where
+    `archive` key corresponds to serialization of EntryArchive::
         {
             "entry_id": str,
             "archive": {
@@ -338,7 +339,7 @@ def _archives_to_rows(
         )
         try:
             _flatten_section(
-                section_data=item,
+                section_data=item['archive'],
                 section_def=EntryArchive.m_def,
                 prefix='',
                 context=context,
