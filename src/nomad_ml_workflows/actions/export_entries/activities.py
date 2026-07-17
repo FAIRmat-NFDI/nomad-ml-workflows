@@ -71,6 +71,12 @@ async def search(data: SearchPageInput) -> SearchPageOutput:
     Returns:
         SearchOutput: Output data from the search activity.
     """
+    info = activity.info()
+
+    activity_logger = logger.bind(
+        activity_type=info.activity_type,
+        search_page_num=data.page_num,
+    )
 
     write_dataset_file = {
         'parquet': write_parquet_file,
@@ -94,12 +100,18 @@ async def search(data: SearchPageInput) -> SearchPageOutput:
     entry_list = response.data[: data.max_entries_export_limit]
 
     if entry_list:
-        write_dataset_file(path=data.output_file_path, data=entry_list, logger=logger)
+        num_entries_exported = write_dataset_file(
+            path=data.output_file_path, data=entry_list, logger=activity_logger
+        )
+    else:
+        num_entries_exported = 0
+
+    activity_logger.info(f'exported {num_entries_exported}/{len(entry_list)} entries')
 
     return SearchPageOutput(
         search_start_time=start,
         search_end_time=end,
-        num_entries_exported=len(entry_list),
+        num_entries_exported=num_entries_exported,
     )
 
 
@@ -195,6 +207,13 @@ async def read_archives(data: ReadArchivesInput) -> SearchPageOutput:
 
     start = datetime.now(timezone.utc).isoformat()
 
+    info = activity.info()
+
+    activity_logger = logger.bind(
+        activity_type=info.activity_type,
+        search_page_num=data.page_num,
+    )
+
     # Find entries whose archives are to be read
     response = nomad_search(
         user_id=data.user_id,
@@ -229,7 +248,7 @@ async def read_archives(data: ReadArchivesInput) -> SearchPageOutput:
                 )
                 entry_archives.append(entry_archive)
             except Exception as e:
-                logger.error(
+                activity_logger.error(
                     'failed to read entry archive',
                     entry_id=entry['entry_id'],
                     exc_info=e,
@@ -245,16 +264,22 @@ async def read_archives(data: ReadArchivesInput) -> SearchPageOutput:
         raise ValueError(f'Unsupported batch file format "{data.batch_file_format}". ')
 
     if entry_archives:
-        write_dataset_file(
+        num_entries_exported = write_dataset_file(
             path=data.output_file_path,
             data=entry_archives,
-            logger=logger,
+            logger=activity_logger,
         )
+    else:
+        num_entries_exported = 0
+
+    activity_logger.info(
+        f'exported {num_entries_exported}/{len(entry_archives)} entries'
+    )
 
     return SearchPageOutput(
         search_start_time=start,
         search_end_time=end,
-        num_entries_exported=len(entry_archives),
+        num_entries_exported=num_entries_exported,
     )
 
 

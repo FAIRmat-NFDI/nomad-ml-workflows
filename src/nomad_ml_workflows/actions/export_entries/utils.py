@@ -472,7 +472,7 @@ def write_parquet_file(path: str, data: list[dict], logger=None):
     if not path.endswith('parquet'):
         raise ValueError('Unsupported file format. Please use parquet.')
 
-    table = archives_to_arrow_table(data, logger)
+    table: pa.Table = archives_to_arrow_table(data, logger)
     with pq.ParquetWriter(
         path,
         table.schema,
@@ -480,6 +480,8 @@ def write_parquet_file(path: str, data: list[dict], logger=None):
         use_dictionary=True,
     ) as writer:
         writer.write_table(table)
+
+    return table.num_rows
 
 
 def write_json_file(path: str, data: list[dict], logger=None):
@@ -494,6 +496,8 @@ def write_json_file(path: str, data: list[dict], logger=None):
 
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2)
+
+    return len(data)
 
 
 def merge_files(

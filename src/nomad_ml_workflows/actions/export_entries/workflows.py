@@ -212,17 +212,18 @@ class ExportEntriesWorkflow:
                 for i, spo in enumerate(search_page_outputs)
                 if spo.num_entries_exported > 0
             ]
-            merged_file_path = await workflow.execute_activity(
-                merge_output_files,
-                MergeOutputFilesInput(
-                    artifact_subdirectory=artifact_subdirectory,
-                    output_file_format=data.output_settings.output_file_format,
-                    generated_file_paths=generated_file_paths,
-                ),
-                start_to_close_timeout=timedelta(hours=2),
-                retry_policy=retry_policy,
-            )
-            export_dataset_input.source_paths = [merged_file_path]
+            if generated_file_paths:
+                merged_file_path = await workflow.execute_activity(
+                    merge_output_files,
+                    MergeOutputFilesInput(
+                        artifact_subdirectory=artifact_subdirectory,
+                        output_file_format=data.output_settings.output_file_format,
+                        generated_file_paths=generated_file_paths,
+                    ),
+                    start_to_close_timeout=timedelta(hours=2),
+                    retry_policy=retry_policy,
+                )
+                export_dataset_input.source_paths = [merged_file_path]
 
         except Exception as e:
             # Capture error info to include in metadata
