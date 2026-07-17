@@ -68,7 +68,11 @@ def _resolve_section_def(m_def: str | None) -> Section | None:
 
 
 def _quantity_to_arrow_column_config(quantity_def: Quantity) -> _ArrowColumnConfig:
-    """Create an Arrow column config from a NOMAD quantity definition."""
+    """
+    Create an Arrow column config from a NOMAD quantity definition. Based on the quantity's type,
+    assigns the appropriate Arrow data type and stringify_json flag. If the quantity's shape is
+    available, integrates it into the Arrow data type.
+    """
     quantity_type = quantity_def.type
 
     if isinstance(quantity_type, Reference):
@@ -288,11 +292,23 @@ def _flatten_section(
 
 
 def _archives_to_rows(
-    archives: list[dict] | dict,
-) -> tuple[list[dict], dict[str, Quantity], Counter]:
+    archives: list[dict] | dict, logger=None
+) -> tuple[list[dict], dict[str, Quantity]]:
     """
     Flatten list of archive dicts into list of row dicts. Also returns column definition
     and a count of unhandled archive dict keys.
+
+    Shape of one archive dict corresponds to serialization of EntryArchive::
+        {
+            "entry_id": str,
+            "archive": {
+                "results": dict,
+                "metadata": dict,
+                "data": dict,
+                "processing_log": list[Any],
+                ...
+            },
+        }
     """
     if isinstance(archives, dict):
         archives = [archives]
@@ -307,6 +323,10 @@ def _archives_to_rows(
     for item in archives:
         if not isinstance(item, dict):
             raise ValueError('Input must be a dictionary (JSON object).')
+        if 'archive' not in item or 'entry_id' not in item:
+            raise ValueError('Archive key and entry_id key are required.')
+        if not isinstance(item['archive'], dict):
+            raise ValueError('Archive value must be a dictionary (JSON object).')
 
         context = _FlattenEntryContext(
             row={},
@@ -379,7 +399,7 @@ def archives_to_arrow_table(archives: list[dict] | dict, logger=None) -> pa.Tabl
     Returns:
         A schema-typed Arrow table.
     """
-    rows, column_quantities, unhandled_keys = _archives_to_rows(archives)
+    rows, columns_quantity_def = _archives_to_rows(archives, logger)
     column_names = sorted({column for row in rows for column in row})
 
     arrays = []
