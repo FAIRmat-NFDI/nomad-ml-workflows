@@ -6,7 +6,7 @@ from functools import lru_cache
 
 import json_stream
 import pandas as pd
-from nomad.datamodel.datamodel import EntryArchive
+from nomad.datamodel.datamodel import EntryArchive, EntryData
 from nomad.metainfo import data_type as nomad_data_type
 from nomad.metainfo.metainfo import Quantity, Reference, Section
 
@@ -240,6 +240,13 @@ def _flatten_section(
     """
     handled_keys = set()
 
+    if prefix == 'data' and section_def == EntryData.m_def:
+        m_def = section_data.get('m_def')
+        if m_def != section_def.qualified_name():
+            raise AssertionError(
+                f'archive.data exists but schema definition "{m_def}" not found. Skipping entry.'
+            )
+
     for quantity_name, quantity_def in section_def.all_quantities.items():
         if quantity_name not in section_data:
             continue
@@ -324,6 +331,8 @@ def _archives_to_rows(
 
     rows = []
     columns_quantity_def: dict[str, Quantity] = {}
+    failed_to_flatten = []
+    unhandled_key_entry_ids: dict[str, set[str]] = {}
     for item in archives:
         if not isinstance(item, dict):
             raise ValueError('Input must be a dictionary (JSON object).')
@@ -346,17 +355,28 @@ def _archives_to_rows(
             )
             rows.append(context.row)
             columns_quantity_def.update(context.columns_quantity_def)
-            if context.unhandled_keys and logger:
-                logger.warning(
-                    'unhandled keys',
-                    entry_id=item['entry_id'],
-                    unhandled_keys=context.unhandled_keys,
-                )
+            for key in context.unhandled_keys:
+                unhandled_key_entry_ids.setdefault(key, set()).add(item['entry_id'])
         except Exception as e:
             if logger:
-                logger.error(
-                    'failed to flatten archive', entry_id=item['entry_id'], exc_info=e
+                logger.warning(
+                    f'failed to flatten archive (entry_id={item["entry_id"]})',
+                    exc_info=e,
                 )
+            failed_to_flatten.append(item['entry_id'])
+
+    if logger:
+        # cummulative logging
+        for key, entry_ids_set in unhandled_key_entry_ids.items():
+            entry_ids = list(entry_ids_set)
+            logger.warning(
+                f'unhandled key {key} (num_entries={len(entry_ids)})',
+                entry_ids=entry_ids,
+            )
+        if failed_to_flatten:
+            logger.warning(
+                f'failed to flatten archives (num_entries={len(failed_to_flatten)})',
+            )
 
     return rows, columns_quantity_def
 
