@@ -20,7 +20,6 @@ from nomad_ml_workflows.actions.export_entries.models import (
     ExportDatasetInput,
     MergeOutputFilesInput,
     ReadArchivesInput,
-    SearchPageInput,
     SearchPageOutput,
 )
 from nomad_ml_workflows.actions.export_entries.utils import (
@@ -53,66 +52,6 @@ async def create_artifact_subdirectory(data: CreateArtifactSubdirectoryInput) ->
     os.makedirs(subdir_path)
 
     return subdir_path
-
-
-@activity.defn
-async def search(data: SearchPageInput) -> SearchPageOutput:
-    """
-    Activity to perform NOMAD search based on the provided input data. The data indexed
-    in the ElasticSearch is read and written to a file in the specified format
-    (Parquet or JSON) in the artifacts directory.
-
-    No archives are read in this activity; non-indexed data like nd-arrays will not be
-    extrated.
-
-    Args:
-        data (SearchInput): Input data for the search activity.
-
-    Returns:
-        SearchOutput: Output data from the search activity.
-    """
-    info = activity.info()
-
-    activity_logger = logger.bind(
-        activity_type=info.activity_type,
-        search_page_num=data.page_num,
-    )
-
-    write_dataset_file = {
-        'parquet': write_parquet_file,
-        'json': write_json_file,
-    }.get(data.batch_file_format)
-    if write_dataset_file is None:
-        raise ValueError(f'Unsupported batch file format "{data.batch_file_format}". ')
-
-    start = datetime.now(timezone.utc).isoformat()
-    response = nomad_search(
-        user_id=data.user_id,
-        owner=data.owner,
-        query=data.query,
-        required=data.required,
-        pagination=data.pagination,
-        aggregations={},  # aggregations support can be added later
-    )
-    end = datetime.now(timezone.utc).isoformat()
-
-    # Limit the number of exported entries
-    entry_list = response.data[: data.max_entries_export_limit]
-
-    if entry_list:
-        num_entries_exported = write_dataset_file(
-            path=data.output_file_path, data=entry_list, logger=activity_logger
-        )
-    else:
-        num_entries_exported = 0
-
-    activity_logger.info(f'exported {num_entries_exported}/{len(entry_list)} entries')
-
-    return SearchPageOutput(
-        search_start_time=start,
-        search_end_time=end,
-        num_entries_exported=num_entries_exported,
-    )
 
 
 @activity.defn
