@@ -16,7 +16,6 @@ with workflow.unsafe.imports_passed_through():
         export_dataset_to_upload,
         merge_output_files,
         read_archives,
-        search,
     )
     from nomad_ml_workflows.actions.export_entries.models import (
         CleanupArtifactsInput,
@@ -50,18 +49,10 @@ class SearchPageWorkflow:
         )
         retry_policy = RetryPolicy(maximum_attempts=1)
 
-        if data.read_archives:
-            rai = ReadArchivesInput.from_search_page_input(data)
-            return await workflow.execute_activity(
-                read_archives,
-                rai,
-                start_to_close_timeout=timedelta(seconds=config.search_batch_timeout),
-                retry_policy=retry_policy,
-            )
-
+        rai = ReadArchivesInput.from_search_page_input(data)
         return await workflow.execute_activity(
-            search,
-            data,
+            read_archives,
+            rai,
             start_to_close_timeout=timedelta(seconds=config.search_batch_timeout),
             retry_policy=retry_policy,
         )

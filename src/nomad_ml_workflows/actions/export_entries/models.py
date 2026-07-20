@@ -30,11 +30,6 @@ class SearchSettings(BaseModel):
             'uiSchema': {'ui:widget': 'textarea', 'ui:options': {'rows': 5}}
         },
     )
-    read_archives: bool = Field(
-        False,
-        description='Read full archive data, including non-indexed fields such as '
-        'n-dim arrays. Disable to export only indexed fields faster.',
-    )
     required_include: list[str] = Field(
         [],
         description='List of fields to include in the search results. For example: '
@@ -95,11 +90,6 @@ class SearchPageInput(BaseModel):
     user_id: str = Field(..., description='User ID performing the search.')
     owner: OwnerLiteral = Field(..., description='Owner of the entries to be searched.')
     query: Query = Field(..., description='Search query parameters.')
-    read_archives: bool = Field(
-        ...,
-        description='Read full archive data, including non-indexed fields such as '
-        'n-dim arrays.',
-    )
     required: Required = Field(
         ..., description='Required fields for filtering the search results.'
     )
@@ -166,7 +156,6 @@ class SearchPageInput(BaseModel):
             user_id=user_input.user_id,
             owner=user_input.search_settings.owner,
             query=query,
-            read_archives=user_input.search_settings.read_archives,
             required=required,
             pagination=pagination,
             batch_file_format=batch_file_format,
@@ -270,7 +259,6 @@ class ReadArchivesInput(SearchPageInput):
             user_id=spi.user_id,
             owner=spi.owner,
             query=spi.query,
-            read_archives=spi.read_archives,
             required=required,
             pagination=spi.pagination,
             batch_file_format=spi.batch_file_format,
