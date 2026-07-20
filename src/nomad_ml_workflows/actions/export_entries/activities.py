@@ -9,6 +9,7 @@ from nomad.actions.manager import action_artifacts_dir, get_upload_files
 from nomad.app.v1.models.models import MetadataPagination, MetadataRequired, User
 from nomad.files import StagingUploadFiles
 from nomad.search import search as nomad_search
+from nomad.utils import get_logger
 from temporalio import activity
 
 from nomad_ml_workflows.actions.export_entries.models import (
@@ -27,6 +28,8 @@ from nomad_ml_workflows.actions.export_entries.utils import (
     write_json_file,
     write_parquet_file,
 )
+
+logger = get_logger(__name__)
 
 
 @activity.defn
@@ -68,6 +71,12 @@ async def search(data: SearchPageInput) -> SearchPageOutput:
     Returns:
         SearchOutput: Output data from the search activity.
     """
+    info = activity.info()
+
+    activity_logger = logger.bind(
+        activity_type=info.activity_type,
+        search_page_num=data.page_num,
+    )
 
     write_dataset_file = {
         'parquet': write_parquet_file,
@@ -91,12 +100,18 @@ async def search(data: SearchPageInput) -> SearchPageOutput:
     entry_list = response.data[: data.max_entries_export_limit]
 
     if entry_list:
-        write_dataset_file(path=data.output_file_path, data=entry_list)
+        num_entries_exported = write_dataset_file(
+            path=data.output_file_path, data=entry_list, logger=activity_logger
+        )
+    else:
+        num_entries_exported = 0
+
+    activity_logger.info(f'exported {num_entries_exported}/{len(entry_list)} entries')
 
     return SearchPageOutput(
         search_start_time=start,
         search_end_time=end,
-        num_entries_exported=len(entry_list),
+        num_entries_exported=num_entries_exported,
     )
 
 
@@ -192,6 +207,13 @@ async def read_archives(data: ReadArchivesInput) -> SearchPageOutput:
 
     start = datetime.now(timezone.utc).isoformat()
 
+    info = activity.info()
+
+    activity_logger = logger.bind(
+        activity_type=info.activity_type,
+        search_page_num=data.page_num,
+    )
+
     # Find entries whose archives are to be read
     response = nomad_search(
         user_id=data.user_id,
@@ -220,22 +242,44 @@ async def read_archives(data: ReadArchivesInput) -> SearchPageOutput:
     # For each entry
     with _Uploads() as uploads:
         for entry in entries:
-            entry_archive = _read_entry_from_archive(entry, uploads, required_reader)
-            entry_archives.append(entry_archive)
+            try:
+                entry_archive = _read_entry_from_archive(
+                    entry, uploads, required_reader
+                )
+                entry_archives.append(entry_archive)
+            except Exception as e:
+                activity_logger.error(
+                    'failed to read entry archive',
+                    entry_id=entry['entry_id'],
+                    exc_info=e,
+                )
 
     end = datetime.now(timezone.utc).isoformat()
 
+    write_dataset_file = {
+        'parquet': write_parquet_file,
+        'json': write_json_file,
+    }.get(data.batch_file_format)
+    if write_dataset_file is None:
+        raise ValueError(f'Unsupported batch file format "{data.batch_file_format}". ')
+
     if entry_archives:
-        write_file_func = {
-            'parquet': write_parquet_file,
-            'json': write_json_file,
-        }.get(data.batch_file_format)
-        write_file_func(path=data.output_file_path, data=entry_archives)
+        num_entries_exported = write_dataset_file(
+            path=data.output_file_path,
+            data=entry_archives,
+            logger=activity_logger,
+        )
+    else:
+        num_entries_exported = 0
+
+    activity_logger.info(
+        f'exported {num_entries_exported}/{len(entry_archives)} entries'
+    )
 
     return SearchPageOutput(
         search_start_time=start,
         search_end_time=end,
-        num_entries_exported=len(entry_archives),
+        num_entries_exported=num_entries_exported,
     )
 
 

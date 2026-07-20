@@ -113,12 +113,14 @@ class SearchPageInput(BaseModel):
     max_entries_export_limit: int = Field(
         ..., description='Maximum number of entries to be exported.'
     )
+    page_num: int = Field(..., description='Page number for the search results.')
 
     @classmethod
     def from_user_input(
         cls,
         user_input: ExportEntriesUserInput,
         /,
+        page_num: int,
         output_file_path: str,
         max_entries_export_limit: int,
     ) -> 'SearchPageInput':
@@ -168,6 +170,7 @@ class SearchPageInput(BaseModel):
             required=required,
             pagination=pagination,
             batch_file_format=batch_file_format,
+            page_num=page_num,
             output_file_path=output_file_path,
             max_entries_export_limit=max_entries_export_limit,
         )
@@ -271,6 +274,7 @@ class ReadArchivesInput(SearchPageInput):
             required=required,
             pagination=spi.pagination,
             batch_file_format=spi.batch_file_format,
+            page_num=spi.page_num,
             output_file_path=spi.output_file_path,
             max_entries_export_limit=spi.max_entries_export_limit,
         )
