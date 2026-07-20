@@ -336,9 +336,9 @@ def _archives_to_rows(
         if not isinstance(item, dict):
             raise ValueError('Input must be a dictionary (JSON object).')
         if 'archive' not in item or 'entry_id' not in item:
-            raise ValueError('Archive key and entry_id key are required.')
+            raise ValueError('archive and entry_id keys are required.')
         if not isinstance(item['archive'], dict):
-            raise ValueError('Archive value must be a dictionary (JSON object).')
+            raise ValueError('archive value must be a dictionary (JSON object).')
 
         context = _FlattenEntryContext(
             row={},
