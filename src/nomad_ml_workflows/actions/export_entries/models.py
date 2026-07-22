@@ -1,12 +1,36 @@
 import json
 from typing import Any, Literal
 
-from nomad.app.v1.models.models import MetadataPagination, MetadataRequired, Query
+from nomad.app.v1.models.models import MetadataPagination, Query
 from pydantic import BaseModel, Field
 
 OwnerLiteral = Literal['public', 'visible', 'shared', 'user', 'staging']
 BatchFileFormatLiteral = Literal['parquet', 'json']
 OutputFileFormatLiteral = Literal['parquet', 'csv', 'json']
+
+
+def _clean_field(field: str) -> str:
+    """
+    Removes trailing whitespaces and inverted commas
+    """
+    return field.strip().strip("'").strip('"')
+
+
+class Include(BaseModel):
+    path: str = Field(..., description='Archive paths to be included.')
+    resolve_references: bool = Field(
+        False,
+        description='Recursively resolve references for the included path.',
+    )
+
+
+class Exclude(BaseModel):
+    path: str = Field(..., description='Archive paths to be excluded.')
+
+
+Required = Include
+# TODO: set "Required = Include | Exclude" once exclude directive is
+# supported in RequiredReader
 
 
 class SearchSettings(BaseModel):
@@ -30,20 +54,11 @@ class SearchSettings(BaseModel):
             'uiSchema': {'ui:widget': 'textarea', 'ui:options': {'rows': 5}}
         },
     )
-    required_include: list[str] = Field(
-        [],
-        description='List of fields to include in the search results. For example: '
-        'results*, data.results*',
-    )
-    required_include_resolved: list[str] = Field(
-        [],
-        description='Paths to include, along with resolved referencs, in the exported '
-        'dataset. For example: results*, data.results*',
-    )
-    required_exclude: list[str] = Field(
-        [],
-        description='List of fields to exclude from the search results. For example: '
-        'results.method.method_name',
+    required: list[Required] | None = Field(
+        None,
+        description='Required archive paths for filtering the search results. '
+        'Paths can target quantities like "results.method.method_name" or '
+        'sub-sections like "results".',
     )
 
 
@@ -77,21 +92,14 @@ class CreateArtifactSubdirectoryInput(BaseModel):
     subdir_name: str = Field(..., description='Name of the subdirectory to be created.')
 
 
-class Required(MetadataRequired):
-    include_resolved: list[str] | None = Field(
-        None,
-        description='Quantities to include for each result. If the quantities include '
-        'references to other sections, the references will be resolved.'
-        'For example: results*, data.results*',
-    )
-
-
 class SearchPageInput(BaseModel):
     user_id: str = Field(..., description='User ID performing the search.')
     owner: OwnerLiteral = Field(..., description='Owner of the entries to be searched.')
     query: Query = Field(..., description='Search query parameters.')
-    required: Required = Field(
-        ..., description='Required fields for filtering the search results.'
+    required: str | dict[str, Any] = Field(
+        '*',
+        description='Dictionary of required fields and directives compatible with '
+        '`nomad.archive.required.RequiredReader` class.',
     )
     pagination: MetadataPagination = Field(
         ..., description='Pagination settings for the search results.'
@@ -105,6 +113,89 @@ class SearchPageInput(BaseModel):
     )
     page_num: int = Field(..., description='Page number for the search results.')
 
+    @staticmethod
+    def build_archive_required(required: list[Required] | None) -> str | dict[str, Any]:
+        """Convert archive path requirements to a RequiredReader specification.
+
+        Includes select an archive path, optionally resolving all references below
+        it. Excludes remove a path from an included subtree. When only exclusions
+        are supplied, the rest of the archive is included by default.
+        """
+        if not required:
+            return '*'
+
+        directive_priority = {
+            'include': 1,
+            'include-resolved': 2,
+            'exclude': 3,
+        }  # 3 is highest priority
+        directives: dict[tuple[str, ...], str] = {}
+        has_include = False
+
+        for r in required:
+            path = _clean_field(r.path).rstrip('*')
+            path_parts = tuple(part for part in path.split('.') if part)
+            if not path_parts:
+                continue
+
+            if isinstance(r, Include):
+                has_include = True
+                directive = 'include-resolved' if r.resolve_references else 'include'
+            elif isinstance(r, Exclude):
+                directive = 'exclude'
+            else:
+                raise AssertionError(
+                    f'Only instances of Include or Exclude allowed, got "{r: type(r)}"'
+                )
+
+            directives[path_parts] = max(
+                directives.get(path_parts, directive),
+                directive,
+                key=directive_priority.__getitem__,
+            )  # if same path_parts has multiple directives, pick the higher priority one
+
+        if not directives:
+            return '*'
+
+        directive_key = object()
+        tree: dict[Any, Any] = {}
+        if not has_include:
+            tree[directive_key] = 'include'
+
+        for path_parts, directive in sorted(
+            directives.items(), key=lambda item: len(item[0])
+        ):
+            inherited_directive = next(
+                (
+                    directives[path_parts[:index]]
+                    for index in range(len(path_parts) - 1, 0, -1)
+                    if path_parts[:index] in directives
+                ),
+                None,
+            )
+            if directive == inherited_directive:
+                continue
+
+            node = tree
+            for part in path_parts:
+                node = node.setdefault(part, {})
+            node[directive_key] = directive
+
+        def _render(node: dict[Any, Any]) -> str | dict[str, Any]:
+            directive = node.get(directive_key)
+            children = {
+                key: _render(value)
+                for key, value in node.items()
+                if key is not directive_key
+            }
+            if directive is None:
+                return children
+            if not children:
+                return directive
+            return {'*': directive, **children}
+
+        return _render(tree)
+
     @classmethod
     def from_user_input(
         cls,
@@ -116,35 +207,13 @@ class SearchPageInput(BaseModel):
     ) -> 'SearchPageInput':
         """Convert from ExportEntriesUserInput to SearchPageInput"""
 
-        def _clean_field(field: str) -> str:
-            """
-            Removes trailing whitespaces and inverted commas
-            """
-            return field.strip().strip("'").strip('"')
-
         query = json.loads(
             _clean_field(user_input.search_settings.query).replace("'", '"')
         )
 
-        required = Required()
-        if user_input.search_settings.required_include:
-            include = [
-                _clean_field(field)
-                for field in user_input.search_settings.required_include
-            ]
-            required.include = include if include else None
-        if user_input.search_settings.required_include_resolved:
-            include_resolved = [
-                _clean_field(field)
-                for field in user_input.search_settings.required_include_resolved
-            ]
-            required.include_resolved = include_resolved if include_resolved else None
-        if user_input.search_settings.required_exclude:
-            exclude = [
-                _clean_field(field)
-                for field in user_input.search_settings.required_exclude
-            ]
-            required.exclude = exclude if exclude else None
+        archive_required = cls.build_archive_required(
+            user_input.search_settings.required
+        )
 
         pagination = MetadataPagination(page_size=user_input.search_settings.page_size)
 
@@ -156,115 +225,12 @@ class SearchPageInput(BaseModel):
             user_id=user_input.user_id,
             owner=user_input.search_settings.owner,
             query=query,
-            required=required,
+            required=archive_required,
             pagination=pagination,
             batch_file_format=batch_file_format,
             page_num=page_num,
             output_file_path=output_file_path,
             max_entries_export_limit=max_entries_export_limit,
-        )
-
-
-class ReadArchivesInput(SearchPageInput):
-    required: str | dict[str, Any] = Field(
-        '*',
-        description='Dictionary of required fields and directives compatible with '
-        '`nomad.archive.required.RequiredReader` class.',
-    )
-
-    @staticmethod
-    def build_archive_required(required: Required) -> str | dict:
-        """
-        Convert dot-separated required paths into a nested-dict structure with
-        directives on the leaf. Output can be used when instantiating the
-        `nomad.archive.required.RequiredReader` class.
-
-        Adds the following directives at the dict nodes:
-            - "include"             (for `required.include` list)
-            - "include-resolved"    (for `required.include_resolved` list)
-
-        Ignores the `required.exclude` list, since there is no support for
-        "exclude" directives.
-
-        If the required lists are empty, returns "*", meaning to include everything.
-
-        Examples:
-            - When required.include is:
-                []                         -> "*"
-                ["data"]                   -> {"data": "include"}
-                ["data.num_val"]           -> {"data": {"num_val": "include"}}
-                ["data.sub_sec"]           -> {"data": {"sub_sec": "include"}}
-                ["data.sub_sec*"]          -> {"data": {"sub_sec": "include"}}
-                                            (remove trailing *)
-                ["data", "data.sub_sec"]   -> {"data": "*"}
-                                            (parent wins)
-
-        For `required.include_resolved`, the directive changes to "include-resolved",
-        but the conversion follows the same logic.
-
-        When same fields are present in `required.include` and
-        `required.include_resolved`, "include-resolved" directive takes priority.
-        """
-        include = required.include or []
-        include_resolved = required.include_resolved or []
-
-        if not include and not include_resolved:
-            return '*'  # include everything
-
-        def _remove_wildcard(require_list: list) -> list:
-            return [el[:-1] if el.endswith('*') else el for el in require_list]
-
-        def _path_parts(path: str) -> list[str]:
-            return [part for part in path.split('.') if part]
-
-        def _add_include(
-            target: dict[str, Any], path: str, directive='include'
-        ) -> None:
-            node = target
-            parts = _path_parts(path)
-            for index, part in enumerate(parts):
-                is_leaf = index == len(parts) - 1
-                if is_leaf:
-                    node[part] = directive
-                    return
-                child = node.get(part)
-                if child == directive:
-                    return
-                if not isinstance(child, dict):
-                    child = {}
-                    node[part] = child
-                node = child
-
-        include = _remove_wildcard(include)
-        include_resolved = _remove_wildcard(include_resolved)
-
-        archive_required = {}
-        for path in include:
-            _add_include(archive_required, path, directive='include')
-        for path in include_resolved:
-            _add_include(archive_required, path, directive='include-resolved')
-
-        return archive_required
-
-    @classmethod
-    def from_search_page_input(
-        cls,
-        spi: SearchPageInput,
-    ) -> 'ReadArchivesInput':
-        """Convert from SearchPageInput to ReadArchivesInput"""
-
-        required = ReadArchivesInput.build_archive_required(spi.required)
-
-        return cls(
-            user_id=spi.user_id,
-            owner=spi.owner,
-            query=spi.query,
-            required=required,
-            pagination=spi.pagination,
-            batch_file_format=spi.batch_file_format,
-            page_num=spi.page_num,
-            output_file_path=spi.output_file_path,
-            max_entries_export_limit=spi.max_entries_export_limit,
         )
 
 
