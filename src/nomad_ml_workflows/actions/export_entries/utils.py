@@ -333,6 +333,10 @@ def _archives_to_rows(
     failed_to_flatten = []
     unhandled_key_entry_ids: dict[str, set[str]] = {}
     for item in archives:
+        if item is None:
+            if logger:
+                logger.warning('Encountered a None item.')
+            continue
         if not isinstance(item, dict):
             raise ValueError('Input must be a dictionary (JSON object).')
         if 'archive' not in item or 'entry_id' not in item:
