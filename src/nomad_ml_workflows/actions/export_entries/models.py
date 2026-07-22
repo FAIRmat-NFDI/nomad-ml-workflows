@@ -1,5 +1,5 @@
 import json
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from nomad.app.v1.models.models import MetadataPagination, Query
 from pydantic import BaseModel, Field
@@ -10,6 +10,7 @@ OutputFileFormatLiteral = Literal['parquet', 'csv', 'json']
 
 
 class Include(BaseModel):
+    type: Literal['include'] = Field('include')
     path: str = Field(..., description='Archive paths to be included.')
     resolve_references: bool = Field(
         False,
@@ -18,12 +19,13 @@ class Include(BaseModel):
 
 
 class Exclude(BaseModel):
+    type: Literal['exclude'] = Field('exclude')
     path: str = Field(..., description='Archive paths to be excluded.')
 
 
-Required = Include
-# TODO: set "Required = Include | Exclude" once exclude directive is
-# supported in RequiredReader
+Required = Annotated[Include, Field(discriminator='type')]
+# TODO: set Required = Annotated[Include | Exclude, Field(discriminator='type')]
+# once exclude directive is supported in RequiredReader
 
 
 def _clean_field(field: str) -> str:
@@ -111,6 +113,13 @@ class SearchSettings(BaseModel):
         description='Required archive paths for filtering the search results. '
         'Paths can target quantities like "results.method.method_name" or '
         'sub-sections like "results".',
+        json_schema_extra={
+            'uiSchema': {
+                'items': {
+                    'type': {'ui:widget': 'hidden'},
+                },
+            },
+        },
     )
 
 
