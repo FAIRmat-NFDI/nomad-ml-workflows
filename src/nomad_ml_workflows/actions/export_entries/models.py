@@ -1,8 +1,46 @@
 import json
+from enum import Enum
 from typing import Annotated, Any, Literal
 
 from nomad.app.v1.models.models import MetadataPagination, Query
 from pydantic import BaseModel, Field
+
+
+def _get_entry_data_section_names() -> tuple[str, ...]:
+    """Return qualified names of EntryData sections from all loaded plugins."""
+    from nomad.datamodel import EntryData, all_metainfo_packages
+    from nomad.metainfo import Section
+
+    environment = all_metainfo_packages()
+    if environment is None:
+        return ()
+
+    return tuple(
+        sorted(
+            {
+                section.qualified_name()
+                for package in environment.packages
+                for section in package.section_definitions
+                if isinstance(section, Section)
+                and section is not EntryData.m_def
+                and section.m_follows(EntryData.m_def, self_as_definition=True)
+            }
+        )
+    )
+
+
+ENTRY_DATA_SECTION_NAMES = _get_entry_data_section_names()
+
+EntryType = Enum(
+    'EntryType',
+    {
+        f'ENTRY_DATA_{index}': qualified_name
+        for index, qualified_name in enumerate(ENTRY_DATA_SECTION_NAMES)
+    },
+    type=str,
+    module=__name__,
+)
+
 
 OwnerLiteral = Literal['public', 'visible', 'shared', 'user', 'staging']
 BatchFileFormatLiteral = Literal['parquet', 'json']
@@ -90,6 +128,26 @@ def _contains_include(required: str | dict[str, Any]) -> bool:
 class SearchSettings(BaseModel):
     owner: OwnerLiteral = Field(
         'visible', description='Owner of the entries to be searched.'
+    )
+    entry_type: EntryType | None = Field(
+        None,
+        description='Optionally restrict the export to an entry data type. Start '
+        'typing a short or fully qualified section name to filter the available '
+        'types.',
+        json_schema_extra={
+            'uiSchema': {
+                'ui:widget': 'AutocompleteWidget',
+                'ui:placeholder': 'Start typing an entry type name…',
+                'ui:enumNames': {
+                    name: name.rsplit('.', 1)[-1] for name in ENTRY_DATA_SECTION_NAMES
+                },
+                'ui:options': {
+                    'limit': 50,
+                    'noOptionsText': 'No matching entry type',
+                    'showValueDetails': True,
+                },
+            }
+        },
     )
     page_size: int = Field(
         1000,
