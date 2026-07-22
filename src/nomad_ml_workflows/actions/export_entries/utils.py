@@ -300,7 +300,7 @@ def _flatten_section(
             )
 
 
-def _archives_to_rows(
+def _archives_to_rows(  # noqa: PLR0912
     archives: list[dict] | dict, logger=None
 ) -> tuple[list[dict], dict[str, Quantity]]:
     """
