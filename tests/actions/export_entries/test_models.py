@@ -1,46 +1,122 @@
-from nomad_ml_workflows.actions.export_entries.models import ReadArchivesInput, Required
+from nomad_ml_workflows.actions.export_entries.models import (
+    Exclude,
+    Include,
+    SearchPageInput,
+)
 
 
 def test_build_archive_required_returns_wildcard_for_empty_paths():
-    assert ReadArchivesInput.build_archive_required(Required()) == '*'
+    assert SearchPageInput.build_archive_required(None) == '*'
 
 
 def test_build_archive_required_builds_nested_include_tree():
-    required = Required(include=['data.results.energy'])
+    required = [Include(path='data.results.energy', resolve_references=False)]
 
-    assert ReadArchivesInput.build_archive_required(required) == {
+    assert SearchPageInput.build_archive_required(required) == {
         'data': {'results': {'energy': 'include'}}
     }
 
 
 def test_build_archive_required_prefers_parent_include():
-    required = Required(include=['data', 'data.results'])
+    required = [
+        Include(path='data', resolve_references=False),
+        Include(path='data.results', resolve_references=False),
+    ]
 
-    assert ReadArchivesInput.build_archive_required(required) == {'data': 'include'}
+    assert SearchPageInput.build_archive_required(required) == {'data': 'include'}
 
 
 def test_build_archive_required_strips_include_wildcard_suffix():
-    required = Required(include=['data.results*'])
+    required = [Include(path='data.results*', resolve_references=False)]
 
-    assert ReadArchivesInput.build_archive_required(required) == {
+    assert SearchPageInput.build_archive_required(required) == {
         'data': {'results': 'include'}
     }
 
 
 def test_build_archive_required_builds_include_resolved_directive():
-    required = Required(include_resolved=['data.results.energy'])
+    required = [Include(path='data.results.energy', resolve_references=True)]
 
-    assert ReadArchivesInput.build_archive_required(required) == {
+    assert SearchPageInput.build_archive_required(required) == {
         'data': {'results': {'energy': 'include-resolved'}}
     }
 
 
 def test_build_archive_required_prefers_include_resolved_for_same_path():
-    required = Required(
-        include=['data.results.energy'],
-        include_resolved=['data.results.energy'],
-    )
+    required = [
+        Include(path='data.results.energy', resolve_references=False),
+        Include(path='data.results.energy', resolve_references=True),
+    ]
 
-    assert ReadArchivesInput.build_archive_required(required) == {
+    assert SearchPageInput.build_archive_required(required) == {
         'data': {'results': {'energy': 'include-resolved'}}
+    }
+
+
+def test_build_archive_required_exclude():
+    required = [Exclude(path='data.results.energy')]
+
+    assert SearchPageInput.build_archive_required(required) == {
+        '*': 'include',
+        'data': {'results': {'energy': 'exclude'}},
+    }
+
+
+def test_build_archive_required_exclude_over_include():
+    required = [
+        Include(path='data.results.energy', resolve_references=False),
+        Exclude(path='data.results.energy'),
+    ]
+
+    assert SearchPageInput.build_archive_required(required) == {
+        'data': {'results': {'energy': 'exclude'}}
+    }
+
+
+def test_build_archive_required_include_nested_exclude():
+    required = [
+        Include(path='data', resolve_references=False),
+        Exclude(path='data.results.energy'),
+    ]
+
+    assert SearchPageInput.build_archive_required(required) == {
+        'data': {
+            '*': 'include',
+            'results': {'energy': 'exclude'},
+        }
+    }
+
+
+def test_build_archive_required_include_resolved_nested_exclude():
+    required = [
+        Include(path='data', resolve_references=True),
+        Exclude(path='data.results.energy'),
+    ]
+
+    assert SearchPageInput.build_archive_required(required) == {
+        'data': {
+            '*': 'include-resolved',
+            'results': {'energy': 'exclude'},
+        }
+    }
+
+
+def test_build_archive_required_prefers_include_resolved_for_whole_parent():
+    """
+    TODO: Remove once wildcard '*' as a key is supported in RequiredReader.
+
+    Ideally, this should give: {
+        'data': {
+            '*': 'include',
+            'results': {'energy': 'include-resolved'},
+        }
+    }
+    """
+    required = [
+        Include(path='data', resolve_references=False),
+        Include(path='data.results.energy', resolve_references=True),
+    ]
+
+    assert SearchPageInput.build_archive_required(required) == {
+        'data': 'include-resolved'
     }
