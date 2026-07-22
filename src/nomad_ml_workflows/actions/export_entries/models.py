@@ -78,6 +78,13 @@ def _add_required_path(
         node[leaf] = directive
 
 
+def _contains_include(required: str | dict[str, Any]) -> bool:
+    """Return whether the final specification contains an include directive."""
+    if isinstance(required, str):
+        return required in {'include', 'include-resolved'}
+    return any(_contains_include(value) for value in required.values())
+
+
 class SearchSettings(BaseModel):
     owner: OwnerLiteral = Field(
         'visible', description='Owner of the entries to be searched.'
@@ -179,6 +186,10 @@ class SearchPageInput(BaseModel):
         # Insert parents first so they absorb redundant child requirements.
         for parts, directive in sorted(paths, key=lambda item: len(item[0])):
             _add_required_path(archive_required, parts, directive)
+
+        # Exclusions need a complete archive from which fields can be removed.
+        if not _contains_include(archive_required):
+            archive_required = {'*': 'include', **archive_required}
 
         # TODO: Remove this block once RequiredReader supports "*" keys.
         # For now, a resolved child promotes its included parent.

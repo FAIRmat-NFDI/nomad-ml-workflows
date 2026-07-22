@@ -69,7 +69,8 @@ def test_build_archive_required_exclude_over_include():
     ]
 
     assert SearchPageInput.build_archive_required(required) == {
-        'data': {'results': {'energy': 'exclude'}}
+        '*': 'include',
+        'data': {'results': {'energy': 'exclude'}},
     }
 
 
@@ -98,6 +99,19 @@ def test_build_archive_required_include_resolved_nested_exclude():
             '*': 'include-resolved',
             'results': {'energy': 'exclude'},
         }
+    }
+
+
+def test_build_archive_required_same_path_multiple_times():
+    required = [
+        Include(path='data.results.energy', resolve_references=True),
+        Include(path='data.results.energy', resolve_references=False),
+        Exclude(path='data.results.energy'),
+    ]
+
+    assert SearchPageInput.build_archive_required(required) == {
+        '*': 'include',
+        'data': {'results': {'energy': 'exclude'}},
     }
 
 
