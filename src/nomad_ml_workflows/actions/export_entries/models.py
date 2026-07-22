@@ -9,13 +9,6 @@ BatchFileFormatLiteral = Literal['parquet', 'json']
 OutputFileFormatLiteral = Literal['parquet', 'csv', 'json']
 
 
-def _clean_field(field: str) -> str:
-    """
-    Removes trailing whitespaces and inverted commas
-    """
-    return field.strip().strip("'").strip('"')
-
-
 class Include(BaseModel):
     path: str = Field(..., description='Archive paths to be included.')
     resolve_references: bool = Field(
@@ -31,6 +24,58 @@ class Exclude(BaseModel):
 Required = Include
 # TODO: set "Required = Include | Exclude" once exclude directive is
 # supported in RequiredReader
+
+
+def _clean_field(field: str) -> str:
+    """
+    Removes trailing whitespaces and inverted commas
+    """
+    return field.strip().strip("'").strip('"')
+
+
+_DIRECTIVE_PRIORITY = {'include': 1, 'include-resolved': 2, 'exclude': 3}
+
+
+def _path_and_directive(item: Include | Exclude) -> tuple[tuple[str, ...], str]:
+    """Normalize one user requirement."""
+    parts = tuple(
+        part for part in _clean_field(item.path).rstrip('*').split('.') if part
+    )
+    if isinstance(item, Include):
+        directive = 'include-resolved' if item.resolve_references else 'include'
+    elif isinstance(item, Exclude):
+        directive = 'exclude'
+    else:
+        raise TypeError(f'Unsupported requirement type: {type(item).__name__}')
+    return parts, directive
+
+
+def _add_required_path(
+    result: dict[str, Any], parts: tuple[str, ...], directive: str
+) -> None:
+    """Add one path, keeping the strongest directive at each level."""
+    node = result
+    for part in parts[:-1]:
+        current = node.get(part)
+        if isinstance(current, str):
+            if _DIRECTIVE_PRIORITY[current] >= _DIRECTIVE_PRIORITY[directive]:
+                return
+            current = {'*': current}
+            node[part] = current
+        node = node.setdefault(part, {})
+
+    leaf = parts[-1]
+    current = node.get(leaf)
+    if isinstance(current, dict):
+        current['*'] = max(
+            current.get('*', directive),
+            directive,
+            key=_DIRECTIVE_PRIORITY.__getitem__,
+        )
+    elif (
+        current is None or _DIRECTIVE_PRIORITY[directive] > _DIRECTIVE_PRIORITY[current]
+    ):
+        node[leaf] = directive
 
 
 class SearchSettings(BaseModel):
@@ -115,86 +160,52 @@ class SearchPageInput(BaseModel):
 
     @staticmethod
     def build_archive_required(required: list[Required] | None) -> str | dict[str, Any]:
-        """Convert archive path requirements to a RequiredReader specification.
-
-        Includes select an archive path, optionally resolving all references below
-        it. Excludes remove a path from an included subtree. When only exclusions
-        are supplied, the rest of the archive is included by default.
-        """
+        """Convert archive paths to a RequiredReader specification."""
         if not required:
             return '*'
 
-        directive_priority = {
-            'include': 1,
-            'include-resolved': 2,
-            'exclude': 3,
-        }  # 3 is highest priority
-        directives: dict[tuple[str, ...], str] = {}
-        has_include = False
-
-        for r in required:
-            path = _clean_field(r.path).rstrip('*')
-            path_parts = tuple(part for part in path.split('.') if part)
-            if not path_parts:
-                continue
-
-            if isinstance(r, Include):
-                has_include = True
-                directive = 'include-resolved' if r.resolve_references else 'include'
-            elif isinstance(r, Exclude):
-                directive = 'exclude'
-            else:
-                raise AssertionError(
-                    f'Only instances of Include or Exclude allowed, got "{r: type(r)}"'
-                )
-
-            directives[path_parts] = max(
-                directives.get(path_parts, directive),
-                directive,
-                key=directive_priority.__getitem__,
-            )  # if same path_parts has multiple directives, pick the higher priority one
-
-        if not directives:
+        paths = [_path_and_directive(item) for item in required]
+        paths = [(parts, directive) for parts, directive in paths if parts]
+        if not paths:
             return '*'
 
-        directive_key = object()
-        tree: dict[Any, Any] = {}
-        if not has_include:
-            tree[directive_key] = 'include'
+        # With only exclusions, start from the complete archive.
+        archive_required: dict[str, Any] = (
+            {}
+            if any(isinstance(item, Include) for item in required)
+            else {'*': 'include'}
+        )
 
-        for path_parts, directive in sorted(
-            directives.items(), key=lambda item: len(item[0])
-        ):
-            inherited_directive = next(
+        # Insert parents first so they absorb redundant child requirements.
+        for parts, directive in sorted(paths, key=lambda item: len(item[0])):
+            _add_required_path(archive_required, parts, directive)
+
+        # TODO: Remove this block once RequiredReader supports "*" keys.
+        # For now, a resolved child promotes its included parent.
+        included_paths = [parts for parts, value in paths if value == 'include']
+        resolved_paths = [
+            parts for parts, value in paths if value == 'include-resolved'
+        ]
+        for resolved_path in resolved_paths:
+            parent_path = min(
                 (
-                    directives[path_parts[:index]]
-                    for index in range(len(path_parts) - 1, 0, -1)
-                    if path_parts[:index] in directives
+                    path
+                    for path in included_paths
+                    if resolved_path[: len(path)] == path
+                    and len(resolved_path) > len(path)
                 ),
-                None,
+                key=len,
+                default=None,
             )
-            if directive == inherited_directive:
+            if parent_path is None:
                 continue
+            node = archive_required
+            for part in parent_path[:-1]:
+                node = node[part]
+            if isinstance(node.get(parent_path[-1]), dict):
+                node[parent_path[-1]] = 'include-resolved'
 
-            node = tree
-            for part in path_parts:
-                node = node.setdefault(part, {})
-            node[directive_key] = directive
-
-        def _render(node: dict[Any, Any]) -> str | dict[str, Any]:
-            directive = node.get(directive_key)
-            children = {
-                key: _render(value)
-                for key, value in node.items()
-                if key is not directive_key
-            }
-            if directive is None:
-                return children
-            if not children:
-                return directive
-            return {'*': directive, **children}
-
-        return _render(tree)
+        return archive_required
 
     @classmethod
     def from_user_input(
