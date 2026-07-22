@@ -26,7 +26,6 @@ with workflow.unsafe.imports_passed_through():
         ExportEntriesOutput,
         ExportEntriesUserInput,
         MergeOutputFilesInput,
-        ReadArchivesInput,
         SearchPageInput,
         SearchPageOutput,
     )
@@ -49,10 +48,9 @@ class SearchPageWorkflow:
         )
         retry_policy = RetryPolicy(maximum_attempts=1)
 
-        rai = ReadArchivesInput.from_search_page_input(data)
         return await workflow.execute_activity(
             read_archives,
-            rai,
+            data,
             start_to_close_timeout=timedelta(seconds=config.search_batch_timeout),
             retry_policy=retry_policy,
         )

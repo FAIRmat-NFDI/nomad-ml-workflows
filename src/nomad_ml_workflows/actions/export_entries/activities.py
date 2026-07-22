@@ -19,7 +19,7 @@ from nomad_ml_workflows.actions.export_entries.models import (
     CreateArtifactSubdirectoryInput,
     ExportDatasetInput,
     MergeOutputFilesInput,
-    ReadArchivesInput,
+    SearchPageInput,
     SearchPageOutput,
 )
 from nomad_ml_workflows.actions.export_entries.utils import (
@@ -129,7 +129,7 @@ async def collect_page_cursors(data: CollectCursorsInput) -> CollectCursorsOutpu
 
 
 @activity.defn
-async def read_archives(data: ReadArchivesInput) -> SearchPageOutput:
+async def read_archives(data: SearchPageInput) -> SearchPageOutput:
     """
     Activity to read archives of the searched entries. The required fields are read
     from the archives and written to a file in the specified format (Parquet or JSON)
