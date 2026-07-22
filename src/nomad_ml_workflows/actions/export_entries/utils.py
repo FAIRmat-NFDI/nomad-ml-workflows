@@ -345,7 +345,7 @@ def _archives_to_rows(  # noqa: PLR0912
             raise ValueError('archive value must be a dictionary (JSON object).')
 
         context = _FlattenEntryContext(
-            row={},
+            row={'entry_id': item['entry_id']},  # Always include entry_id as a column
             columns_quantity_def=columns_quantity_def,
             unhandled_keys=[],
         )
@@ -384,6 +384,11 @@ def _archives_to_rows(  # noqa: PLR0912
     return rows, columns_quantity_def
 
 
+def _ordered_columns(columns) -> list[str]:
+    """Put entry_id first and sort all remaining columns alphabetically."""
+    return sorted(columns, key=lambda column: (column != 'entry_id', column))
+
+
 def archives_to_dataframe(archives: list[dict] | dict, logger=None) -> pd.DataFrame:
     """
     Convert serialized NOMAD entries into a flattened pandas DataFrame.
@@ -391,7 +396,8 @@ def archives_to_dataframe(archives: list[dict] | dict, logger=None) -> pd.DataFr
     Archive traversal follows NOMAD metainfo subsections, while quantities remain
     opaque cell values. Concrete ``m_def`` values are used to resolve schemas, and
     pandas infers the resulting column dtypes from the flattened rows.
-    Columns are returned in alphabetical order.
+    The ``entry_id`` column is returned first, followed by all other columns in
+    alphabetical order.
 
     Args:
         archives: A serialized entry dictionary or list of entry dictionaries. Each
@@ -403,7 +409,7 @@ def archives_to_dataframe(archives: list[dict] | dict, logger=None) -> pd.DataFr
     rows, _ = _archives_to_rows(archives, logger=logger)
 
     df = pd.DataFrame(rows)
-    sorted_df = df.reindex(sorted(df.columns), axis=1)
+    sorted_df = df.reindex(_ordered_columns(df.columns), axis=1)
 
     return sorted_df
 
@@ -418,6 +424,8 @@ def archives_to_arrow_table(archives: list[dict] | dict, logger=None) -> pa.Tabl
     are safely cast when necessary; JSON, ``Any``, references, complex numbers, and
     unsupported custom datatypes are stored as deterministic JSON strings. Columns
     without a NOMAD quantity definition use Arrow inference with the same JSON fallback.
+    The ``entry_id`` column is returned first, followed by all other columns in
+    alphabetical order.
 
     Args:
         archives: A serialized entry dictionary or list of entry dictionaries. Each
@@ -427,7 +435,7 @@ def archives_to_arrow_table(archives: list[dict] | dict, logger=None) -> pa.Tabl
         A schema-typed Arrow table.
     """
     rows, columns_quantity_def = _archives_to_rows(archives, logger)
-    column_names = sorted({column for row in rows for column in row})
+    column_names = _ordered_columns({column for row in rows for column in row})
 
     arrays = []
     for column_name in column_names:
