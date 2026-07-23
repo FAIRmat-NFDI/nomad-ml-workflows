@@ -142,6 +142,7 @@ def _normalize_arrow_column(
     values: list,
     config: _ArrowColumnConfig,
     column_name: str,
+    logger=None,
 ) -> pa.Array:
     """
     Build a typed Arrow array. It converts mismatched values, when needed, using Arrow's
@@ -153,10 +154,13 @@ def _normalize_arrow_column(
                 [_json_stringify(value) for value in values],
                 type=config.arrow_type,
             )
-        except (TypeError, ValueError) as error:
-            raise ValueError(
-                f'Cannot JSON-encode values in column {column_name!r}.'
-            ) from error
+        except (TypeError, ValueError) as e:
+            if logger:
+                logger.warning(
+                    f'Cannot JSON-encode values in column {column_name!r}.',
+                    exc_info=e,
+                )
+            return pa.array([None for _ in values], type=config.arrow_type, safe=True)
 
     try:
         return pa.array(values, type=config.arrow_type, safe=True)
@@ -183,17 +187,16 @@ def _normalize_arrow_column(
             OverflowError,
             TypeError,
             ValueError,
-        ) as error:
-            raise ValueError(
-                f'Cannot convert row {row_index} of column {column_name!r} '
-                f'to {config.arrow_type}: {value!r}.'
-            ) from error
+        ) as e:
+            if logger:
+                logger.warning(
+                    f'Cannot convert row {row_index} of column {column_name!r} '
+                    f'to {config.arrow_type}: {value!r}.',
+                    exc_info=e,
+                )
+            converted_values.append(None)
 
-    return pa.array(
-        converted_values,
-        type=config.arrow_type,
-        safe=True,
-    )
+    return pa.array(converted_values, type=config.arrow_type, safe=True)
 
 
 def _infer_arrow_column(values: list, column_name: str) -> pa.Array:
@@ -449,6 +452,7 @@ def archives_to_arrow_table(archives: list[dict] | dict, logger=None) -> pa.Tabl
                 values,
                 config,
                 column_name,
+                logger=logger,
             )
         arrays.append(array)
 
