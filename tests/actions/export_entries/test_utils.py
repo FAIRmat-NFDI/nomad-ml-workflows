@@ -64,6 +64,29 @@ def resolve_test_schema(monkeypatch):
     )
 
 
+@pytest.mark.parametrize(
+    ('leaf_type', 'is_string'),
+    [
+        pytest.param(pa.int64(), False, id='int64'),
+        pytest.param(pa.float64(), False, id='float64'),
+        pytest.param(pa.bool_(), False, id='bool'),
+        pytest.param(pa.string(), True, id='string'),
+        pytest.param(pa.timestamp('us', tz='UTC'), False, id='datetime'),
+    ],
+)
+@pytest.mark.parametrize('list_depth', [0, 1, 2], ids=['scalar', 'list', 'nested'])
+def test_is_list_of_string_for_supported_arrow_types(
+    leaf_type,
+    is_string,
+    list_depth,
+):
+    arrow_type = leaf_type
+    for _ in range(list_depth):
+        arrow_type = pa.list_(arrow_type)
+
+    assert utils._is_list_of_string(arrow_type) is (is_string and list_depth > 0)
+
+
 def test_archives_to_arrow_table_uses_nomad_quantity_types(resolve_test_schema):
     table = utils.archives_to_arrow_table(
         [

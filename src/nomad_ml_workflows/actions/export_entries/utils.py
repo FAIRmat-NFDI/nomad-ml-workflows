@@ -120,6 +120,16 @@ def _json_stringify(value):
     return json.dumps(value, sort_keys=True, separators=(',', ':'))
 
 
+def _is_list_of_string(arrow_type: pa.DataType) -> bool:
+    """Return whether the given Arrow type is a list or nested list of strings."""
+    if pa.types.is_list(arrow_type):
+        if pa.types.is_string(arrow_type.value_type):
+            return True
+        if pa.types.is_list(arrow_type.value_type):
+            return _is_list_of_string(arrow_type.value_type)
+    return False
+
+
 def _cast_arrow_value(value, arrow_type: pa.DataType):
     """
     Cast a scalar or nested list recursively using Arrow's safe casts.
@@ -163,12 +173,20 @@ def _normalize_arrow_column(
             return pa.array([None for _ in values], type=config.arrow_type, safe=True)
 
     try:
+        if _is_list_of_string(config.arrow_type):
+            # If a row value is string, it can be silently converted to list of alphabets
+            # e.g. "abc" -> ["a", "b", "c"]
+            # Each row value is later converted individually to avoid Arrow's safe cast
+            # behavior.
+            raise AssertionError("Do not use Arrow's safe cast for list of strings")
+        # Attempt to bulk convert values to Arrow array using safe cast
         return pa.array(values, type=config.arrow_type, safe=True)
     except (
         pa.ArrowInvalid,
         pa.ArrowNotImplementedError,
         pa.ArrowTypeError,
         OverflowError,
+        AssertionError,
     ):
         pass
 
