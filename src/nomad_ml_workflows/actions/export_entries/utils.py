@@ -120,6 +120,16 @@ def _json_stringify(value):
     return json.dumps(value, sort_keys=True, separators=(',', ':'))
 
 
+def _is_list_of_string(arrow_type: pa.DataType) -> bool:
+    """Return whether the given Arrow type is a list or nested list of strings."""
+    if pa.types.is_list(arrow_type):
+        if pa.types.is_string(arrow_type.value_type):
+            return True
+        if pa.types.is_list(arrow_type.value_type):
+            return _is_list_of_string(arrow_type.value_type)
+    return False
+
+
 def _cast_arrow_value(value, arrow_type: pa.DataType):
     """
     Cast a scalar or nested list recursively using Arrow's safe casts.
@@ -142,6 +152,7 @@ def _normalize_arrow_column(
     values: list,
     config: _ArrowColumnConfig,
     column_name: str,
+    logger=None,
 ) -> pa.Array:
     """
     Build a typed Arrow array. It converts mismatched values, when needed, using Arrow's
@@ -153,18 +164,29 @@ def _normalize_arrow_column(
                 [_json_stringify(value) for value in values],
                 type=config.arrow_type,
             )
-        except (TypeError, ValueError) as error:
-            raise ValueError(
-                f'Cannot JSON-encode values in column {column_name!r}.'
-            ) from error
+        except (TypeError, ValueError) as e:
+            if logger:
+                logger.warning(
+                    f'Cannot JSON-encode values in column {column_name!r}.',
+                    exc_info=e,
+                )
+            return pa.array([None for _ in values], type=config.arrow_type, safe=True)
 
     try:
+        if _is_list_of_string(config.arrow_type):
+            # If a row value is string, it can be silently converted to list of alphabets
+            # e.g. "abc" -> ["a", "b", "c"]
+            # Each row value is later converted individually to avoid Arrow's safe cast
+            # behavior.
+            raise AssertionError("Do not use Arrow's safe cast for list of strings")
+        # Attempt to bulk convert values to Arrow array using safe cast
         return pa.array(values, type=config.arrow_type, safe=True)
     except (
         pa.ArrowInvalid,
         pa.ArrowNotImplementedError,
         pa.ArrowTypeError,
         OverflowError,
+        AssertionError,
     ):
         pass
 
@@ -183,17 +205,16 @@ def _normalize_arrow_column(
             OverflowError,
             TypeError,
             ValueError,
-        ) as error:
-            raise ValueError(
-                f'Cannot convert row {row_index} of column {column_name!r} '
-                f'to {config.arrow_type}: {value!r}.'
-            ) from error
+        ) as e:
+            if logger:
+                logger.warning(
+                    f'Cannot convert row {row_index} of column {column_name!r} '
+                    f'to {config.arrow_type}: {value!r}.',
+                    exc_info=e,
+                )
+            converted_values.append(None)
 
-    return pa.array(
-        converted_values,
-        type=config.arrow_type,
-        safe=True,
-    )
+    return pa.array(converted_values, type=config.arrow_type, safe=True)
 
 
 def _infer_arrow_column(values: list, column_name: str) -> pa.Array:
@@ -449,6 +470,7 @@ def archives_to_arrow_table(archives: list[dict] | dict, logger=None) -> pa.Tabl
                 values,
                 config,
                 column_name,
+                logger=logger,
             )
         arrays.append(array)
 
