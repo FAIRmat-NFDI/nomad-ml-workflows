@@ -16,6 +16,7 @@ with workflow.unsafe.imports_passed_through():
         export_dataset_to_upload,
         merge_output_files,
         read_archives,
+        rename_generated_file,
     )
     from nomad_ml_workflows.actions.export_entries.models import (
         CleanupArtifactsInput,
@@ -26,6 +27,7 @@ with workflow.unsafe.imports_passed_through():
         ExportEntriesOutput,
         ExportEntriesUserInput,
         MergeOutputFilesInput,
+        RenameGeneratedFileInput,
         SearchPageInput,
         SearchPageOutput,
     )
@@ -90,7 +92,7 @@ class ExportEntriesWorkflow:
                 f'export_entries_{workflow.info().start_time.isoformat()}'
             ),
             zip_output=data.output_settings.zip_output,
-            source_paths=[],
+            source_path=None,
             metadata=ExportDatasetMetadata(user_input=data),
         )
 
@@ -201,8 +203,19 @@ class ExportEntriesWorkflow:
                 for i, spo in enumerate(search_page_outputs)
                 if spo.num_entries_exported > 0
             ]
-            if generated_file_paths:
-                merged_file_path = await workflow.execute_activity(
+            if len(generated_file_paths) == 1:
+                export_dataset_input.source_path = await workflow.execute_activity(
+                    rename_generated_file,
+                    RenameGeneratedFileInput(
+                        artifact_subdirectory=artifact_subdirectory,
+                        output_file_format=data.output_settings.output_file_format,
+                        generated_file_path=generated_file_paths[0],
+                    ),
+                    start_to_close_timeout=timedelta(hours=2),
+                    retry_policy=retry_policy,
+                )
+            elif len(generated_file_paths) > 1:
+                export_dataset_input.source_path = await workflow.execute_activity(
                     merge_output_files,
                     MergeOutputFilesInput(
                         artifact_subdirectory=artifact_subdirectory,
@@ -212,7 +225,6 @@ class ExportEntriesWorkflow:
                     start_to_close_timeout=timedelta(hours=2),
                     retry_policy=retry_policy,
                 )
-                export_dataset_input.source_paths = [merged_file_path]
 
         except Exception as e:
             # Capture error info to include in metadata

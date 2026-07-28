@@ -19,6 +19,7 @@ from nomad_ml_workflows.actions.export_entries.models import (
     CreateArtifactSubdirectoryInput,
     ExportDatasetInput,
     MergeOutputFilesInput,
+    RenameGeneratedFileInput,
     SearchPageInput,
     SearchPageOutput,
 )
@@ -223,6 +224,15 @@ async def read_archives(data: SearchPageInput) -> SearchPageOutput:
 
 
 @activity.defn
+def rename_generated_file(data: RenameGeneratedFileInput) -> str | None:
+    target_file_path = os.path.join(
+        data.artifact_subdirectory, 'data.' + data.output_file_format
+    )
+    os.rename(data.generated_file_path, target_file_path)
+    return target_file_path
+
+
+@activity.defn
 async def merge_output_files(data: MergeOutputFilesInput) -> str | None:
     """
     Activity to merge multiple batch files into a single file.
@@ -288,7 +298,10 @@ async def export_dataset_to_upload(data: ExportDatasetInput) -> str:
     with open(metadata_path, 'w', encoding='utf-8') as metafile:
         json.dump(metadata_dict, metafile, indent=4)
 
-    exportable_filepaths = data.source_paths + [metadata_path]
+    exportable_filepaths = [metadata_path]
+    if data.source_path:
+        exportable_filepaths.append(data.source_path)
+
     exportable_dir_name = unique_filename(data.exportable_dir_name, upload_files)
 
     # Create a zip file containing all the source paths and the metadata file

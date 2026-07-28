@@ -305,6 +305,21 @@ class CollectCursorsOutput(BaseModel):
     )
 
 
+class RenameGeneratedFileInput(BaseModel):
+    artifact_subdirectory: str = Field(
+        ...,
+        description='Subdirectory where the file will be renamed.',
+    )
+    output_file_format: OutputFileFormatLiteral = Field(
+        ...,
+        description='Format of the output file.',
+    )
+    generated_file_path: str = Field(
+        ...,
+        description='Path of generated file that will be renamed.',
+    )
+
+
 class MergeOutputFilesInput(BaseModel):
     artifact_subdirectory: str = Field(
         ...,
@@ -374,8 +389,8 @@ class ExportDatasetInput(BaseModel):
         description='Name of the directory containing the dataset that will be '
         'exported.',
     )
-    source_paths: list[str] = Field(
-        ..., description='List of paths to the source files of the dataset.'
+    source_path: str | None = Field(
+        None, description='Path to the source files of the dataset.'
     )
     metadata: ExportDatasetMetadata = Field(
         ..., description='Metadata associated with the exported dataset.'
