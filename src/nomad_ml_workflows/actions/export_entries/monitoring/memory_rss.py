@@ -251,7 +251,7 @@ def execute_workflow(data: ExportEntriesUserInput) -> tuple[float, str, str]:
 def wait_and_get_result(action_instance_id: str, user_id: str, wait: float = 10):
     # Check if the action has completed at 'wait' second intervals
     while True:
-        if get_action_status(action_instance_id, user_id).name == 'COMPLETED':
+        if get_action_status(action_instance_id, user_id).name != 'RUNNING':
             return get_action_result(action_instance_id, user_id)
         time.sleep(wait)
 
@@ -300,6 +300,7 @@ if __name__ == '__main__':
             'search_settings': {
                 'owner': 'public',  ## changed this
                 'page_size': 100,
+                # 'query': "{'entry_type': 'CatalyticReaction'}",  ## changed this
                 'query': "{'entry_type': 'PerovskiteSolarCell'}",  ## changed this
                 'required': [
                     {
@@ -322,7 +323,8 @@ if __name__ == '__main__':
     )
 
     # Generate data for different page sizes
-    for page_size in [1000] * 2:
+    # for page_size in reversed([10, 100, 1000] * 1):
+    for page_size in [10000] * 1:
         model = export_entries_user_input.model_copy(deep=True)
         model.search_settings.page_size = page_size
         data.append(model)

@@ -1,7 +1,9 @@
 import json
+import multiprocessing
 import os
 import shutil
 import zipfile
+from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime, timezone
 from math import ceil
 
@@ -223,7 +225,7 @@ async def read_archives(data: SearchPageInput) -> SearchPageOutput:
 
 
 @activity.defn
-async def merge_output_files(data: MergeOutputFilesInput) -> str | None:
+def merge_output_files(data: MergeOutputFilesInput) -> str | None:
     """
     Activity to merge multiple batch files into a single file.
 
@@ -242,6 +244,18 @@ async def merge_output_files(data: MergeOutputFilesInput) -> str | None:
     )
 
     merge_files(data.generated_file_paths, data.output_file_format, merged_file_path)
+
+    # process_context = multiprocessing.get_context('spawn')
+
+    # with ProcessPoolExecutor(max_workers=1, mp_context=process_context) as executor:
+    #     # Run within a separate process to recover memory usage to baseline
+    #     future = executor.submit(
+    #         merge_files,
+    #         data.generated_file_paths,
+    #         data.output_file_format,
+    #         merged_file_path,
+    #     )
+    #     future.result(timeout=None)
 
     return merged_file_path
 
