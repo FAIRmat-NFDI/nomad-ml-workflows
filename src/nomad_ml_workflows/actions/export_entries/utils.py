@@ -1,7 +1,9 @@
+import gc
 import importlib
 import json
 from dataclasses import dataclass
 from functools import lru_cache
+from zlib import DEFLATED
 
 import json_stream
 import pandas as pd
@@ -20,6 +22,9 @@ except ImportError as e:
     ) from e
 
 IGNORED_KEYS = ['m_def', 'm_def_id', 'm_ref_archives']
+ARROW_MERGE_BATCH_SIZE = 8192
+ARROW_MERGE_BATCH_READAHEAD = 1
+ARROW_MERGE_FRAGMENT_READAHEAD = 1
 
 
 @dataclass(frozen=True)
@@ -325,8 +330,8 @@ def _archives_to_rows(  # noqa: PLR0912
     archives: list[dict] | dict, logger=None
 ) -> tuple[list[dict], dict[str, Quantity]]:
     """
-    Flatten list of archive dicts into list of row dicts. Also returns column definition
-    and a count of unhandled archive dict keys.
+    Flatten list of archive dicts into list of row dicts. Also returns a dict of
+    column definition.
 
     Each element in the `archives` list should have the following structure, where
     `archive` key corresponds to serialization of EntryArchive::
@@ -499,13 +504,17 @@ def _stringify_nested_columns(batch: pa.RecordBatch) -> pa.RecordBatch:
     for i, column in enumerate(batch.columns):
         if _is_nested_type(batch.schema.field(i).type):
             # Convert each element to JSON string
+            stringified_values = []
+            for scalar in column:
+                value = scalar.as_py()
+                stringified_values.append(
+                    json.dumps(value) if value is not None else None
+                )
             stringified = pa.array(
-                [
-                    json.dumps(val.as_py()) if val.as_py() is not None else None
-                    for val in column
-                ],
+                stringified_values,
                 type=pa.string(),
             )
+            del stringified_values
             new_columns.append(stringified)
         else:
             new_columns.append(column)
@@ -553,6 +562,144 @@ def write_json_file(path: str, data: list[dict], logger=None):
     return len(data)
 
 
+def _dataset_batches(dataset: ds.Dataset):
+    """Scan a dataset with bounded read-ahead to limit merge working memory."""
+    return dataset.to_batches(
+        batch_size=ARROW_MERGE_BATCH_SIZE,
+        batch_readahead=ARROW_MERGE_BATCH_READAHEAD,
+        fragment_readahead=ARROW_MERGE_FRAGMENT_READAHEAD,
+        use_threads=False,
+    )
+
+
+def _write_batches_as_row_group(
+    writer: pq.ParquetWriter,
+    batches: list[pa.RecordBatch],
+    schema: pa.Schema,
+) -> None:
+    table = pa.Table.from_batches(batches, schema=schema)
+
+    # One write call and one row group for all accumulated batches.
+    writer.write_table(
+        table,
+        row_group_size=table.num_rows,
+    )
+
+
+def _merge_parquet_files(
+    input_paths: list[str],
+    output_path: str,
+    batch_size: int = 1024,
+) -> None:
+    if not input_paths:
+        raise ValueError('No input files provided')
+    if not output_path.endswith('.parquet'):
+        raise ValueError('Output path must end with .parquet')
+
+    # First pass: read schemas from Parquet footers only.
+    unified_schema = pq.read_schema(input_paths[0])
+
+    for path in input_paths[1:]:
+        if not path.endswith('.parquet'):
+            continue
+        file_schema = pq.read_schema(path)
+        unified_schema = pa.unify_schemas(
+            [unified_schema, file_schema],
+            promote_options='permissive',
+        )
+        del file_schema
+
+    # Second pass: stream bounded batches to the output.
+    target_row_group_rows = 1024
+    target_row_group_bytes = 64 * 1024 * 1024  # 64 MB
+    max_batches_per_row_group = 256
+
+    pending_batches: list[pa.RecordBatch] = []
+    pending_rows = 0
+    pending_bytes = 0
+
+    with pq.ParquetWriter(
+        output_path,
+        unified_schema,
+        compression='snappy',
+        use_dictionary=False,
+        write_batch_size=1024,
+    ) as writer:
+        for path in input_paths:
+            file_dataset = ds.dataset(
+                path,
+                format='parquet',
+                schema=unified_schema,
+                exclude_invalid_files=False,
+            )
+
+            for batch in file_dataset.to_batches(
+                batch_size=batch_size,
+                batch_readahead=1,
+                fragment_readahead=1,
+                use_threads=False,
+            ):
+                pending_batches.append(batch)
+                pending_rows += batch.num_rows
+                pending_bytes += batch.nbytes
+
+                # Bounds the size of each row group that will be written to
+                # a fixed number of total rows, total bytes, and max batches
+                # per row group (useful when search batches are highly granular).
+                should_flush = (
+                    pending_rows >= target_row_group_rows
+                    or pending_bytes >= target_row_group_bytes
+                    or len(pending_batches) >= max_batches_per_row_group
+                )
+
+                if should_flush:
+                    print(
+                        f'Reason of flush: {pending_rows}/{target_row_group_rows} rows, {pending_bytes}/{target_row_group_bytes} bytes, {len(pending_batches)}/{max_batches_per_row_group} batches'
+                    )
+                    _write_batches_as_row_group(
+                        writer,
+                        pending_batches,
+                        unified_schema,
+                    )
+                    pending_batches.clear()
+                    pending_rows = 0
+                    pending_bytes = 0
+
+            del file_dataset
+
+        if pending_batches:
+            print(
+                f'Final flush: {pending_rows}/{target_row_group_rows} rows, {pending_bytes}/{target_row_group_bytes} bytes, {len(pending_batches)}/{max_batches_per_row_group} batches'
+            )
+            _write_batches_as_row_group(
+                writer,
+                pending_batches,
+                unified_schema,
+            )
+
+
+def _merge_csv_files(
+    input_file_paths: list[str],
+    output_file_path: str,
+):
+    """Merge Parquet batch files into CSV with bounded Arrow working memory."""
+    dataset = ds.dataset(input_file_paths, format='parquet')
+    csv_schema = _get_csv_compatible_schema(dataset.schema)
+
+    with pcsv.CSVWriter(output_file_path, csv_schema) as writer:
+        for batch in _dataset_batches(dataset):
+            csv_batch = _stringify_nested_columns(batch)
+            writer.write_batch(csv_batch)
+            del csv_batch
+            del batch
+
+
+def _release_unused_arrow_memory():
+    """Best-effort release after merge-local Arrow references are gone."""
+    gc.collect()
+    pa.default_memory_pool().release_unused()
+
+
 def merge_files(
     input_file_paths: list[str], output_file_format: str, output_file_path: str
 ):
@@ -565,37 +712,18 @@ def merge_files(
         output_file_path (str): Path of the merged output file.
     """
     if output_file_format == 'parquet':
-        # Creates a logical dataset from the input files, not loading all data into
-        # memory. Also, unifies the schema across the files.
-        dataset = ds.dataset(input_file_paths, format='parquet')
-
-        # Write the dataset to a single Parquet file in batches
-        with pq.ParquetWriter(
-            output_file_path,
-            dataset.schema,
-            compression='zstd',  # for better compression for merged file
-            compression_level=3,
-            use_dictionary=True,
-        ) as writer:
-            for batch in dataset.to_batches():
-                writer.write_batch(batch)
+        try:
+            _merge_parquet_files(input_file_paths, output_file_path)
+        finally:
+            _release_unused_arrow_memory()
 
     elif output_file_format == 'csv':
-        # Creates a logical dataset from the input files, not loading all data into
-        # memory. Also, unifies the schema across the files.
-        # The batch files for `csv` are written in Parquet format for efficiency,
-        # so we read them as Parquet here.
-        dataset = ds.dataset(input_file_paths, format='parquet')
-
-        # PyArrow CSV writer doesn't support nested types (list, struct, etc.)
-        # Convert nested columns to JSON strings
-        csv_schema = _get_csv_compatible_schema(dataset.schema)
-
-        # Write the dataset to a single CSV file in batches
-        with pcsv.CSVWriter(output_file_path, csv_schema) as writer:
-            for batch in dataset.to_batches():
-                csv_batch = _stringify_nested_columns(batch)
-                writer.write_batch(csv_batch)
+        # The batch files for 'csv' are written in Parquet format for efficiency,
+        # so the merge reads them as Parquet.
+        try:
+            _merge_csv_files(input_file_paths, output_file_path)
+        finally:
+            _release_unused_arrow_memory()
 
     elif output_file_format == 'json':
 
