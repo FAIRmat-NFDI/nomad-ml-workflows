@@ -354,7 +354,10 @@ def archive_to_row(archive: dict) -> tuple[dict, dict[str, Quantity]]:
 
     columns_quantity_def: dict[str, Quantity] = {}
     context = _FlattenEntryContext(
-        row={'entry_id': archive['entry_id']},  # Always include entry_id as a column
+        row={
+            'entry_id': archive['entry_id'],
+            'upload_id': archive['upload_id'],
+        },  # Always include entry_id and upload_id as columns
         columns_quantity_def=columns_quantity_def,
         unhandled_keys=[],
     )
@@ -454,8 +457,10 @@ def _archives_to_rows(  # noqa: PLR0912
 
 
 def _ordered_columns(columns) -> list[str]:
-    """Put entry_id first and sort all remaining columns alphabetically."""
-    return sorted(columns, key=lambda column: (column != 'entry_id', column))
+    """Put entry_id and upload_id first and sort all remaining columns alphabetically."""
+    return sorted(
+        columns, key=lambda column: (column != ['entry_id', 'upload_id'], column)
+    )
 
 
 def archives_to_dataframe(archives: list[dict] | dict, logger=None) -> pd.DataFrame:
