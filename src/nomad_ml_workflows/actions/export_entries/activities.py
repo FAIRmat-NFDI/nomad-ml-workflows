@@ -154,12 +154,13 @@ def prepare_manifest(data: PrepareManifestInput) -> PrepapeManifestOutput:
         for entry in response.data
     ]
     manifest = manifest[: data.max_entries_export_limit]  #  Apply max limit
+    num_entries_exported = len(manifest)
     write_dicts_to_json(manifest, data.manifest_file_path)
 
     return PrepapeManifestOutput(
         search_start_time=starttime,
         search_end_time=endtime,
-        num_entries_available=len(manifest),
+        num_entries_available=num_entries_exported,
     )
 
 

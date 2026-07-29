@@ -700,18 +700,19 @@ def generate_archives(
         for entry_id in entry_ids:
             entry = {'entry_id': entry_id, 'upload_id': upload_id}
             try:
-                with upload_files.read_archive(entry_id) as archive:
+                with upload_files.read_archive(entry_id) as upload_archive:
                     entry['archive'] = required_reader.read(
-                        archive, entry_id, upload_id
+                        upload_archive, entry_id, upload_id
                     )
                     yield entry
             except Exception as e:
-                logger.error(
-                    'failed to read entry archive',
-                    entry_id=entry_id,
-                    upload_id=upload_id,
-                    exc_info=e,
-                )
+                if logger:
+                    logger.error(
+                        'failed to read entry archive',
+                        entry_id=entry_id,
+                        upload_id=upload_id,
+                        exc_info=e,
+                    )
 
 
 def generate_table_rows(
@@ -741,7 +742,7 @@ def write_dicts_to_json(items: Iterable[dict], output_file_path: str) -> int:
         for item in items:
             if not first_item:
                 f.write(',\n')
-            json.dump(item, f, indent=2)
+            json.dump(item, f, separators=(',', ':'))
             count += 1
             first_item = False
 
@@ -761,15 +762,14 @@ def write_table_rows_to_json(
         file.write('[\n')
 
         for row, row_column_defs in rows_with_definitions:
-            # Accumulate only the schema information.
+            # accumulate only the schema information
             for column, quantity_def in row_column_defs.items():
                 columns_quantity_def.setdefault(column, quantity_def)
 
-            # Write the current row immediately.
+            # write the current row immediately
             if not first_row:
                 file.write(',\n')
-
-            json.dump(row, file, indent=2)
+            json.dump(row, file, separators=(',', ':'))
             first_row = False
 
         file.write('\n]')
