@@ -25,8 +25,6 @@ with workflow.unsafe.imports_passed_through():
         NormalizedSearchSettings,
         OutputFile,
         PrepareManifestInput,
-        ReadArchivesAndWriteOutputJsonInput,
-        ReadArchivesAndWriteTableRowsInput,
         ReadArchivesWorkflowInput,
     )
 
@@ -44,12 +42,7 @@ class ReadArchivesWorkflow:
         if data.output_file_format == 'json':
             return await workflow.execute_activity(
                 read_archives_and_write_output_json,
-                ReadArchivesAndWriteOutputJsonInput(
-                    user_id=data.user_id,
-                    manifest_path=data.manifest_file_path,
-                    required=data.required,
-                    output_file_path=f'{data.artifact_subdirectory}/data.{data.output_file_format}',
-                ),
+                data,
                 start_to_close_timeout=timedelta(hours=2),
                 retry_policy=retry_policy,
             )
@@ -57,13 +50,7 @@ class ReadArchivesWorkflow:
         # Write table rows and columns quantity definition files
         await workflow.execute_activity(
             read_archives_and_write_table_rows,
-            ReadArchivesAndWriteTableRowsInput(
-                user_id=data.user_id,
-                manifest_path=data.manifest_file_path,
-                required=data.required,
-                table_rows_file_path=f'{data.artifact_subdirectory}/table_rows.tmp.{data.output_file_format}',
-                columns_quantity_def_file_path=f'{data.artifact_subdirectory}/columns_quantity_def.tmp.{data.output_file_format}',
-            ),
+            data,
             start_to_close_timeout=timedelta(hours=2),
             retry_policy=retry_policy,
         )

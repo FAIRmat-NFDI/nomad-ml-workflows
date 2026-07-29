@@ -299,33 +299,6 @@ class ReadArchivesWorkflowInput(BaseModel):
     )
 
 
-class ReadArchivesAndWriteOutputJsonInput(BaseModel):
-    user_id: str = Field(..., description='User ID performing the search.')
-    manifest_path: str = Field(..., description='Path to the manifest file.')
-    required: str | dict[str, Any] = Field(
-        '*',
-        description='Dictionary of required fields and directives compatible with '
-        '`nomad.archive.required.RequiredReader` class.',
-    )
-    output_file_path: str = Field(..., description='Path to the output JSON file.')
-
-
-class ReadArchivesAndWriteTableRowsInput(BaseModel):
-    user_id: str = Field(..., description='User ID performing the search.')
-    manifest_path: str = Field(..., description='Path to the manifest file.')
-    required: str | dict[str, Any] = Field(
-        '*',
-        description='Dictionary of required fields and directives compatible with '
-        '`nomad.archive.required.RequiredReader` class.',
-    )
-    table_rows_file_path: str = Field(
-        ..., description='Path to the table rows output file.'
-    )
-    columns_quantity_def_file_path: str = Field(
-        ..., description='Path to the column quantity definitions output file.'
-    )
-
-
 class OutputFile(BaseModel):
     file_path: str = Field(..., description='Path to the output file.')
     file_size: int = Field(..., description='Size of the output file in bytes.')
@@ -333,11 +306,11 @@ class OutputFile(BaseModel):
 
 
 class TableRowsOutput(BaseModel):
-    table_rows_json_path: str = Field(
-        ..., description='Path to the JSON file containing table rows.'
+    table_rows_file_path: str = Field(
+        ..., description='Path to the table rows output file.'
     )
-    column_m_defs_json_path: str = Field(
-        ..., description='Path to the JSON file containing m_defs of the table columns.'
+    columns_quantity_def_file_path: str = Field(
+        ..., description='Path to the column quantity definitions output file.'
     )
 
 

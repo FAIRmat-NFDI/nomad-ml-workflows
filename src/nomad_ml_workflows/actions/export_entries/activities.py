@@ -23,9 +23,9 @@ from nomad_ml_workflows.actions.export_entries.models import (
     OutputFile,
     PrepapeManifestOutput,
     PrepareManifestInput,
-    ReadArchivesAndWriteOutputJsonInput,
-    ReadArchivesAndWriteTableRowsInput,
+    ReadArchivesWorkflowInput,
     RenameGeneratedFileInput,
+    TableRowsOutput,
 )
 from nomad_ml_workflows.actions.export_entries.utils import (
     generate_archives,
@@ -165,44 +165,44 @@ def prepare_manifest(data: PrepareManifestInput) -> PrepapeManifestOutput:
 
 @activity.defn
 def read_archives_and_write_output_json(
-    data: ReadArchivesAndWriteOutputJsonInput,
+    data: ReadArchivesWorkflowInput,
 ) -> OutputFile:
     """
     Reads the archives and writes the output JSON file.
     """
+    output_file_path = f'{data.artifact_subdirectory}/data.{data.output_file_format}'
+
     # load manifest
-    with open(data.manifest_path, encoding='utf-8') as f:
+    with open(data.manifest_file_path, encoding='utf-8') as f:
         manifest = [ManifestEntry(**entry) for entry in json.load(f)]
 
     info = activity.info()
     activity_logger = logger.bind(activity_type=info.activity_type)
 
     archives = generate_archives(manifest, data.required, data.user_id, activity_logger)
-    num_entries_exported = write_dicts_to_json(archives, data.output_file_path)
+    num_entries_exported = write_dicts_to_json(archives, output_file_path)
 
     return OutputFile(
-        file_path=data.output_file_path,
-        file_size=os.path.getsize(data.output_file_path),
+        file_path=output_file_path,
+        file_size=os.path.getsize(output_file_path),
         num_entries_exported=num_entries_exported,
     )
 
 
 @activity.defn
-async def read_archives_and_write_table_rows(data: ReadArchivesAndWriteTableRowsInput):
+async def read_archives_and_write_table_rows(
+    data: ReadArchivesWorkflowInput,
+) -> TableRowsOutput:
     """
-    Activity to read archives of the searched entries. The required fields are read
-    from the archives, converted to table rows, and written to a JSON file in the
-    artifact directory. At the same time, a list of required m_definitions is written to
-    another JSON file.
-
-    Args:
-        data (ReadArchivesAndWriteTableRowsInput): Input data for the search activity.
-
-    Returns:
-        SearchPageOutput: Output data from the search and read archives activity.
+    Reads archives and writes table rows and column quantity definitions to JSON files.
     """
+    table_rows_file_path = f'{data.artifact_subdirectory}/table_rows.tmp.json'
+    columns_quantity_def_file_path = (
+        f'{data.artifact_subdirectory}/columns_quantity_def.tmp.json'
+    )
+
     # load manifest
-    with open(data.manifest_path, encoding='utf-8') as f:
+    with open(data.manifest_file_path, encoding='utf-8') as f:
         manifest = [ManifestEntry(**entry) for entry in json.load(f)]
 
     info = activity.info()
@@ -213,10 +213,15 @@ async def read_archives_and_write_table_rows(data: ReadArchivesAndWriteTableRows
     )
 
     columns_quantity_def = write_table_rows_to_json(
-        rows_with_definitions, data.table_rows_file_path
+        rows_with_definitions, table_rows_file_path
     )
 
-    write_dicts_to_json([columns_quantity_def], data.columns_quantity_def_file_path)
+    write_dicts_to_json([columns_quantity_def], columns_quantity_def_file_path)
+
+    return TableRowsOutput(
+        table_rows_file_path=table_rows_file_path,
+        columns_quantity_def_file_path=columns_quantity_def_file_path,
+    )
 
 
 @activity.defn
