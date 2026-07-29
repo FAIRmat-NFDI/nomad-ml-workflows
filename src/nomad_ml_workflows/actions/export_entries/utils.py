@@ -1,13 +1,20 @@
 import importlib
 import json
+from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import lru_cache
 
 import json_stream
 import pandas as pd
+from nomad.app.v1.models.models import User
+from nomad.archive.required import RequiredReader
 from nomad.datamodel.datamodel import EntryArchive, EntryData
+from nomad.files import UploadFiles
 from nomad.metainfo import data_type as nomad_data_type
 from nomad.metainfo.metainfo import Quantity, Reference, Section
+
+from nomad_ml_workflows.actions.export_entries.models import ManifestEntry
 
 try:
     import pyarrow as pa
@@ -578,8 +585,8 @@ def write_parquet_file(path: str, data: list[dict], logger=None):
     return table.num_rows
 
 
-def write_json_file(path: str, data: list[dict], logger=None):
-    """Writes a list of NOMAD entry dicts to a JSON file.
+def write_json_file(path: str, data, logger=None):
+    """Writes a JSON file with the given data.
 
     Args:
         path (str): The path where the file will be saved.
@@ -661,3 +668,83 @@ def merge_files(
 
     else:
         raise ValueError('Unsupported file format. Please use parquet, csv, or json.')
+
+
+def generate_archives(
+    manifest: list[ManifestEntry], required: dict | str, user_id: str, logger=None
+) -> Iterable[dict]:
+    """Generates entry archive dicts from the manifest and required fields."""
+
+    # set up required reader
+    required_reader = RequiredReader(
+        required=required,
+        resolve_inplace=True,
+        user=User(user_id=user_id),
+    )
+
+    # arrange entries by upload_id
+    manifest_dict = defaultdict(list)
+    for entry in manifest:
+        manifest_dict[entry.upload_id].append(entry.entry_id)
+
+    for upload_id, entry_ids in manifest_dict.items():
+        if logger:
+            logger.info(f'processing upload_id: {upload_id}')
+
+        upload_files = UploadFiles.get(upload_id)
+        if upload_files is None:
+            if logger:
+                logger.info(f'no upload files found for upload_id: {upload_id}')
+            continue
+
+        for entry_id in entry_ids:
+            entry = {'entry_id': entry_id, 'upload_id': upload_id}
+            try:
+                with upload_files.read_archive(entry_id) as archive:
+                    entry['archive'] = required_reader.read(
+                        archive, entry_id, upload_id
+                    )
+                    yield entry
+            except Exception as e:
+                logger.error(
+                    'failed to read entry archive',
+                    entry_id=entry_id,
+                    upload_id=upload_id,
+                    exc_info=e,
+                )
+
+
+def generate_table_rows(
+    manifest: list[ManifestEntry], required: dict | str, user_id: str, logger=None
+) -> Iterable[tuple[dict, dict[str, Quantity]]]:
+    """
+    Generates table rows from the manifest and required fields.
+    """
+    archives = generate_archives(manifest, required, user_id, logger)
+    for archive in archives:
+        try:
+            yield archive_to_row(archive)
+        except Exception as e:
+            logger.error(
+                'failed to generate table rows for archive',
+                exc_info=e,
+            )
+
+
+def write_dicts_to_json(items: Iterable[dict], output_file_path: str) -> int:
+    first_item = True
+    count = 0
+
+    with open(output_file_path, 'w', encoding='utf-8') as f:
+        f.write('[\n')
+
+        for item in items:
+            if not first_item:
+                f.write(',\n')
+            json.dump(item, f, indent=2)
+            count += 1
+            first_item = False
+
+        f.write('\n]')
+
+    return count
