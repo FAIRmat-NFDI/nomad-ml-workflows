@@ -748,3 +748,30 @@ def write_dicts_to_json(items: Iterable[dict], output_file_path: str) -> int:
         f.write('\n]')
 
     return count
+
+
+def write_table_rows_to_json(
+    rows_with_definitions: Iterable[tuple[dict, dict[str, Quantity]]],
+    output_file_path: str,
+) -> dict[str, Quantity]:
+    columns_quantity_def: dict[str, Quantity] = {}
+    first_row = True
+
+    with open(output_file_path, 'w', encoding='utf-8') as file:
+        file.write('[\n')
+
+        for row, row_column_defs in rows_with_definitions:
+            # Accumulate only the schema information.
+            for column, quantity_def in row_column_defs.items():
+                columns_quantity_def.setdefault(column, quantity_def)
+
+            # Write the current row immediately.
+            if not first_row:
+                file.write(',\n')
+
+            json.dump(row, file, indent=2)
+            first_row = False
+
+        file.write('\n]')
+
+    return columns_quantity_def
