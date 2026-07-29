@@ -29,35 +29,33 @@ class ExportEntriesActionEntryPoint(ActionEntryPoint):
 
         from nomad_ml_workflows.actions.export_entries.activities import (
             cleanup_artifacts,
-            collect_page_cursors,
             create_artifact_subdirectory,
             export_dataset_to_upload,
-            merge_output_files,
-            read_archives,
-            rename_generated_file,
+            prepare_manifest,
+            read_archives_and_write_output_json,
+            read_archives_and_write_table_rows,
         )
         from nomad_ml_workflows.actions.export_entries.workflows import (
             ExportEntriesWorkflow,
-            SearchPageWorkflow,
+            ReadArchivesWorkflow,
         )
 
         return Action(
             task_queue=self.task_queue,
             workflow=ExportEntriesWorkflow,
-            child_workflows=[SearchPageWorkflow],
+            child_workflows=[ReadArchivesWorkflow],
             activities=[
                 create_artifact_subdirectory,
-                collect_page_cursors,
-                read_archives,
-                rename_generated_file,
-                merge_output_files,
+                prepare_manifest,
+                read_archives_and_write_output_json,
+                read_archives_and_write_table_rows,
                 export_dataset_to_upload,
                 cleanup_artifacts,
             ],
         )
 
 
-export_entries = ExportEntriesActionEntryPoint(
+export_entries = ExportEntriesActionEntryPoint(  # type: ignore
     name='Export Entries Action',
     description='An action to search entries and export them as a zip file in the '
     'specified upload.',

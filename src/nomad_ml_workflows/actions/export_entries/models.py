@@ -1,7 +1,7 @@
 import json
 from typing import Annotated, Any, Literal
 
-from nomad.app.v1.models.models import MetadataPagination, Query
+from nomad.app.v1.models.models import MetadataPagination, Query, owner_documentation
 from pydantic import BaseModel, Field
 
 OwnerLiteral = Literal['public', 'visible', 'shared', 'user', 'staging']
@@ -153,7 +153,7 @@ class CreateArtifactSubdirectoryInput(BaseModel):
     subdir_name: str = Field(..., description='Name of the subdirectory to be created.')
 
 
-class SearchPageInput(BaseModel):
+class NormalizedSearchSettings(BaseModel):
     user_id: str = Field(..., description='User ID performing the search.')
     owner: OwnerLiteral = Field(..., description='Owner of the entries to be searched.')
     query: Query = Field(..., description='Search query parameters.')
@@ -165,14 +165,6 @@ class SearchPageInput(BaseModel):
     pagination: MetadataPagination = Field(
         ..., description='Pagination settings for the search results.'
     )
-    batch_file_format: BatchFileFormatLiteral = Field(
-        ..., description='Format of the output file.'
-    )
-    output_file_path: str = Field(..., description='Path to the generated output file.')
-    max_entries_export_limit: int = Field(
-        ..., description='Maximum number of entries to be exported.'
-    )
-    page_num: int = Field(..., description='Page number for the search results.')
 
     @staticmethod
     def build_archive_required(required: list[Required] | None) -> str | dict[str, Any]:
@@ -231,13 +223,7 @@ class SearchPageInput(BaseModel):
     def from_user_input(
         cls,
         user_input: ExportEntriesUserInput,
-        /,
-        page_num: int,
-        output_file_path: str,
-        max_entries_export_limit: int,
-    ) -> 'SearchPageInput':
-        """Convert from ExportEntriesUserInput to SearchPageInput"""
-
+    ) -> 'NormalizedSearchSettings':
         query = json.loads(
             _clean_field(user_input.search_settings.query).replace("'", '"')
         )
@@ -246,11 +232,7 @@ class SearchPageInput(BaseModel):
             user_input.search_settings.required
         )
 
-        pagination = MetadataPagination(page_size=user_input.search_settings.page_size)
-
-        batch_file_format = user_input.output_settings.output_file_format
-        if batch_file_format == 'csv':
-            batch_file_format = 'parquet'  # use parquet batches for csv
+        pagination = MetadataPagination(page_size=user_input.search_settings.page_size)  # type: ignore
 
         return cls(
             user_id=user_input.user_id,
@@ -258,10 +240,6 @@ class SearchPageInput(BaseModel):
             query=query,
             required=archive_required,
             pagination=pagination,
-            batch_file_format=batch_file_format,
-            page_num=page_num,
-            output_file_path=output_file_path,
-            max_entries_export_limit=max_entries_export_limit,
         )
 
 
@@ -274,6 +252,92 @@ class SearchPageOutput(BaseModel):
     )
     search_end_time: str = Field(
         ..., description='UTC Timestamp (ISO) when the last search completed.'
+    )
+
+
+class ManifestEntry(BaseModel):
+    entry_id: str = Field(..., description='Entry ID.')
+    upload_id: str = Field(..., description='Upload ID.')
+
+
+class PrepareManifestInput(BaseModel):
+    user_id: str = Field(..., description='User ID performing the search.')
+    owner: OwnerLiteral = Field(..., description='Owner of the entries to be searched.')
+    query: Query = Field(..., description='Search query parameters.')
+    pagination: MetadataPagination = Field(
+        ..., description='Pagination settings for the search results.'
+    )
+    max_entries_export_limit: int = Field(
+        ..., description='Maximum number of entries to be exported.'
+    )
+    manifest_file_path: str = Field(..., description='Path to the manifest file.')
+
+
+class PrepapeManifestOutput(BaseModel):
+    num_entries_available: int = Field(
+        ..., description='Number of entries available for export.'
+    )
+    search_start_time: str = Field(
+        ..., description='UTC Timestamp (ISO) when the search started.'
+    )
+    search_end_time: str = Field(
+        ..., description='UTC Timestamp (ISO) when the search ended.'
+    )
+
+
+class ReadArchivesWorkflowInput(BaseModel):
+    user_id: str = Field(..., description='User ID performing the search.')
+    output_file_format: str = Field(..., description='Output file format.')
+    manifest_file_path: str = Field(..., description='Path to the manifest file.')
+    artifact_subdirectory: str = Field(
+        ..., description="Subdirectory where current workflow's artifacts are stored."
+    )
+    required: str | dict[str, Any] = Field(
+        '*',
+        description='Dictionary of required fields and directives compatible with '
+        '`nomad.archive.required.RequiredReader` class.',
+    )
+
+
+class ReadArchivesAndWriteOutputJsonInput(BaseModel):
+    user_id: str = Field(..., description='User ID performing the search.')
+    manifest_path: str = Field(..., description='Path to the manifest file.')
+    required: str | dict[str, Any] = Field(
+        '*',
+        description='Dictionary of required fields and directives compatible with '
+        '`nomad.archive.required.RequiredReader` class.',
+    )
+    output_file_path: str = Field(..., description='Path to the output JSON file.')
+
+
+class ReadArchivesAndWriteTableRowsInput(BaseModel):
+    user_id: str = Field(..., description='User ID performing the search.')
+    manifest_path: str = Field(..., description='Path to the manifest file.')
+    required: str | dict[str, Any] = Field(
+        '*',
+        description='Dictionary of required fields and directives compatible with '
+        '`nomad.archive.required.RequiredReader` class.',
+    )
+    table_rows_file_path: str = Field(
+        ..., description='Path to the table rows output file.'
+    )
+    columns_quantity_def_file_path: str = Field(
+        ..., description='Path to the column quantity definitions output file.'
+    )
+
+
+class OutputFile(BaseModel):
+    file_path: str = Field(..., description='Path to the output file.')
+    file_size: int = Field(..., description='Size of the output file in bytes.')
+    num_entries_exported: int = Field(..., description='Number of entries exported.')
+
+
+class TableRowsOutput(BaseModel):
+    table_rows_json_path: str = Field(
+        ..., description='Path to the JSON file containing table rows.'
+    )
+    column_m_defs_json_path: str = Field(
+        ..., description='Path to the JSON file containing m_defs of the table columns.'
     )
 
 
@@ -389,8 +453,8 @@ class ExportDatasetInput(BaseModel):
         description='Name of the directory containing the dataset that will be '
         'exported.',
     )
-    source_path: str | None = Field(
-        None, description='Path to the source files of the dataset.'
+    source_paths: list[str] | None = Field(
+        None, description='Paths to the source files of the dataset.'
     )
     metadata: ExportDatasetMetadata = Field(
         ..., description='Metadata associated with the exported dataset.'

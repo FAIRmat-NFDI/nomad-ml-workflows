@@ -321,6 +321,47 @@ def _flatten_section(
             )
 
 
+def archive_to_row(archive: dict) -> tuple[dict, dict[str, Quantity]]:
+    """
+    Flatten archive dict into a row dict. Also returns column definition.
+
+    `archive` argument should have the following structure, where `archive` corresponds
+    to serialization of EntryArchive::
+        {
+            "entry_id": str,
+            "archive": {
+                "results": dict,
+                "metadata": dict,
+                "data": dict,
+                "processing_log": list[Any],
+                ...
+            },
+        }
+    """
+    if not isinstance(archive, dict):
+        raise ValueError('archive must be a dictionary (JSON object).')
+    if 'archive' not in archive or 'entry_id' not in archive:
+        raise ValueError('archive and entry_id keys are required.')
+    if not isinstance(archive['archive'], dict):
+        raise ValueError('archive[archive] must be a dictionary (JSON object).')
+
+    columns_quantity_def: dict[str, Quantity] = {}
+    context = _FlattenEntryContext(
+        row={'entry_id': archive['entry_id']},  # Always include entry_id as a column
+        columns_quantity_def=columns_quantity_def,
+        unhandled_keys=[],
+    )
+    _flatten_section(
+        section_data=archive['archive'],
+        section_def=EntryArchive.m_def,
+        prefix='',
+        context=context,
+    )
+    columns_quantity_def.update(context.columns_quantity_def)
+
+    return context.row, columns_quantity_def
+
+
 def _archives_to_rows(  # noqa: PLR0912
     archives: list[dict] | dict, logger=None
 ) -> tuple[list[dict], dict[str, Quantity]]:

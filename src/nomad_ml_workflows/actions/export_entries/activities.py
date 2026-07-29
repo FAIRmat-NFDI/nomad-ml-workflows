@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from math import ceil
 
 from nomad.actions.manager import action_artifacts_dir, get_upload_files
-from nomad.app.v1.models.models import MetadataPagination, MetadataRequired, User
+from nomad.app.v1.models.models import MetadataPagination, MetadataRequired
 from nomad.files import StagingUploadFiles
 from nomad.search import search as nomad_search
 from nomad.utils import get_logger
@@ -18,15 +18,22 @@ from nomad_ml_workflows.actions.export_entries.models import (
     CollectCursorsOutput,
     CreateArtifactSubdirectoryInput,
     ExportDatasetInput,
+    ManifestEntry,
     MergeOutputFilesInput,
+    OutputFile,
+    PrepapeManifestOutput,
+    PrepareManifestInput,
+    ReadArchivesAndWriteOutputJsonInput,
+    ReadArchivesAndWriteTableRowsInput,
     RenameGeneratedFileInput,
-    SearchPageInput,
-    SearchPageOutput,
 )
 from nomad_ml_workflows.actions.export_entries.utils import (
+    generate_archives,
+    generate_table_rows,
     merge_files,
-    write_json_file,
+    write_dicts_to_json,
     write_parquet_file,
+    write_table_rows_to_json,
 )
 
 logger = get_logger(__name__)
@@ -130,75 +137,98 @@ async def collect_page_cursors(data: CollectCursorsInput) -> CollectCursorsOutpu
 
 
 @activity.defn
-async def read_archives(data: SearchPageInput) -> SearchPageOutput:
-    """
-    Activity to read archives of the searched entries. The required fields are read
-    from the archives and written to a file in the specified format (Parquet or JSON)
-    in the artifacts directory.
+def prepare_manifest(data: PrepareManifestInput) -> PrepapeManifestOutput:
 
-    Args:
-        data (ReadArchivesInput): Input data for the search activity.
-
-    Returns:
-        SearchPageOutput: Output data from the search and read archives activity.
-    """
-    from nomad.app.v1.routers.entries import _read_entry_from_archive, _Uploads
-    from nomad.archive.required import RequiredReader
-
-    start = datetime.now(timezone.utc).isoformat()
-
-    info = activity.info()
-
-    activity_logger = logger.bind(
-        activity_type=info.activity_type,
-        search_page_num=data.page_num,
-    )
-
-    # Find entries whose archives are to be read
+    starttime = datetime.now(timezone.utc).isoformat()
     response = nomad_search(
         user_id=data.user_id,
         owner=data.owner,
         query=data.query,
-        required=MetadataRequired(include=['entry_id', 'upload_id']),
+        required=MetadataRequired(include=['entry_id', 'upload_id']),  # type: ignore
         pagination=data.pagination,
     )
-    entries: list = [
-        {
-            'entry_id': entry['entry_id'],
-            'upload_id': entry['upload_id'],
-        }
+    endtime = datetime.now(timezone.utc).isoformat()
+
+    manifest: list = [
+        {'entry_id': entry['entry_id'], 'upload_id': entry['upload_id']}
         for entry in response.data
     ]
-    entries = entries[: data.max_entries_export_limit]  #  Apply max limit
+    manifest = manifest[: data.max_entries_export_limit]  #  Apply max limit
+    write_dicts_to_json(manifest, data.manifest_file_path)
 
-    # setup required reader
-    required_reader = RequiredReader(
-        data.required,
-        resolve_inplace=True,
-        user=User(user_id=data.user_id),
+    return PrepapeManifestOutput(
+        search_start_time=starttime,
+        search_end_time=endtime,
+        num_entries_available=len(manifest),
     )
-    entry_archives = []
 
-    # For each entry
-    with _Uploads() as uploads:
-        for entry in entries:
-            try:
-                entry_archive = _read_entry_from_archive(
-                    entry, uploads, required_reader
-                )
-                entry_archives.append(entry_archive)
-            except Exception as e:
-                activity_logger.error(
-                    'failed to read entry archive',
-                    entry_id=entry['entry_id'],
-                    exc_info=e,
-                )
 
-    end = datetime.now(timezone.utc).isoformat()
+@activity.defn
+def read_archives_and_write_output_json(
+    data: ReadArchivesAndWriteOutputJsonInput,
+) -> OutputFile:
+    """
+    Reads the archives and writes the output JSON file.
+    """
+    # load manifest
+    with open(data.manifest_path, encoding='utf-8') as f:
+        manifest = [ManifestEntry(**entry) for entry in json.load(f)]
 
+    info = activity.info()
+    activity_logger = logger.bind(activity_type=info.activity_type)
+
+    archives = generate_archives(manifest, data.required, data.user_id, activity_logger)
+    num_entries_exported = write_dicts_to_json(archives, data.output_file_path)
+
+    return OutputFile(
+        file_path=data.output_file_path,
+        file_size=os.path.getsize(data.output_file_path),
+        num_entries_exported=num_entries_exported,
+    )
+
+
+@activity.defn
+async def read_archives_and_write_table_rows(data: ReadArchivesAndWriteTableRowsInput):
+    """
+    Activity to read archives of the searched entries. The required fields are read
+    from the archives, converted to table rows, and written to a JSON file in the
+    artifact directory. At the same time, a list of required m_definitions is written to
+    another JSON file.
+
+    Args:
+        data (ReadArchivesAndWriteTableRowsInput): Input data for the search activity.
+
+    Returns:
+        SearchPageOutput: Output data from the search and read archives activity.
+    """
+    # load manifest
+    with open(data.manifest_path, encoding='utf-8') as f:
+        manifest = [ManifestEntry(**entry) for entry in json.load(f)]
+
+    info = activity.info()
+    activity_logger = logger.bind(activity_type=info.activity_type)
+
+    rows_with_definitions = generate_table_rows(
+        manifest, data.required, data.user_id, activity_logger
+    )
+
+    columns_quantity_def = write_table_rows_to_json(
+        rows_with_definitions, data.table_rows_file_path
+    )
+
+    write_dicts_to_json([columns_quantity_def], data.columns_quantity_def_file_path)
+
+
+@activity.defn
+def write_output_file_tabular(
+    data: ReadArchivesAndWriteTableRowsInput, entry_archives: list[dict]
+) -> OutputFile:
+    """
+    Writes the output file based on the batch file format.
+    """
     write_dataset_file = {
         'parquet': write_parquet_file,
-        'json': write_json_file,
+        # 'csv': write_csv_file,
     }.get(data.batch_file_format)
     if write_dataset_file is None:
         raise ValueError(f'Unsupported batch file format "{data.batch_file_format}". ')
@@ -216,10 +246,9 @@ async def read_archives(data: SearchPageInput) -> SearchPageOutput:
         f'exported {num_entries_exported}/{len(entry_archives)} entries'
     )
 
-    return SearchPageOutput(
-        search_start_time=start,
-        search_end_time=end,
-        num_entries_exported=num_entries_exported,
+    return OutputFile(
+        file_path=data.output_file_path,
+        file_size=os.path.getsize(data.output_file_path),
     )
 
 
@@ -299,8 +328,8 @@ async def export_dataset_to_upload(data: ExportDatasetInput) -> str:
         json.dump(metadata_dict, metafile, indent=4)
 
     exportable_filepaths = [metadata_path]
-    if data.source_path:
-        exportable_filepaths.append(data.source_path)
+    if data.source_paths:
+        exportable_filepaths.extend(data.source_paths)
 
     exportable_dir_name = unique_filename(data.exportable_dir_name, upload_files)
 
