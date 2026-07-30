@@ -31,7 +31,7 @@ from nomad_ml_workflows.actions.export_entries.utils import (
     generate_table_rows,
     merge_files,
     write_dicts_to_json,
-    write_table_rows_to_json,
+    write_table_rows_to_ndjson,
     write_table_rows_to_tabular_file,
 )
 
@@ -201,7 +201,7 @@ async def read_archives_and_write_output_tabular(
             f'Unsupported tabular output format: {data.output_file_format}'
         )
 
-    table_rows_file_path = f'{data.artifact_subdirectory}/table_rows.tmp.json'
+    table_rows_file_path = f'{data.artifact_subdirectory}/table_rows.tmp.ndjson'
     output_file_path = f'{data.artifact_subdirectory}/data.{data.output_file_format}'
 
     # load manifest
@@ -215,7 +215,7 @@ async def read_archives_and_write_output_tabular(
         manifest, data.required, data.user_id, activity_logger
     )
 
-    columns_quantity_def = write_table_rows_to_json(
+    columns_quantity_def = write_table_rows_to_ndjson(
         rows_with_columns_quantity_def, table_rows_file_path
     )
     num_entries_exported = write_table_rows_to_tabular_file(

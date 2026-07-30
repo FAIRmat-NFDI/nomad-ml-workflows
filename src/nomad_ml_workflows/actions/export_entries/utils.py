@@ -588,7 +588,6 @@ def _stringify_nested_columns(
     new_columns = []
     for i, column in enumerate(batch.columns):
         if _is_nested_type(batch.schema.field(i).type):
-            # Convert each element to JSON string
             stringified = pa.array(
                 [
                     json.dumps(value, separators=(',', ':'))
@@ -793,28 +792,23 @@ def write_dicts_to_json(items: Iterable[dict], output_file_path: str) -> int:
     return count
 
 
-def write_table_rows_to_json(
+def write_table_rows_to_ndjson(
     rows_with_definitions: Iterable[tuple[dict, dict[str, Quantity]]],
     output_file_path: str,
 ) -> dict[str, Quantity]:
+    if not output_file_path.endswith('.ndjson')
+        raise ValueError('ouput_file_path should have .ndjson extension.')
     columns_quantity_def: dict[str, Quantity] = {}
-    first_row = True
 
     with open(output_file_path, 'w', encoding='utf-8') as file:
-        file.write('[\n')
-
         for row, row_column_defs in rows_with_definitions:
             # accumulate only the schema information
             for column, quantity_def in row_column_defs.items():
                 columns_quantity_def.setdefault(column, quantity_def)
 
             # write the current row immediately
-            if not first_row:
-                file.write(',\n')
             json.dump(row, file, separators=(',', ':'))
-            first_row = False
-
-        file.write('\n]')
+            file.write('\n')
 
     return columns_quantity_def
 
@@ -857,7 +851,7 @@ def write_table_rows_to_tabular_file(
     logger=None,
 ) -> int:
     """
-    Stream flattened rows from JSON into byte-bounded Parquet or CSV batches.
+    Stream flattened rows from NDJSON into byte-bounded Parquet or CSV batches.
 
     The complete set of quantity definitions is collected before this function is
     called, allowing each row to be normalized once into a RecordBatch with the same
@@ -906,8 +900,8 @@ def write_table_rows_to_tabular_file(
             buffered_batches.clear()
             buffered_bytes = 0
 
-        for row in json_stream.load(input_file):
-            standard_row = json_stream.to_standard_types(row)
+        for line in input_file:
+            standard_row = json.loads(line)
             if not isinstance(standard_row, dict):
                 raise ValueError('Each table row must be a JSON object.')
             row_batch = _table_rows_to_arrow_batch(
