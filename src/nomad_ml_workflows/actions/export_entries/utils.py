@@ -796,7 +796,7 @@ def write_table_rows_to_ndjson(
     rows_with_definitions: Iterable[tuple[dict, dict[str, Quantity]]],
     output_file_path: str,
 ) -> dict[str, Quantity]:
-    if not output_file_path.endswith('.ndjson')
+    if not output_file_path.endswith('.ndjson'):
         raise ValueError('ouput_file_path should have .ndjson extension.')
     columns_quantity_def: dict[str, Quantity] = {}
 

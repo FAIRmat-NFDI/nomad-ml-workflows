@@ -1,7 +1,7 @@
 import json
 from typing import Annotated, Any, Literal
 
-from nomad.app.v1.models.models import MetadataPagination, Query, owner_documentation
+from nomad.app.v1.models.models import MetadataPagination, Query
 from pydantic import BaseModel, Field
 
 OwnerLiteral = Literal['public', 'visible', 'shared', 'user', 'staging']

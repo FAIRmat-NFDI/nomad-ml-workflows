@@ -1,18 +1,18 @@
 from nomad_ml_workflows.actions.export_entries.models import (
     Exclude,
     Include,
-    SearchPageInput,
+    NormalizedSearchSettings,
 )
 
 
 def test_build_archive_required_returns_wildcard_for_empty_paths():
-    assert SearchPageInput.build_archive_required(None) == '*'
+    assert NormalizedSearchSettings.build_archive_required(None) == '*'
 
 
 def test_build_archive_required_builds_nested_include_tree():
     required = [Include(path='data.results.energy', resolve_references=False)]
 
-    assert SearchPageInput.build_archive_required(required) == {
+    assert NormalizedSearchSettings.build_archive_required(required) == {
         'data': {'results': {'energy': 'include'}}
     }
 
@@ -23,13 +23,15 @@ def test_build_archive_required_prefers_parent_include():
         Include(path='data.results', resolve_references=False),
     ]
 
-    assert SearchPageInput.build_archive_required(required) == {'data': 'include'}
+    assert NormalizedSearchSettings.build_archive_required(required) == {
+        'data': 'include'
+    }
 
 
 def test_build_archive_required_strips_include_wildcard_suffix():
     required = [Include(path='data.results*', resolve_references=False)]
 
-    assert SearchPageInput.build_archive_required(required) == {
+    assert NormalizedSearchSettings.build_archive_required(required) == {
         'data': {'results': 'include'}
     }
 
@@ -37,7 +39,7 @@ def test_build_archive_required_strips_include_wildcard_suffix():
 def test_build_archive_required_builds_include_resolved_directive():
     required = [Include(path='data.results.energy', resolve_references=True)]
 
-    assert SearchPageInput.build_archive_required(required) == {
+    assert NormalizedSearchSettings.build_archive_required(required) == {
         'data': {'results': {'energy': 'include-resolved'}}
     }
 
@@ -48,7 +50,7 @@ def test_build_archive_required_prefers_include_resolved_for_same_path():
         Include(path='data.results.energy', resolve_references=True),
     ]
 
-    assert SearchPageInput.build_archive_required(required) == {
+    assert NormalizedSearchSettings.build_archive_required(required) == {
         'data': {'results': {'energy': 'include-resolved'}}
     }
 
@@ -56,7 +58,7 @@ def test_build_archive_required_prefers_include_resolved_for_same_path():
 def test_build_archive_required_exclude():
     required = [Exclude(path='data.results.energy')]
 
-    assert SearchPageInput.build_archive_required(required) == {
+    assert NormalizedSearchSettings.build_archive_required(required) == {
         '*': 'include',
         'data': {'results': {'energy': 'exclude'}},
     }
@@ -68,7 +70,7 @@ def test_build_archive_required_exclude_over_include():
         Exclude(path='data.results.energy'),
     ]
 
-    assert SearchPageInput.build_archive_required(required) == {
+    assert NormalizedSearchSettings.build_archive_required(required) == {
         '*': 'include',
         'data': {'results': {'energy': 'exclude'}},
     }
@@ -80,7 +82,7 @@ def test_build_archive_required_include_nested_exclude():
         Exclude(path='data.results.energy'),
     ]
 
-    assert SearchPageInput.build_archive_required(required) == {
+    assert NormalizedSearchSettings.build_archive_required(required) == {
         'data': {
             '*': 'include',
             'results': {'energy': 'exclude'},
@@ -94,7 +96,7 @@ def test_build_archive_required_include_resolved_nested_exclude():
         Exclude(path='data.results.energy'),
     ]
 
-    assert SearchPageInput.build_archive_required(required) == {
+    assert NormalizedSearchSettings.build_archive_required(required) == {
         'data': {
             '*': 'include-resolved',
             'results': {'energy': 'exclude'},
@@ -109,7 +111,7 @@ def test_build_archive_required_same_path_multiple_times():
         Exclude(path='data.results.energy'),
     ]
 
-    assert SearchPageInput.build_archive_required(required) == {
+    assert NormalizedSearchSettings.build_archive_required(required) == {
         '*': 'include',
         'data': {'results': {'energy': 'exclude'}},
     }
@@ -131,6 +133,6 @@ def test_build_archive_required_prefers_include_resolved_for_whole_parent():
         Include(path='data.results.energy', resolve_references=True),
     ]
 
-    assert SearchPageInput.build_archive_required(required) == {
+    assert NormalizedSearchSettings.build_archive_required(required) == {
         'data': 'include-resolved'
     }
