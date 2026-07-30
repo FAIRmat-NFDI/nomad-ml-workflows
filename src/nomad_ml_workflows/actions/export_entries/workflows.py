@@ -13,7 +13,7 @@ with workflow.unsafe.imports_passed_through():
         export_dataset_to_upload,
         prepare_manifest,
         read_archives_and_write_output_json,
-        read_archives_and_write_table_rows,
+        read_archives_and_write_output_tabular,
     )
     from nomad_ml_workflows.actions.export_entries.models import (
         CleanupArtifactsInput,
@@ -47,13 +47,15 @@ class ReadArchivesWorkflow:
                 retry_policy=retry_policy,
             )
 
-        # Write table rows and columns quantity definition files
-        await workflow.execute_activity(
-            read_archives_and_write_table_rows,
-            data,
-            start_to_close_timeout=timedelta(hours=2),
-            retry_policy=retry_policy,
-        )
+        if data.output_file_format in ['parquet', 'csv']:
+            return await workflow.execute_activity(
+                read_archives_and_write_output_tabular,
+                data,
+                start_to_close_timeout=timedelta(hours=2),
+                retry_policy=retry_policy,
+            )
+
+        raise ValueError(f'Unsupported output file format: {data.output_file_format}')
 
 
 @workflow.defn

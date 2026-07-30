@@ -25,15 +25,14 @@ from nomad_ml_workflows.actions.export_entries.models import (
     PrepareManifestInput,
     ReadArchivesWorkflowInput,
     RenameGeneratedFileInput,
-    TableRowsOutput,
 )
 from nomad_ml_workflows.actions.export_entries.utils import (
     generate_archives,
     generate_table_rows,
     merge_files,
     write_dicts_to_json,
-    write_parquet_file,
     write_table_rows_to_json,
+    write_table_rows_to_tabular_file,
 )
 
 logger = get_logger(__name__)
@@ -191,16 +190,19 @@ def read_archives_and_write_output_json(
 
 
 @activity.defn
-async def read_archives_and_write_table_rows(
+async def read_archives_and_write_output_tabular(
     data: ReadArchivesWorkflowInput,
-) -> TableRowsOutput:
+) -> OutputFile:
     """
-    Reads archives and writes table rows and column quantity definitions to JSON files.
+    Reads archives and streams flattened table rows to Parquet or CSV.
     """
+    if data.output_file_format not in {'parquet', 'csv'}:
+        raise ValueError(
+            f'Unsupported tabular output format: {data.output_file_format}'
+        )
+
     table_rows_file_path = f'{data.artifact_subdirectory}/table_rows.tmp.json'
-    columns_quantity_def_file_path = (
-        f'{data.artifact_subdirectory}/columns_quantity_def.tmp.json'
-    )
+    output_file_path = f'{data.artifact_subdirectory}/data.{data.output_file_format}'
 
     # load manifest
     with open(data.manifest_file_path, encoding='utf-8') as f:
@@ -209,52 +211,25 @@ async def read_archives_and_write_table_rows(
     info = activity.info()
     activity_logger = logger.bind(activity_type=info.activity_type)
 
-    rows_with_definitions = generate_table_rows(
+    rows_with_columns_quantity_def = generate_table_rows(
         manifest, data.required, data.user_id, activity_logger
     )
 
     columns_quantity_def = write_table_rows_to_json(
-        rows_with_definitions, table_rows_file_path
+        rows_with_columns_quantity_def, table_rows_file_path
     )
-
-    write_dicts_to_json([columns_quantity_def], columns_quantity_def_file_path)
-
-    return TableRowsOutput(
-        table_rows_file_path=table_rows_file_path,
-        columns_quantity_def_file_path=columns_quantity_def_file_path,
-    )
-
-
-@activity.defn
-def write_output_file_tabular(
-    data: ReadArchivesAndWriteTableRowsInput, entry_archives: list[dict]
-) -> OutputFile:
-    """
-    Writes the output file based on the batch file format.
-    """
-    write_dataset_file = {
-        'parquet': write_parquet_file,
-        # 'csv': write_csv_file,
-    }.get(data.batch_file_format)
-    if write_dataset_file is None:
-        raise ValueError(f'Unsupported batch file format "{data.batch_file_format}". ')
-
-    if entry_archives:
-        num_entries_exported = write_dataset_file(
-            path=data.output_file_path,
-            data=entry_archives,
-            logger=activity_logger,
-        )
-    else:
-        num_entries_exported = 0
-
-    activity_logger.info(
-        f'exported {num_entries_exported}/{len(entry_archives)} entries'
+    num_entries_exported = write_table_rows_to_tabular_file(
+        table_rows_file_path,
+        output_file_path,
+        columns_quantity_def,
+        max_buffer_bytes=2 * 1024 * 1024,
+        logger=activity_logger,
     )
 
     return OutputFile(
-        file_path=data.output_file_path,
-        file_size=os.path.getsize(data.output_file_path),
+        file_path=output_file_path,
+        file_size=os.path.getsize(output_file_path),
+        num_entries_exported=num_entries_exported,
     )
 
 

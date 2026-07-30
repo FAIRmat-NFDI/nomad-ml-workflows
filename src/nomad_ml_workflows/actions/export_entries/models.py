@@ -305,15 +305,6 @@ class OutputFile(BaseModel):
     num_entries_exported: int = Field(..., description='Number of entries exported.')
 
 
-class TableRowsOutput(BaseModel):
-    table_rows_file_path: str = Field(
-        ..., description='Path to the table rows output file.'
-    )
-    columns_quantity_def_file_path: str = Field(
-        ..., description='Path to the column quantity definitions output file.'
-    )
-
-
 class CollectCursorsInput(BaseModel):
     user_id: str = Field(..., description='User ID performing the search.')
     owner: OwnerLiteral = Field(..., description='Owner of the entries to be searched.')

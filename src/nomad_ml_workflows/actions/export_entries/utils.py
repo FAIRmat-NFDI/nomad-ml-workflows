@@ -530,6 +530,41 @@ def archives_to_arrow_table(archives: list[dict] | dict, logger=None) -> pa.Tabl
     return pa.Table.from_arrays(arrays, names=column_names)
 
 
+def _table_column_configs(
+    columns_quantity_def: dict[str, Quantity],
+) -> dict[str, _ArrowColumnConfig]:
+    """
+    Build ordered Arrow column configs based on the columns quantity definition.
+    Adds 'entry_id' and 'upload_id' columns to the configs.
+    """
+    configs = {
+        column: _quantity_to_arrow_column_config(quantity_def)
+        for column, quantity_def in columns_quantity_def.items()
+    }
+    configs['entry_id'] = _ArrowColumnConfig(pa.string())
+    configs['upload_id'] = _ArrowColumnConfig(pa.string())
+    return {column: configs[column] for column in _ordered_columns(configs)}
+
+
+def _table_rows_to_arrow_batch(
+    rows: list[dict],
+    column_configs: dict[str, _ArrowColumnConfig],
+    schema: pa.Schema,
+    logger=None,
+) -> pa.RecordBatch:
+    """Convert a batch of flattened rows using a fixed Arrow schema."""
+    arrays = [
+        _normalize_arrow_column(
+            [row.get(column_name) for row in rows],
+            config,
+            column_name,
+            logger=logger,
+        )
+        for column_name, config in column_configs.items()
+    ]
+    return pa.RecordBatch.from_arrays(arrays, schema=schema)
+
+
 def _is_nested_type(dtype: pa.DataType) -> bool:
     """Check if a PyArrow type is nested."""
     return pa.types.is_nested(dtype)
@@ -546,7 +581,9 @@ def _get_csv_compatible_schema(schema: pa.Schema) -> pa.Schema:
     return pa.schema(new_fields)
 
 
-def _stringify_nested_columns(batch: pa.RecordBatch) -> pa.RecordBatch:
+def _stringify_nested_columns(
+    batch: pa.RecordBatch, csv_schema: pa.Schema
+) -> pa.RecordBatch:
     """Convert nested columns (list, struct) in a batch to JSON strings."""
     new_columns = []
     for i, column in enumerate(batch.columns):
@@ -554,8 +591,10 @@ def _stringify_nested_columns(batch: pa.RecordBatch) -> pa.RecordBatch:
             # Convert each element to JSON string
             stringified = pa.array(
                 [
-                    json.dumps(val.as_py()) if val.as_py() is not None else None
-                    for val in column
+                    json.dumps(value, separators=(',', ':'))
+                    if value is not None
+                    else None
+                    for value in column.to_pylist()
                 ],
                 type=pa.string(),
             )
@@ -563,9 +602,7 @@ def _stringify_nested_columns(batch: pa.RecordBatch) -> pa.RecordBatch:
         else:
             new_columns.append(column)
 
-    return pa.RecordBatch.from_arrays(
-        new_columns, schema=_get_csv_compatible_schema(batch.schema)
-    )
+    return pa.RecordBatch.from_arrays(new_columns, schema=csv_schema)
 
 
 def write_parquet_file(path: str, data: list[dict], logger=None):
@@ -647,7 +684,7 @@ def merge_files(
         # Write the dataset to a single CSV file in batches
         with pcsv.CSVWriter(output_file_path, csv_schema) as writer:
             for batch in dataset.to_batches():
-                csv_batch = _stringify_nested_columns(batch)
+                csv_batch = _stringify_nested_columns(batch, csv_schema=csv_schema)
                 writer.write_batch(csv_batch)
 
     elif output_file_format == 'json':
@@ -780,3 +817,129 @@ def write_table_rows_to_json(
         file.write('\n]')
 
     return columns_quantity_def
+
+
+def _tabular_output_file_format(output_file_path: str) -> str:
+    output_file_format = output_file_path.rpartition('.')[2]
+    if output_file_format not in {'parquet', 'csv'}:
+        raise ValueError('Unsupported output file format. Please use parquet or csv.')
+    return output_file_format
+
+
+def _create_tabular_writer(
+    output_file_path: str,
+    output_file_format: str,
+    schema: pa.Schema,
+):
+    if output_file_format == 'csv':
+        return pcsv.CSVWriter(output_file_path, schema)
+    return pq.ParquetWriter(
+        output_file_path,
+        schema,
+        compression='zstd',
+        compression_level=3,
+        use_dictionary=True,
+    )
+
+
+def _write_tabular_table(writer, table: pa.Table, output_file_format: str) -> None:
+    if output_file_format == 'parquet':
+        writer.write_table(table, row_group_size=table.num_rows)
+    else:
+        writer.write_table(table)
+
+
+def write_table_rows_to_tabular_file(
+    table_rows_file_path: str,
+    output_file_path: str,
+    columns_quantity_def: dict[str, Quantity],
+    max_buffer_bytes: int = 2 * 1024 * 1024,
+    logger=None,
+) -> int:
+    """
+    Stream flattened rows from JSON into byte-bounded Parquet or CSV batches.
+
+    The complete set of quantity definitions is collected before this function is
+    called, allowing each row to be normalized once into a RecordBatch with the same
+    schema. Record batches are buffered until their total uncompressed Arrow size
+    reaches ``max_buffer_bytes``.
+
+    A single row is always accepted. If it is larger than ``max_buffer_bytes``, it is
+    logged and written immediately.
+    """
+    output_file_format = _tabular_output_file_format(output_file_path)
+    if max_buffer_bytes < 1:
+        raise ValueError('max_buffer_bytes must be at least 1.')
+
+    column_configs = _table_column_configs(columns_quantity_def)
+    arrow_schema = pa.schema(
+        [
+            pa.field(column_name, config.arrow_type)
+            for column_name, config in column_configs.items()
+        ]
+    )
+    output_schema = (
+        _get_csv_compatible_schema(arrow_schema)
+        if output_file_format == 'csv'
+        else arrow_schema
+    )
+
+    buffered_batches: list[pa.RecordBatch] = []
+    buffered_bytes = 0
+    count = 0
+
+    with (
+        open(table_rows_file_path, encoding='utf-8') as input_file,
+        _create_tabular_writer(
+            output_file_path, output_file_format, output_schema
+        ) as writer,
+    ):
+
+        def flush_batch() -> None:
+            nonlocal buffered_bytes, count
+            if not buffered_batches:
+                return
+
+            table = pa.Table.from_batches(buffered_batches, schema=output_schema)
+            _write_tabular_table(writer, table, output_file_format)
+            count += table.num_rows
+            buffered_batches.clear()
+            buffered_bytes = 0
+
+        for row in json_stream.load(input_file):
+            standard_row = json_stream.to_standard_types(row)
+            if not isinstance(standard_row, dict):
+                raise ValueError('Each table row must be a JSON object.')
+            row_batch = _table_rows_to_arrow_batch(
+                [standard_row],
+                column_configs,
+                arrow_schema,
+                logger=logger,
+            )
+            if output_file_format == 'csv':
+                row_batch = _stringify_nested_columns(row_batch, output_schema)
+            row_size_bytes = row_batch.nbytes
+
+            if buffered_batches and buffered_bytes + row_size_bytes > max_buffer_bytes:
+                flush_batch()
+
+            buffered_batches.append(row_batch)
+            buffered_bytes += row_size_bytes
+
+            if row_size_bytes > max_buffer_bytes:
+                if logger:
+                    logger.warning(
+                        'Tabular row exceeds the uncompressed buffer size and '
+                        'will be written immediately.',
+                        entry_id=standard_row.get('entry_id'),
+                        output_file_format=output_file_format,
+                        row_size_bytes=row_size_bytes,
+                        max_buffer_bytes=max_buffer_bytes,
+                    )
+                flush_batch()
+            elif buffered_bytes >= max_buffer_bytes:
+                flush_batch()
+
+        flush_batch()
+
+    return count
