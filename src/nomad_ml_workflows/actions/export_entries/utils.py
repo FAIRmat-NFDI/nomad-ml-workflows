@@ -5,8 +5,6 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import lru_cache
 
-import json_stream
-import pandas as pd
 from nomad.app.v1.models.models import User
 from nomad.archive.required import RequiredReader
 from nomad.datamodel.datamodel import EntryArchive, EntryData
@@ -19,7 +17,6 @@ from nomad_ml_workflows.actions.export_entries.models import ManifestEntry
 try:
     import pyarrow as pa
     import pyarrow.csv as pcsv
-    import pyarrow.dataset as ds
     import pyarrow.parquet as pq
 except ImportError as e:
     raise ImportError(
@@ -224,29 +221,6 @@ def _normalize_arrow_column(
     return pa.array(converted_values, type=config.arrow_type, safe=True)
 
 
-def _infer_arrow_column(values: list, column_name: str) -> pa.Array:
-    """Infer non-schema column types, falling back to deterministic JSON text."""
-    try:
-        array = pa.array(values)
-        return array
-    except (
-        pa.ArrowInvalid,
-        pa.ArrowNotImplementedError,
-        pa.ArrowTypeError,
-        OverflowError,
-        TypeError,
-        ValueError,
-    ):
-        try:
-            return pa.array(
-                [_json_stringify(value) for value in values], type=pa.string()
-            )
-        except (TypeError, ValueError) as error:
-            raise ValueError(
-                f'Cannot infer or JSON-encode column {column_name!r}.'
-            ) from error
-
-
 def _store_leaf_value(row: dict, col: str, value):
     """Store a value as one opaque DataFrame cell."""
     row[col] = value
@@ -372,88 +346,6 @@ def archive_to_row(archive: dict) -> tuple[dict, dict[str, Quantity]]:
     return context.row, columns_quantity_def
 
 
-def _archives_to_rows(  # noqa: PLR0912
-    archives: list[dict] | dict, logger=None
-) -> tuple[list[dict], dict[str, Quantity]]:
-    """
-    Flatten list of archive dicts into list of row dicts. Also returns column definition
-    and a count of unhandled archive dict keys.
-
-    Each element in the `archives` list should have the following structure, where
-    `archive` key corresponds to serialization of EntryArchive::
-        {
-            "entry_id": str,
-            "archive": {
-                "results": dict,
-                "metadata": dict,
-                "data": dict,
-                "processing_log": list[Any],
-                ...
-            },
-        }
-    """
-    if isinstance(archives, dict):
-        archives = [archives]
-    elif not isinstance(archives, list):
-        raise ValueError(
-            'Input must be a dictionary (JSON object) or a list of dictionaries '
-            '(JSON objects)'
-        )
-
-    rows = []
-    columns_quantity_def: dict[str, Quantity] = {}
-    failed_to_flatten = []
-    unhandled_key_entry_ids: dict[str, set[str]] = {}
-    for item in archives:
-        if item is None:
-            if logger:
-                logger.warning('Encountered a None item.')
-            continue
-        if not isinstance(item, dict):
-            raise ValueError('Input must be a dictionary (JSON object).')
-        if 'archive' not in item or 'entry_id' not in item:
-            raise ValueError('archive and entry_id keys are required.')
-        if not isinstance(item['archive'], dict):
-            raise ValueError('archive value must be a dictionary (JSON object).')
-
-        context = _FlattenEntryContext(
-            row={'entry_id': item['entry_id']},  # Always include entry_id as a column
-            columns_quantity_def=columns_quantity_def,
-            unhandled_keys=[],
-        )
-        try:
-            _flatten_section(
-                section_data=item['archive'],
-                section_def=EntryArchive.m_def,
-                prefix='',
-                context=context,
-            )
-            rows.append(context.row)
-            columns_quantity_def.update(context.columns_quantity_def)
-            for key in context.unhandled_keys:
-                unhandled_key_entry_ids.setdefault(key, set()).add(item['entry_id'])
-        except Exception as e:
-            if logger:
-                logger.warning(
-                    f'failed to flatten archive (entry_id={item["entry_id"]})',
-                    exc_info=e,
-                )
-            failed_to_flatten.append(item['entry_id'])
-
-    if logger:
-        # cummulative logging
-        for key, entry_ids_set in unhandled_key_entry_ids.items():
-            entry_ids = list(entry_ids_set)
-            logger.warning(
-                f'unhandled key {key} (num_entries={len(entry_ids)})',
-                entry_ids=entry_ids,
-            )
-        if failed_to_flatten:
-            logger.warning(
-                f'failed to flatten archives (num_entries={len(failed_to_flatten)})',
-            )
-
-    return rows, columns_quantity_def
 
 
 def _ordered_columns(columns: Iterable[str]) -> list[str]:
@@ -464,73 +356,6 @@ def _ordered_columns(columns: Iterable[str]) -> list[str]:
     ]
     remaining_columns = sorted(column_set.difference(identifier_columns))
     return [*identifier_columns, *remaining_columns]
-
-
-def archives_to_dataframe(archives: list[dict] | dict, logger=None) -> pd.DataFrame:
-    """
-    Convert serialized NOMAD entries into a flattened pandas DataFrame.
-
-    Archive traversal follows NOMAD metainfo subsections, while quantities remain
-    opaque cell values. Concrete ``m_def`` values are used to resolve schemas, and
-    pandas infers the resulting column dtypes from the flattened rows.
-    The ``entry_id`` column is returned first, followed by all other columns in
-    alphabetical order.
-
-    Args:
-        archives: A serialized entry dictionary or list of entry dictionaries. Each
-            entry may contain an ``archive`` dictionary and optional top-level data.
-
-    Returns:
-        A flattened DataFrame.
-    """
-    rows, _ = _archives_to_rows(archives, logger=logger)
-
-    df = pd.DataFrame(rows)
-    sorted_df = df.reindex(_ordered_columns(df.columns), axis=1)
-
-    return sorted_df
-
-
-def archives_to_arrow_table(archives: list[dict] | dict, logger=None) -> pa.Table:
-    """
-    Convert serialized NOMAD entries into a schema-typed Arrow table.
-
-    Entries are flattened using the same metainfo-aware traversal as
-    :func:`archives_to_dataframe`. Schema-backed columns receive explicit Arrow types
-    derived from their quantity definitions, including nested list dimensions. Values
-    are safely cast when necessary; JSON, ``Any``, references, complex numbers, and
-    unsupported custom datatypes are stored as deterministic JSON strings. Columns
-    without a NOMAD quantity definition use Arrow inference with the same JSON fallback.
-    The ``entry_id`` column is returned first, followed by all other columns in
-    alphabetical order.
-
-    Args:
-        archives: A serialized entry dictionary or list of entry dictionaries. Each
-            entry may contain an ``archive`` dictionary and optional top-level data.
-
-    Returns:
-        A schema-typed Arrow table.
-    """
-    rows, columns_quantity_def = _archives_to_rows(archives, logger)
-    column_names = _ordered_columns({column for row in rows for column in row})
-
-    arrays = []
-    for column_name in column_names:
-        values = [row.get(column_name) for row in rows]
-        quantity_def = columns_quantity_def.get(column_name)
-        if quantity_def is None:
-            array = _infer_arrow_column(values, column_name)
-        else:
-            config = _quantity_to_arrow_column_config(quantity_def)
-            array = _normalize_arrow_column(
-                values,
-                config,
-                column_name,
-                logger=logger,
-            )
-        arrays.append(array)
-
-    return pa.Table.from_arrays(arrays, names=column_names)
 
 
 def _table_column_configs(
@@ -605,113 +430,6 @@ def _stringify_nested_columns(
             new_columns.append(column)
 
     return pa.RecordBatch.from_arrays(new_columns, schema=csv_schema)
-
-
-def write_parquet_file(path: str, data: list[dict], logger=None):
-    """Writes a list of NOMAD entry dicts to a parquet file.
-
-    Args:
-        path (str): The path where the file will be saved.
-        data (list[dict]): The list of NOMAD entry dicts to be written to the file.
-    """
-    if not path.endswith('parquet'):
-        raise ValueError('Unsupported file format. Please use parquet.')
-
-    table: pa.Table = archives_to_arrow_table(data, logger)
-    with pq.ParquetWriter(
-        path,
-        table.schema,
-        compression='snappy',  # snappy for faster write/read for individual files
-        use_dictionary=True,
-    ) as writer:
-        writer.write_table(table)
-
-    return table.num_rows
-
-
-def write_json_file(path: str, data, logger=None):
-    """Writes a JSON file with the given data.
-
-    Args:
-        path (str): The path where the file will be saved.
-        data (list[dict]): The list of NOMAD entry dicts to be written to the file.
-    """
-    if not path.endswith('json'):
-        raise ValueError('Unsupported file format. Please use json.')
-
-    with open(path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=2)
-
-    return len(data)
-
-
-def merge_files(
-    input_file_paths: list[str], output_file_format: str, output_file_path: str
-):
-    """Merges multiple Parquet or JSON files into a single file.
-
-    Args:
-        input_file_paths (list[str]): List of file paths to be merged.
-        output_file_format (str): The format of the output file ('parquet', 'csv', or
-            'json').
-        output_file_path (str): Path of the merged output file.
-    """
-    if output_file_format == 'parquet':
-        # Creates a logical dataset from the input files, not loading all data into
-        # memory. Also, unifies the schema across the files.
-        dataset = ds.dataset(input_file_paths, format='parquet')
-
-        # Write the dataset to a single Parquet file in batches
-        with pq.ParquetWriter(
-            output_file_path,
-            dataset.schema,
-            compression='zstd',  # for better compression for merged file
-            compression_level=3,
-            use_dictionary=True,
-        ) as writer:
-            for batch in dataset.to_batches():
-                writer.write_batch(batch)
-
-    elif output_file_format == 'csv':
-        # Creates a logical dataset from the input files, not loading all data into
-        # memory. Also, unifies the schema across the files.
-        # The batch files for `csv` are written in Parquet format for efficiency,
-        # so we read them as Parquet here.
-        dataset = ds.dataset(input_file_paths, format='parquet')
-
-        # PyArrow CSV writer doesn't support nested types (list, struct, etc.)
-        # Convert nested columns to JSON strings
-        csv_schema = _get_csv_compatible_schema(dataset.schema)
-
-        # Write the dataset to a single CSV file in batches
-        with pcsv.CSVWriter(output_file_path, csv_schema) as writer:
-            for batch in dataset.to_batches():
-                csv_batch = _stringify_nested_columns(batch, csv_schema=csv_schema)
-                writer.write_batch(csv_batch)
-
-    elif output_file_format == 'json':
-
-        def _json_stream_files(input_file_paths):
-            """Generator that streams one entry dict at a time from multiple files."""
-            for file_path in input_file_paths:
-                with open(file_path, encoding='utf-8') as f:
-                    data = json_stream.load(f)
-                    yield from data
-
-        # Write a single JSON file by streaming entry dicts and wrapping in a list
-        with open(output_file_path, 'w', encoding='utf-8') as f:
-            f.write('[\n')
-            first_item = True
-            for item in _json_stream_files(input_file_paths):
-                if not first_item:
-                    f.write(',\n')
-                # Convert transient json_stream object to standard Python types
-                json.dump(json_stream.to_standard_types(item), f, indent=4)
-                first_item = False
-            f.write('\n]')
-
-    else:
-        raise ValueError('Unsupported file format. Please use parquet, csv, or json.')
 
 
 def generate_archives(
