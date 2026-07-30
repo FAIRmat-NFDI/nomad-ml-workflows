@@ -3,7 +3,6 @@ import os
 import shutil
 import zipfile
 from datetime import datetime, timezone
-from math import ceil
 
 from nomad.actions.manager import action_artifacts_dir, get_upload_files
 from nomad.app.v1.models.models import MetadataPagination, MetadataRequired
@@ -14,22 +13,17 @@ from temporalio import activity
 
 from nomad_ml_workflows.actions.export_entries.models import (
     CleanupArtifactsInput,
-    CollectCursorsInput,
-    CollectCursorsOutput,
     CreateArtifactSubdirectoryInput,
     ExportDatasetInput,
     ManifestEntry,
-    MergeOutputFilesInput,
     OutputFile,
     PrepapeManifestOutput,
     PrepareManifestInput,
     ReadArchivesWorkflowInput,
-    RenameGeneratedFileInput,
 )
 from nomad_ml_workflows.actions.export_entries.utils import (
     generate_archives,
     generate_table_rows,
-    merge_files,
     write_dicts_to_json,
     write_table_rows_to_ndjson,
     write_table_rows_to_tabular_file,
@@ -59,80 +53,6 @@ async def create_artifact_subdirectory(data: CreateArtifactSubdirectoryInput) ->
     os.makedirs(subdir_path)
 
     return subdir_path
-
-
-@activity.defn
-async def collect_page_cursors(data: CollectCursorsInput) -> CollectCursorsOutput:
-    """
-    Activity to serially walk NOMAD search pagination and collect all
-    page_after_value cursors needed for parallel page fetching.
-
-    Only entry IDs are requested to minimise payload size.
-
-    Assumption: The cursors are valid for any subsequent search with the same query,
-    regardless of the required fields used in those searches.
-
-    Args:
-        data (CollectCursorsInput): Input data specifying the search and limits.
-
-    Returns:
-        CollectCursorsOutput: All page cursors and the total entry count.
-    """
-
-    # Use minimal required fields so the probe searches are as fast as possible.
-    required = MetadataRequired(include=['entry_id'])
-
-    # First page: cursor is None (start of results).
-    pagination = MetadataPagination(page_size=data.page_size)
-    response = nomad_search(
-        user_id=data.user_id,
-        owner=data.owner,
-        query=data.query,
-        required=required,
-        pagination=pagination,
-        aggregations={},
-    )
-
-    # determine the number of pages needed, incl. the first page
-    num_entries_available = response.pagination.total
-    num_entries_to_export = min(num_entries_available, data.max_entries_export_limit)
-    num_pages = (
-        ceil(num_entries_to_export / data.page_size) if num_entries_to_export > 0 else 0
-    )
-
-    if num_pages == 0:
-        return CollectCursorsOutput(
-            page_after_values=[],
-            num_entries_available=num_entries_available,
-            num_pages=num_pages,
-        )
-
-    # Collect the page_after_value cursor for each page.
-    # The first page starts with a None cursor.
-    page_after_values: list[str | None] = [None]
-    cursor = response.pagination.next_page_after_value
-    for _ in range(num_pages - 1):
-        if cursor is None:
-            break
-        page_after_values.append(cursor)
-        pagination = MetadataPagination(
-            page_size=data.page_size, page_after_value=cursor
-        )
-        response = nomad_search(
-            user_id=data.user_id,
-            owner=data.owner,
-            query=data.query,
-            required=required,
-            pagination=pagination,
-            aggregations={},
-        )
-        cursor = response.pagination.next_page_after_value
-
-    return CollectCursorsOutput(
-        page_after_values=page_after_values,
-        num_entries_available=num_entries_available,
-        num_pages=num_pages,
-    )
 
 
 @activity.defn
@@ -231,39 +151,6 @@ async def read_archives_and_write_output_tabular(
         file_size=os.path.getsize(output_file_path),
         num_entries_exported=num_entries_exported,
     )
-
-
-@activity.defn
-def rename_generated_file(data: RenameGeneratedFileInput) -> str | None:
-    target_file_path = os.path.join(
-        data.artifact_subdirectory, 'data.' + data.output_file_format
-    )
-    os.rename(data.generated_file_path, target_file_path)
-    return target_file_path
-
-
-@activity.defn
-async def merge_output_files(data: MergeOutputFilesInput) -> str | None:
-    """
-    Activity to merge multiple batch files into a single file.
-
-    Args:
-        data (MergeOutputFilesInput): Input data for merging files.
-
-    Returns:
-        str | None: Path of the merged output file, or None if no files were merged.
-    """
-
-    if not data.generated_file_paths:
-        raise ValueError('No generated file paths provided for merging.')
-
-    merged_file_path = os.path.join(
-        data.artifact_subdirectory, 'data.' + data.output_file_format
-    )
-
-    merge_files(data.generated_file_paths, data.output_file_format, merged_file_path)
-
-    return merged_file_path
 
 
 @activity.defn

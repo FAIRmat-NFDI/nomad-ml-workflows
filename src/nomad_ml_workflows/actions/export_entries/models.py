@@ -243,18 +243,6 @@ class NormalizedSearchSettings(BaseModel):
         )
 
 
-class SearchPageOutput(BaseModel):
-    num_entries_exported: int = Field(
-        ..., description='Number of entries exported to the output file.'
-    )
-    search_start_time: str = Field(
-        ..., description='UTC Timestamp (ISO) when the first search started.'
-    )
-    search_end_time: str = Field(
-        ..., description='UTC Timestamp (ISO) when the last search completed.'
-    )
-
-
 class ManifestEntry(BaseModel):
     entry_id: str = Field(..., description='Entry ID.')
     upload_id: str = Field(..., description='Upload ID.')
@@ -303,64 +291,6 @@ class OutputFile(BaseModel):
     file_path: str = Field(..., description='Path to the output file.')
     file_size: int = Field(..., description='Size of the output file in bytes.')
     num_entries_exported: int = Field(..., description='Number of entries exported.')
-
-
-class CollectCursorsInput(BaseModel):
-    user_id: str = Field(..., description='User ID performing the search.')
-    owner: OwnerLiteral = Field(..., description='Owner of the entries to be searched.')
-    query: Query = Field(..., description='Search query parameters.')
-    page_size: int = Field(..., description='Number of entries per page.')
-    max_entries_export_limit: int = Field(
-        ..., description='Maximum number of entries to be exported.'
-    )
-
-
-class CollectCursorsOutput(BaseModel):
-    page_after_values: list[str | None] = Field(
-        ...,
-        description='List of page_after_value cursors, one per page. '
-        'The first entry is None (start of first page) when at least one page is '
-        'available. If num_entries_available is 0, it is an empty list.',
-    )
-    num_entries_available: int = Field(
-        ...,
-        description='Total number of entries available for the given search query.',
-    )
-    num_pages: int = Field(
-        ...,
-        description='Total number of pages needed to export the entries, based on the '
-        'page size and max entries export limit.',
-    )
-
-
-class RenameGeneratedFileInput(BaseModel):
-    artifact_subdirectory: str = Field(
-        ...,
-        description='Subdirectory where the file will be renamed.',
-    )
-    output_file_format: OutputFileFormatLiteral = Field(
-        ...,
-        description='Format of the output file.',
-    )
-    generated_file_path: str = Field(
-        ...,
-        description='Path of generated file that will be renamed.',
-    )
-
-
-class MergeOutputFilesInput(BaseModel):
-    artifact_subdirectory: str = Field(
-        ...,
-        description='Subdirectory where the merged output file will be stored.',
-    )
-    output_file_format: OutputFileFormatLiteral = Field(
-        ...,
-        description='Format of the output file.',
-    )
-    generated_file_paths: list[str] = Field(
-        ...,
-        description='List of the generated file paths to be merged into a single file.',
-    )
 
 
 class ExportDatasetMetadata(BaseModel):
