@@ -57,7 +57,6 @@ class ExportEntriesActionEntryPoint(ActionEntryPoint):
 
 export_entries = ExportEntriesActionEntryPoint(  # type: ignore
     name='Export Entries Action',
-    description='An action to search entries and export them as a zip file in the '
-    'specified upload.',
+    description='An action to search entries and export them in the specified upload.',
     task_queue=TaskQueue.CPU,
 )

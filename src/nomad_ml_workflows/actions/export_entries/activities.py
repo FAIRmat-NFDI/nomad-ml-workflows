@@ -4,10 +4,11 @@ import shutil
 import zipfile
 from datetime import datetime, timezone
 
-from nomad.actions.manager import action_artifacts_dir, get_upload_files
-from nomad.app.v1.models.models import MetadataPagination, MetadataRequired
+from nomad.actions.manager import action_artifacts_dir
+from nomad.app.v1.models.models import MetadataRequired
 from nomad.files import StagingUploadFiles
 from nomad.search import search as nomad_search
+from nomad.uploads import get_upload_files
 from nomad.utils import get_logger
 from temporalio import activity
 
@@ -179,9 +180,9 @@ async def export_dataset_to_upload(data: ExportDatasetInput) -> str:
             count += 1
 
     upload_files = get_upload_files(data.upload_id, data.user_id)
-    if not upload_files:
+    if not upload_files or not isinstance(upload_files, StagingUploadFiles):
         raise ValueError(
-            f'Upload with ID {data.upload_id} for user {data.user_id} not found.'
+            f'Staging upload with ID {data.upload_id} for user {data.user_id} not found.'
         )
 
     # Create a metadata.json file in the artifact subdirectory
