@@ -454,6 +454,8 @@ def generate_archives(
                     entry['archive'] = required_reader.read(
                         upload_archive, entry_id, upload_id
                     )
+                    if entry['archive'] is None:
+                        continue
                     yield entry
             except Exception as e:
                 if logger:
