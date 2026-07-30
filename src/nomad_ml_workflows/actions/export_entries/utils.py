@@ -456,11 +456,14 @@ def _archives_to_rows(  # noqa: PLR0912
     return rows, columns_quantity_def
 
 
-def _ordered_columns(columns) -> list[str]:
+def _ordered_columns(columns: Iterable[str]) -> list[str]:
     """Put entry_id and upload_id first and sort all remaining columns alphabetically."""
-    return sorted(
-        columns, key=lambda column: (column != ['entry_id', 'upload_id'], column)
-    )
+    column_set = set(columns)
+    identifier_columns = [
+        column for column in ('entry_id', 'upload_id') if column in column_set
+    ]
+    remaining_columns = sorted(column_set.difference(identifier_columns))
+    return [*identifier_columns, *remaining_columns]
 
 
 def archives_to_dataframe(archives: list[dict] | dict, logger=None) -> pd.DataFrame:

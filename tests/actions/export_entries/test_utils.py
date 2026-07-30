@@ -55,6 +55,29 @@ def _column(name: str, section=TypedEntryData) -> str:
     return f'data.{name}#{section.m_def.qualified_name()}'
 
 
+def test_ordered_columns_places_identifiers_before_sorted_columns():
+    assert utils._ordered_columns(
+        ['z_column', 'upload_id', 'a_column', 'entry_id']
+    ) == ['entry_id', 'upload_id', 'a_column', 'z_column']
+    assert utils._ordered_columns(['z_column', 'entry_id', 'a_column']) == [
+        'entry_id',
+        'a_column',
+        'z_column',
+    ]
+    assert utils._ordered_columns(['z_column', 'entry_id', 'a_column']) == [
+        'entry_id',
+        'a_column',
+        'z_column',
+    ]
+    assert utils._ordered_columns(
+        {'z_column': 'm_def_1', 'entry_id': 'str', 'a_column': 'm_def_2'}
+    ) == [
+        'entry_id',
+        'a_column',
+        'z_column',
+    ]
+
+
 @pytest.fixture
 def resolve_test_schema(monkeypatch):
     monkeypatch.setattr(
