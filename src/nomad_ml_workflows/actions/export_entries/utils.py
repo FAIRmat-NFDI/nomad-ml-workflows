@@ -33,8 +33,8 @@ class _ArrowColumnConfig:
 
 
 @dataclass
-class _FlattenEntryContext:
-    row: dict[str, str | int | float | bool | dict | list | None]
+class FlatEntryArchive:
+    data_dict: dict[str, str | int | float | bool | dict | list | None]
     columns_quantity_def: dict[str, Quantity]
     unhandled_keys: list[str]
 
@@ -88,7 +88,7 @@ def _quantity_to_arrow_column_config(quantity_def: Quantity) -> _ArrowColumnConf
         return _ArrowColumnConfig(pa.string(), stringify_json=True)
 
     try:
-        standard_type = quantity_type.standard_type()
+        standard_type = quantity_type.standard_type()  # type: ignore
     except (AttributeError, NotImplementedError, TypeError, ValueError):
         return _ArrowColumnConfig(pa.string(), stringify_json=True)
 
@@ -230,7 +230,7 @@ def _flatten_section(
     section_data: dict,
     section_def: Section,
     prefix: str,
-    context: _FlattenEntryContext,
+    output: FlatEntryArchive,
 ):
     """
     Flatten one serialized NOMAD section using its metainfo definition.
@@ -248,15 +248,15 @@ def _flatten_section(
                 f'archive.data exists but schema definition "{m_def}" not found. Skipping entry.'
             )
 
-    for quantity_name, quantity_def in section_def.all_quantities.items():
+    for quantity_name, quantity_def in section_def.all_quantities.items():  # type: ignore
         if quantity_name not in section_data:
             continue
         handled_keys.add(quantity_name)
         col = f'{_join_path(prefix, quantity_name)}#{section_def.qualified_name()}'
-        context.columns_quantity_def.setdefault(col, quantity_def)
-        _store_leaf_value(context.row, col, section_data[quantity_name])
+        output.columns_quantity_def.setdefault(col, quantity_def)
+        _store_leaf_value(output.data_dict, col, section_data[quantity_name])
 
-    for sub_section_name, sub_section_def in section_def.all_sub_sections.items():
+    for sub_section_name, sub_section_def in section_def.all_sub_sections.items():  # type: ignore
         if sub_section_name not in section_data:
             continue
 
@@ -279,7 +279,7 @@ def _flatten_section(
                     item,
                     item_section_def or child_section_def,
                     item_prefix,
-                    context,
+                    output,
                 )
         else:
             # If m_def is available in the dict, get a section_def based on it.
@@ -290,62 +290,50 @@ def _flatten_section(
                 sub_section_value,
                 item_section_def or child_section_def,
                 sub_section_prefix,
-                context,
+                output,
             )
 
     # Add the unhandled keys to a list. These point to the obsolete data in the
     # archives that do not correspond to a subsection/quantity in the current schema
     for key, _ in section_data.items():
         if key not in [*handled_keys, *IGNORED_KEYS]:
-            context.unhandled_keys.append(
+            output.unhandled_keys.append(
                 f'{prefix}.{key}#{section_def.qualified_name()}'
             )
 
 
-def archive_to_row(archive: dict) -> tuple[dict, dict[str, Quantity]]:
+def _flatten_entry_archive(
+    entry_archive: dict,
+    entry_id: str = '',
+    upload_id: str = '',
+) -> FlatEntryArchive:
     """
-    Flatten archive dict into a row dict. Also returns column definition.
+    Convert a nested entry archive dict into a flat dict.
 
-    `archive` argument should have the following structure, where `archive` corresponds
-    to serialization of EntryArchive::
-        {
-            "entry_id": str,
-            "archive": {
-                "results": dict,
-                "metadata": dict,
-                "data": dict,
-                "processing_log": list[Any],
-                ...
-            },
+    `archive` should corresponds to serialization of EntryArchive::
+        "archive": {
+            "results": dict,
+            "metadata": dict,
+            "data": dict,
+            "processing_log": list[Any],
+            ...
         }
     """
-    if not isinstance(archive, dict):
-        raise ValueError('archive must be a dictionary (JSON object).')
-    if 'archive' not in archive or 'entry_id' not in archive:
-        raise ValueError('archive and entry_id keys are required.')
-    if not isinstance(archive['archive'], dict):
-        raise ValueError('archive[archive] must be a dictionary (JSON object).')
-
-    columns_quantity_def: dict[str, Quantity] = {}
-    context = _FlattenEntryContext(
-        row={
-            'entry_id': archive['entry_id'],
-            'upload_id': archive['upload_id'],
-        },  # Always include entry_id and upload_id as columns
-        columns_quantity_def=columns_quantity_def,
+    output = FlatEntryArchive(
+        data_dict={
+            'entry_id': entry_id,
+            'upload_id': upload_id,
+        },
+        columns_quantity_def={},
         unhandled_keys=[],
     )
     _flatten_section(
-        section_data=archive['archive'],
+        section_data=entry_archive,
         section_def=EntryArchive.m_def,
         prefix='',
-        context=context,
+        output=output,
     )
-    columns_quantity_def.update(context.columns_quantity_def)
-
-    return context.row, columns_quantity_def
-
-
+    return output
 
 
 def _ordered_columns(columns: Iterable[str]) -> list[str]:
@@ -479,19 +467,35 @@ def generate_archives(
 
 def generate_table_rows(
     manifest: list[ManifestEntry], required: dict | str, user_id: str, logger=None
-) -> Iterable[tuple[dict, dict[str, Quantity]]]:
+) -> Iterable[FlatEntryArchive]:
     """
     Generates table rows from the manifest and required fields.
     """
     archives = generate_archives(manifest, required, user_id, logger)
+
+    all_unhandled_keys: set[str] = set()
     for archive in archives:
+        entry_id = archive['entry_id']
+        upload_id = archive['upload_id']
         try:
-            yield archive_to_row(archive)
+            table_row = _flatten_entry_archive(
+                archive['archive'],
+                entry_id,
+                upload_id,
+            )
+            all_unhandled_keys.update(table_row.unhandled_keys)
+            yield table_row
         except Exception as e:
             logger.error(
-                'failed to generate table rows for archive',
+                'failed to flatten archive '
+                f'(entry_id={entry_id} upload_id={upload_id})',
                 exc_info=e,
             )
+    if all_unhandled_keys and logger:
+        logger.warning(
+            f'Unhandled keys ({len(all_unhandled_keys)}) while flattening '
+            f'archives: {all_unhandled_keys}'
+        )
 
 
 def write_dicts_to_json(items: Iterable[dict], output_file_path: str) -> int:
@@ -514,21 +518,20 @@ def write_dicts_to_json(items: Iterable[dict], output_file_path: str) -> int:
 
 
 def write_table_rows_to_ndjson(
-    rows_with_definitions: Iterable[tuple[dict, dict[str, Quantity]]],
-    output_file_path: str,
+    table_rows: Iterable[FlatEntryArchive], output_file_path: str
 ) -> dict[str, Quantity]:
     if not output_file_path.endswith('.ndjson'):
         raise ValueError('ouput_file_path should have .ndjson extension.')
     columns_quantity_def: dict[str, Quantity] = {}
 
     with open(output_file_path, 'w', encoding='utf-8') as file:
-        for row, row_column_defs in rows_with_definitions:
+        for table_row in table_rows:
             # accumulate only the schema information
-            for column, quantity_def in row_column_defs.items():
+            for column, quantity_def in table_row.columns_quantity_def.items():
                 columns_quantity_def.setdefault(column, quantity_def)
 
             # write the current row immediately
-            json.dump(row, file, separators=(',', ':'))
+            json.dump(table_row.data_dict, file, separators=(',', ':'))
             file.write('\n')
 
     return columns_quantity_def
