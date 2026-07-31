@@ -69,20 +69,39 @@ def prepare_manifest(data: PrepareManifestInput) -> PrepapeManifestOutput:
         config.max_entries_export_limit,  # type: ignore
         data.num_entries_user_limit,
     )
+    manifest: list = []
+    page_size = min(10000, max_num_entries_limit + 1)
     starttime = datetime.now(timezone.utc).isoformat()
     response = nomad_search(
         user_id=data.user_id,
         owner=data.owner,
         query=data.query,
         required=MetadataRequired(include=['entry_id', 'upload_id']),  # type: ignore
-        pagination=MetadataPagination(page_size=max_num_entries_limit + 1),  # type: ignore
+        pagination=MetadataPagination(page_size=page_size),  # type: ignore
     )
+    while True:
+        manifest.extend(
+            [
+                {'entry_id': entry['entry_id'], 'upload_id': entry['upload_id']}
+                for entry in response.data
+            ]
+        )
+        if len(manifest) >= max_num_entries_limit:
+            break
+        if response.pagination.next_page_after_value is None:
+            break
+        response = nomad_search(
+            user_id=data.user_id,
+            owner=data.owner,
+            query=data.query,
+            required=MetadataRequired(include=['entry_id', 'upload_id']),  # type: ignore
+            pagination=MetadataPagination(
+                page_size=page_size,
+                page_after_value=response.pagination.next_page_after_value,
+            ),  # type: ignore
+        )
     endtime = datetime.now(timezone.utc).isoformat()
 
-    manifest: list = [
-        {'entry_id': entry['entry_id'], 'upload_id': entry['upload_id']}
-        for entry in response.data
-    ]
     if len(manifest) > max_num_entries_limit:
         reached_max_entries_limit = True
         manifest = manifest[:max_num_entries_limit]  #  Apply max limit
