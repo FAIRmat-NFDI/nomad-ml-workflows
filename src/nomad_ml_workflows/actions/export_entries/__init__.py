@@ -7,21 +7,21 @@ with workflow.unsafe.imports_passed_through():
 
 
 class ExportEntriesActionEntryPoint(ActionEntryPoint):
-    search_workflow_concurrency_limit: int = Field(
-        default=5,
-        description='Number of child search workflow instances to run concurrently in '
-        'the Export Entries action. Keep this low to avoid overwhelming the Temporal '
-        'server with too many concurrent activities.',
-    )
-    search_batch_timeout: int = Field(
-        default=7200,  # 2 hours
-        description='Timeout (in seconds) for each search batch in the Export Entries '
-        'action. Set this accordingly to time out longer searches.',
-    )
     max_entries_export_limit: int = Field(
         default=100000,
         description='Maximum number of entries that can be exported in a single '
         'Export Entries action.',
+    )
+    read_archives_timeout: int = Field(
+        default=7200,  # 2 hours
+        description='Timeout (in seconds) for the activity that reads '
+        'and writes the output file.',
+    )
+    max_write_buffered_bytes: int = Field(
+        default=1024 * 1024 * 32,  # 16 MB
+        description='Maximum number of bytes to buffer before writing to the output '
+        'tabular file. Increasing it can lead to higher memory usage but improved '
+        'compression ratios.',
     )
 
     def load(self):

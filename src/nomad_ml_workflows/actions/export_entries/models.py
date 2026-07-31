@@ -1,12 +1,17 @@
 import json
 from typing import Annotated, Any, Literal
 
-from nomad.app.v1.models.models import MetadataPagination, Query
+from nomad.app.v1.models.models import Query
+from nomad.config import config as nomad_config
 from pydantic import BaseModel, Field
 
 OwnerLiteral = Literal['public', 'visible', 'shared', 'user', 'staging']
 BatchFileFormatLiteral = Literal['parquet', 'json']
 OutputFileFormatLiteral = Literal['parquet', 'csv', 'json']
+
+config = nomad_config.get_plugin_entry_point(
+    'nomad_ml_workflows.actions:export_entries'
+)
 
 
 class Include(BaseModel):
@@ -91,11 +96,11 @@ class SearchSettings(BaseModel):
     owner: OwnerLiteral = Field(
         'visible', description='Owner of the entries to be searched.'
     )
-    page_size: int = Field(
-        1000,
+    num_entries: int = Field(
+        config.max_entries_export_limit,  # type: ignore
         gt=0,
-        description='Number of entries to be fetched and written per search page. '
-        'Use smaller page sizes when exporting large entries to reduce memory usage.',
+        le=config.max_entries_export_limit,  # type: ignore
+        description='Number of entries to be exported.',
     )
     query: str = Field(
         ...,
@@ -157,13 +162,13 @@ class NormalizedSearchSettings(BaseModel):
     user_id: str = Field(..., description='User ID performing the search.')
     owner: OwnerLiteral = Field(..., description='Owner of the entries to be searched.')
     query: Query = Field(..., description='Search query parameters.')
+    num_entries_user_limit: int = Field(
+        ..., description='Number of entries requested by the user.'
+    )
     required: str | dict[str, Any] = Field(
         '*',
         description='Dictionary of required fields and directives compatible with '
         '`nomad.archive.required.RequiredReader` class.',
-    )
-    pagination: MetadataPagination = Field(
-        ..., description='Pagination settings for the search results.'
     )
 
     @staticmethod
@@ -232,14 +237,12 @@ class NormalizedSearchSettings(BaseModel):
             user_input.search_settings.required
         )
 
-        pagination = MetadataPagination(page_size=user_input.search_settings.page_size)  # type: ignore
-
         return cls(
             user_id=user_input.user_id,
             owner=user_input.search_settings.owner,
             query=query,
+            num_entries_user_limit=user_input.search_settings.num_entries,
             required=archive_required,
-            pagination=pagination,
         )
 
 
@@ -252,11 +255,8 @@ class PrepareManifestInput(BaseModel):
     user_id: str = Field(..., description='User ID performing the search.')
     owner: OwnerLiteral = Field(..., description='Owner of the entries to be searched.')
     query: Query = Field(..., description='Search query parameters.')
-    pagination: MetadataPagination = Field(
-        ..., description='Pagination settings for the search results.'
-    )
-    max_entries_export_limit: int = Field(
-        ..., description='Maximum number of entries to be exported.'
+    num_entries_user_limit: int = Field(
+        ..., description='Number of entries requested by the user.'
     )
     manifest_file_path: str = Field(..., description='Path to the manifest file.')
 
@@ -270,6 +270,10 @@ class PrepapeManifestOutput(BaseModel):
     )
     search_end_time: str = Field(
         ..., description='UTC Timestamp (ISO) when the search ended.'
+    )
+    reached_max_entries_limit: bool = Field(
+        ...,
+        description='Whether the maximum number of entries export limit was reached.',
     )
 
 
@@ -296,12 +300,12 @@ class OutputFile(BaseModel):
 class ExportDatasetMetadata(BaseModel):
     num_entries_exported: int = Field(
         0,
-        description='Total number of entries exported in all the exported dataset '
-        'batches.',
+        description='Number of entries that were successfully exported in the data file. ',
     )
     num_entries_available: int = Field(
         0,
-        description='Total number of entries available for the given search query.',
+        description='Number of entries available for the given search query. Limited by '
+        'the maximum number of entries allowed.',
     )
     reached_max_entries_limit: bool = Field(
         False,

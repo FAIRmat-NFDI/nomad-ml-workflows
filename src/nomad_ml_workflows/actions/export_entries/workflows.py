@@ -28,6 +28,10 @@ with workflow.unsafe.imports_passed_through():
         ReadArchivesWorkflowInput,
     )
 
+config = nomad_config.get_plugin_entry_point(
+    'nomad_ml_workflows.actions:export_entries'
+)
+
 
 @workflow.defn
 class ReadArchivesWorkflow:
@@ -43,7 +47,7 @@ class ReadArchivesWorkflow:
             return await workflow.execute_activity(
                 read_archives_and_write_output_json,
                 data,
-                start_to_close_timeout=timedelta(hours=2),
+                start_to_close_timeout=timedelta(seconds=config.read_archives_timeout),  # type: ignore
                 retry_policy=retry_policy,
             )
 
@@ -51,7 +55,7 @@ class ReadArchivesWorkflow:
             return await workflow.execute_activity(
                 read_archives_and_write_output_tabular,
                 data,
-                start_to_close_timeout=timedelta(hours=2),
+                start_to_close_timeout=timedelta(seconds=config.read_archives_timeout),  # type: ignore
                 retry_policy=retry_policy,
             )
 
@@ -97,10 +101,6 @@ class ExportEntriesWorkflow:
         )
 
         try:
-            config = nomad_config.get_plugin_entry_point(
-                'nomad_ml_workflows.actions:export_entries'
-            )
-
             search_settings = NormalizedSearchSettings.from_user_input(data)
 
             manifest_file_path = f'{artifact_subdirectory}/manifest.json'
@@ -110,8 +110,7 @@ class ExportEntriesWorkflow:
                     user_id=search_settings.user_id,
                     owner=search_settings.owner,
                     query=search_settings.query,
-                    pagination=search_settings.pagination,
-                    max_entries_export_limit=config.max_entries_export_limit,  # type: ignore
+                    num_entries_user_limit=search_settings.num_entries_user_limit,  # type: ignore
                     manifest_file_path=manifest_file_path,
                 ),
                 start_to_close_timeout=timedelta(hours=2),
@@ -119,7 +118,7 @@ class ExportEntriesWorkflow:
             )
 
             export_dataset_input.metadata.reached_max_entries_limit = (
-                manifest_output.num_entries_available > config.max_entries_export_limit  # type: ignore
+                manifest_output.reached_max_entries_limit
             )
             export_dataset_input.metadata.num_entries_available = (
                 manifest_output.num_entries_available

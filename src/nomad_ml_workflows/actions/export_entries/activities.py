@@ -5,7 +5,8 @@ import zipfile
 from datetime import datetime, timezone
 
 from nomad.actions.manager import action_artifacts_dir
-from nomad.app.v1.models.models import MetadataRequired
+from nomad.app.v1.models.models import MetadataPagination, MetadataRequired
+from nomad.config import config as nomad_config
 from nomad.files import StagingUploadFiles
 from nomad.search import search as nomad_search
 from nomad.uploads import get_upload_files
@@ -30,6 +31,9 @@ from nomad_ml_workflows.actions.export_entries.utils import (
     write_table_rows_to_tabular_file,
 )
 
+config = nomad_config.get_plugin_entry_point(
+    'nomad_ml_workflows.actions:export_entries'
+)
 logger = get_logger(__name__)
 
 
@@ -58,14 +62,17 @@ async def create_artifact_subdirectory(data: CreateArtifactSubdirectoryInput) ->
 
 @activity.defn
 def prepare_manifest(data: PrepareManifestInput) -> PrepapeManifestOutput:
-
+    max_num_entries_limit = min(
+        config.max_entries_export_limit,  # type: ignore
+        data.num_entries_user_limit,
+    )
     starttime = datetime.now(timezone.utc).isoformat()
     response = nomad_search(
         user_id=data.user_id,
         owner=data.owner,
         query=data.query,
         required=MetadataRequired(include=['entry_id', 'upload_id']),  # type: ignore
-        pagination=data.pagination,
+        pagination=MetadataPagination(page_size=max_num_entries_limit + 1),  # type: ignore
     )
     endtime = datetime.now(timezone.utc).isoformat()
 
@@ -73,14 +80,20 @@ def prepare_manifest(data: PrepareManifestInput) -> PrepapeManifestOutput:
         {'entry_id': entry['entry_id'], 'upload_id': entry['upload_id']}
         for entry in response.data
     ]
-    manifest = manifest[: data.max_entries_export_limit]  #  Apply max limit
-    num_entries_exported = len(manifest)
+    if len(manifest) > max_num_entries_limit:
+        reached_max_entries_limit = True
+        manifest = manifest[:max_num_entries_limit]  #  Apply max limit
+    else:
+        reached_max_entries_limit = False
+
+    num_entries_available = len(manifest)
     write_dicts_to_json(manifest, data.manifest_file_path)
 
     return PrepapeManifestOutput(
         search_start_time=starttime,
         search_end_time=endtime,
-        num_entries_available=num_entries_exported,
+        num_entries_available=num_entries_available,
+        reached_max_entries_limit=reached_max_entries_limit,
     )
 
 
@@ -143,7 +156,7 @@ async def read_archives_and_write_output_tabular(
         table_rows_file_path,
         output_file_path,
         columns_quantity_def,
-        max_buffer_bytes=2 * 1024 * 1024,
+        max_buffer_bytes=config.max_write_buffered_bytes,  # type: ignore
         logger=activity_logger,
     )
 
