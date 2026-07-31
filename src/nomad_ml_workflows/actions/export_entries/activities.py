@@ -29,6 +29,7 @@ from nomad_ml_workflows.actions.export_entries.models import (
 from nomad_ml_workflows.actions.export_entries.utils import (
     generate_archives,
     generate_table_rows,
+    worker_process_initializer,
     write_dicts_to_json,
     write_table_rows_to_ndjson,
     write_table_rows_to_tabular_file,

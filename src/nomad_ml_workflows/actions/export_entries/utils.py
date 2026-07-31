@@ -664,3 +664,9 @@ def write_table_rows_to_tabular_file(
         flush_batch()
 
     return count
+
+
+def worker_process_initializer() -> None:
+    from nomad.infrastructure import setup_mongo
+
+    setup_mongo()
