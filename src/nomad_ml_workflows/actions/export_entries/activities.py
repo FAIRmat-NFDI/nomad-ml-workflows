@@ -1,7 +1,9 @@
 import json
+import multiprocessing
 import os
 import shutil
 import zipfile
+from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime, timezone
 
 from nomad.actions.manager import action_artifacts_dir
@@ -123,17 +125,10 @@ def read_archives_and_write_output_json(
     )
 
 
-@activity.defn
-async def read_archives_and_write_output_tabular(
-    data: ReadArchivesWorkflowInput,
+def _read_archives_and_write_output_tabular(
+    data: ReadArchivesWorkflowInput, activity_type: str
 ) -> OutputFile:
-    """
-    Reads archives and streams flattened table rows to Parquet or CSV.
-    """
-    if data.output_file_format not in {'parquet', 'csv'}:
-        raise ValueError(
-            f'Unsupported tabular output format: {data.output_file_format}'
-        )
+    activity_logger = logger.bind(activity_type=activity_type)
 
     table_rows_file_path = f'{data.artifact_subdirectory}/table_rows.tmp.ndjson'
     output_file_path = f'{data.artifact_subdirectory}/data.{data.output_file_format}'
@@ -142,16 +137,15 @@ async def read_archives_and_write_output_tabular(
     with open(data.manifest_file_path, encoding='utf-8') as f:
         manifest = [ManifestEntry(**entry) for entry in json.load(f)]
 
-    info = activity.info()
-    activity_logger = logger.bind(activity_type=info.activity_type)
-
     rows_with_columns_quantity_def = generate_table_rows(
         manifest, data.required, data.user_id, activity_logger
     )
 
+    activity_logger.info('Reading archives and building the schema...')
     columns_quantity_def = write_table_rows_to_ndjson(
         rows_with_columns_quantity_def, table_rows_file_path
     )
+    activity_logger.info('Writing table rows to tabular file...')
     num_entries_exported = write_table_rows_to_tabular_file(
         table_rows_file_path,
         output_file_path,
@@ -159,12 +153,43 @@ async def read_archives_and_write_output_tabular(
         max_buffer_bytes=config.max_write_buffer_size_bytes,  # type: ignore
         logger=activity_logger,
     )
+    activity_logger.info(
+        f'{num_entries_exported} table rows written to '
+        f'"data.{data.output_file_format}" file.'
+    )
 
     return OutputFile(
         file_path=output_file_path,
         file_size=os.path.getsize(output_file_path),
         num_entries_exported=num_entries_exported,
     )
+
+
+@activity.defn
+def read_archives_and_write_output_tabular(
+    data: ReadArchivesWorkflowInput,
+) -> OutputFile:
+    """
+    Reads archives and streams flattened table rows to Parquet or CSV.
+    Runs in an isolated process to ensure that memory is released after execution.
+    """
+
+    if data.output_file_format not in {'parquet', 'csv'}:
+        raise ValueError(
+            f'Unsupported tabular output format: {data.output_file_format}'
+        )
+
+    activity_type = activity.info().activity_type
+
+    with ProcessPoolExecutor(
+        max_workers=1, mp_context=multiprocessing.get_context('spawn')
+    ) as executor:
+        future = executor.submit(
+            _read_archives_and_write_output_tabular,
+            data,
+            activity_type,
+        )
+        return future.result()
 
 
 @activity.defn
