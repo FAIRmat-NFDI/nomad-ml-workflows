@@ -17,8 +17,8 @@ class ExportEntriesActionEntryPoint(ActionEntryPoint):
         description='Timeout (in seconds) for the activity that reads '
         'and writes the output file.',
     )
-    max_write_buffered_bytes: int = Field(
-        default=1024 * 1024 * 32,  # 16 MB
+    max_write_buffer_size_bytes: int = Field(
+        default=1024 * 1024 * 32,  # 32 MB
         description='Maximum number of bytes to buffer before writing to the output '
         'tabular file. Increasing it can lead to higher memory usage but improved '
         'compression ratios.',

@@ -156,7 +156,7 @@ async def read_archives_and_write_output_tabular(
         table_rows_file_path,
         output_file_path,
         columns_quantity_def,
-        max_buffer_bytes=config.max_write_buffered_bytes,  # type: ignore
+        max_buffer_bytes=config.max_write_buffer_size_bytes,  # type: ignore
         logger=activity_logger,
     )
 
