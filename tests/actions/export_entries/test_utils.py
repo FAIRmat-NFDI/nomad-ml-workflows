@@ -55,6 +55,35 @@ def _column(name: str, section=TypedEntryData) -> str:
     return f'data.{name}#{section.m_def.qualified_name()}'
 
 
+def _archives_to_arrow_table(archives: list[dict]) -> pa.Table:
+    table_rows = [
+        utils._flatten_entry_archive(
+            archive['archive'],
+            entry_id=archive['entry_id'],
+            upload_id=archive.get('upload_id', ''),
+        )
+        for archive in archives
+    ]
+    columns_quantity_def = {
+        column: quantity_def
+        for table_row in table_rows
+        for column, quantity_def in table_row.columns_quantity_def.items()
+    }
+    column_configs = utils._table_column_configs(columns_quantity_def)
+    schema = pa.schema(
+        [
+            pa.field(column_name, config.arrow_type)
+            for column_name, config in column_configs.items()
+        ]
+    )
+    batch = utils._table_rows_to_arrow_batch(
+        [table_row.data_dict for table_row in table_rows],
+        column_configs,
+        schema,
+    )
+    return pa.Table.from_batches([batch], schema=schema)
+
+
 def test_ordered_columns_places_identifiers_before_sorted_columns():
     assert utils._ordered_columns(
         ['z_column', 'upload_id', 'a_column', 'entry_id']
@@ -110,8 +139,8 @@ def test_is_list_of_string_for_supported_arrow_types(
     assert utils._is_list_of_string(arrow_type) is (is_string and list_depth > 0)
 
 
-def test_archives_to_arrow_table_uses_nomad_quantity_types(resolve_test_schema):
-    table = utils.archives_to_arrow_table(
+def test_table_rows_to_arrow_batch_uses_nomad_quantity_types(resolve_test_schema):
+    table = _archives_to_arrow_table(
         [
             _archive(
                 'entry_1',
@@ -193,39 +222,100 @@ def test_archives_to_arrow_table_uses_nomad_quantity_types(resolve_test_schema):
         ('str_matrix', ['one', ['two']]),
     ],
 )
-def test_archives_to_arrow_table_handles_invalid_list_shapes_with_None(
+def test_table_rows_to_arrow_batch_handles_invalid_list_shapes_with_none(
     resolve_test_schema,
     quantity_name,
     value,
 ):
-    table = utils.archives_to_arrow_table([_archive('entry_1', {quantity_name: value})])
-    assert table.column_names == ['entry_id', _column(quantity_name)]
+    table = _archives_to_arrow_table([_archive('entry_1', {quantity_name: value})])
+    assert table.column_names == ['entry_id', 'upload_id', _column(quantity_name)]
     assert table[_column(quantity_name)].to_pylist() == [None]
 
 
-def test_archives_to_arrow_table_handles_failed_conversion_with_None(
+def test_table_rows_to_arrow_batch_handles_failed_conversion_with_none(
     resolve_test_schema,
 ):
-    table = utils.archives_to_arrow_table(
-        [_archive('entry_1', {'count': 'not-an-integer'})]
-    )
+    table = _archives_to_arrow_table([_archive('entry_1', {'count': 'not-an-integer'})])
     assert table[_column('count')].to_pylist() == [None]
 
 
-def test_archives_to_dataframe_preserves_existing_behavior(resolve_test_schema):
-    dataframe = utils.archives_to_dataframe([_archive('entry_1', {'count': '7'})])
-
-    assert dataframe[_column('count')].iloc[0] == '7'
-
-
-def test_write_parquet_file_uses_schema_normalized_table(tmp_path, resolve_test_schema):
+def test_write_table_rows_to_tabular_file_uses_normalized_schema(
+    tmp_path,
+    resolve_test_schema,
+):
+    rows_path = tmp_path / 'entries.ndjson'
     output_path = tmp_path / 'entries.parquet'
+    table_rows = [
+        utils._flatten_entry_archive(
+            archive['archive'],
+            entry_id=archive['entry_id'],
+        )
+        for archive in [
+            _archive('entry_1', {'count': None}),
+            _archive('entry_2', {'count': '7'}),
+        ]
+    ]
+    columns_quantity_def = utils.write_table_rows_to_ndjson(
+        table_rows,
+        str(rows_path),
+    )
 
-    utils.write_parquet_file(
+    count = utils.write_table_rows_to_tabular_file(
+        str(rows_path),
         str(output_path),
-        [_archive('entry_1', {'count': None}), _archive('entry_2', {'count': '7'})],
+        columns_quantity_def,
     )
 
     table = pq.read_table(output_path)
+    assert count == len(table_rows)
     assert table.schema.field(_column('count')).type == pa.int32()
     assert table[_column('count')].to_pylist() == [None, 7]
+
+
+def test_write_table_rows_to_ndjson_accepts_repeated_quantity_definition(tmp_path):
+    output_path = tmp_path / 'rows.ndjson'
+    quantity_def = Quantity(type=str)
+
+    result = utils.write_table_rows_to_ndjson(
+        [
+            utils.FlatEntryArchive(
+                data_dict={'entry_id': 'one'},
+                columns_quantity_def={'value': quantity_def},
+                unhandled_keys=[],
+            ),
+            utils.FlatEntryArchive(
+                data_dict={'entry_id': 'two'},
+                columns_quantity_def={'value': quantity_def},
+                unhandled_keys=[],
+            ),
+        ],
+        str(output_path),
+    )
+
+    assert result == {'value': quantity_def}
+    assert output_path.read_text(encoding='utf-8') == (
+        '{"entry_id":"one"}\n{"entry_id":"two"}\n'
+    )
+
+
+def test_write_table_rows_to_tabular_file_reads_ndjson(tmp_path):
+    rows_path = tmp_path / 'rows.ndjson'
+    output_path = tmp_path / 'rows.parquet'
+    quantity_def = Quantity(type=str)
+    rows_path.write_text(
+        '{"entry_id":"one","upload_id":"upload","value":"first"}\n'
+        '{"entry_id":"two","upload_id":"upload","value":"second"}\n',
+        encoding='utf-8',
+    )
+
+    count = utils.write_table_rows_to_tabular_file(
+        str(rows_path),
+        str(output_path),
+        {'value': quantity_def},
+    )
+
+    table = pq.read_table(output_path)
+    assert count == table.num_rows
+    assert table.column_names == ['entry_id', 'upload_id', 'value']
+    assert table['entry_id'].to_pylist() == ['one', 'two']
+    assert table['value'].to_pylist() == ['first', 'second']
