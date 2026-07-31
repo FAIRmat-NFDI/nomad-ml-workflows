@@ -315,11 +315,11 @@ class ExportDatasetMetadata(BaseModel):
     )
     search_start_time: str = Field(
         '',
-        description='UTC Timestamp (ISO) when the first search batch started.',
+        description='UTC Timestamp (ISO) when the search for entries started.',
     )
     search_end_time: str = Field(
         '',
-        description='UTC Timestamp (ISO) when the last search batch completed.',
+        description='UTC Timestamp (ISO) when the search for entries ended.',
     )
     user_input: ExportEntriesUserInput | None = Field(
         None, description='Original user input for the export entries workflow.'
