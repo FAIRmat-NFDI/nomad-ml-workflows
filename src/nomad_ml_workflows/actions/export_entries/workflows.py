@@ -117,11 +117,17 @@ class ExportEntriesWorkflow:
                 retry_policy=retry_policy,
             )
 
-            export_dataset_input.metadata.reached_max_entries_limit = (
-                manifest_output.reached_max_entries_limit
-            )
             export_dataset_input.metadata.num_entries_available = (
                 manifest_output.num_entries_available
+            )
+            export_dataset_input.metadata.search_start_time = (
+                manifest_output.search_start_time
+            )
+            export_dataset_input.metadata.search_end_time = (
+                manifest_output.search_end_time
+            )
+            export_dataset_input.metadata.reached_max_entries_limit = (
+                manifest_output.reached_max_entries_limit
             )
             if manifest_output.num_entries_available == 0:
                 # No pages to export, return early with an empty dataset
@@ -143,12 +149,6 @@ class ExportEntriesWorkflow:
 
             export_dataset_input.metadata.num_entries_exported = (
                 output_file.num_entries_exported
-            )
-            export_dataset_input.metadata.search_start_time = (
-                manifest_output.search_start_time
-            )
-            export_dataset_input.metadata.search_end_time = (
-                manifest_output.search_end_time
             )
 
             export_dataset_input.source_paths = [
