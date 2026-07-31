@@ -566,6 +566,7 @@ def _write_tabular_table(writer, table: pa.Table, output_file_format: str) -> No
     if output_file_format == 'parquet':
         writer.write_table(table, row_group_size=table.num_rows)
     else:
+        # pcsv.CSVWriter.write_table does not support row_group_size
         writer.write_table(table)
 
 
@@ -573,7 +574,7 @@ def write_table_rows_to_tabular_file(
     table_rows_file_path: str,
     output_file_path: str,
     columns_quantity_def: dict[str, Quantity],
-    max_buffer_bytes: int = 2 * 1024 * 1024,
+    max_buffer_bytes: int = 4 * 1024 * 1024,
     logger=None,
 ) -> int:
     """
@@ -616,7 +617,7 @@ def write_table_rows_to_tabular_file(
     ):
 
         def flush_batch() -> None:
-            nonlocal buffered_bytes, count
+            nonlocal buffered_bytes, count  # update from flush
             if not buffered_batches:
                 return
 
