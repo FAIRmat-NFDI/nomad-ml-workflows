@@ -7,7 +7,6 @@ from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime, timezone
 
 from nomad.actions.manager import action_artifacts_dir
-from nomad.actions.workers.utils import worker_process_initializer
 from nomad.app.v1.models.models import MetadataPagination, MetadataRequired
 from nomad.config import config as nomad_config
 from nomad.files import StagingUploadFiles
