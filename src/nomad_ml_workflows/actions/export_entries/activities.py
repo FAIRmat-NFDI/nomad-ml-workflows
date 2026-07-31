@@ -7,6 +7,7 @@ from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime, timezone
 
 from nomad.actions.manager import action_artifacts_dir
+from nomad.actions.workers.utils import worker_process_initializer
 from nomad.app.v1.models.models import MetadataPagination, MetadataRequired
 from nomad.config import config as nomad_config
 from nomad.files import StagingUploadFiles
@@ -182,7 +183,9 @@ def read_archives_and_write_output_tabular(
     activity_type = activity.info().activity_type
 
     with ProcessPoolExecutor(
-        max_workers=1, mp_context=multiprocessing.get_context('spawn')
+        max_workers=1,
+        initializer=worker_process_initializer,
+        mp_context=multiprocessing.get_context('spawn'),
     ) as executor:
         future = executor.submit(
             _read_archives_and_write_output_tabular,
