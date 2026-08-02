@@ -21,8 +21,8 @@ from nomad_ml_workflows.actions.export_entries.models import (
     ExportDatasetInput,
     ManifestEntry,
     OutputFile,
-    PrepapeManifestOutput,
     PrepareManifestInput,
+    PrepareManifestOutput,
     ReadArchivesWorkflowInput,
 )
 from nomad_ml_workflows.actions.export_entries.utils import (
@@ -64,7 +64,7 @@ async def create_artifact_subdirectory(data: CreateArtifactSubdirectoryInput) ->
 
 
 @activity.defn
-def prepare_manifest(data: PrepareManifestInput) -> PrepapeManifestOutput:
+def prepare_manifest(data: PrepareManifestInput) -> PrepareManifestOutput:
     max_num_entries_limit = min(
         config.max_entries_export_limit,  # type: ignore
         data.num_entries_user_limit,
@@ -109,7 +109,7 @@ def prepare_manifest(data: PrepareManifestInput) -> PrepapeManifestOutput:
     num_entries_selected = len(manifest)
     write_dicts_to_json(manifest, data.manifest_file_path)
 
-    return PrepapeManifestOutput(
+    return PrepareManifestOutput(
         search_start_time=starttime,
         search_end_time=endtime,
         num_entries_available=num_entries_available,

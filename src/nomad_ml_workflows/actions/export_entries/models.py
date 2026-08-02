@@ -261,7 +261,7 @@ class PrepareManifestInput(BaseModel):
     manifest_file_path: str = Field(..., description='Path to the manifest file.')
 
 
-class PrepapeManifestOutput(BaseModel):
+class PrepareManifestOutput(BaseModel):
     num_entries_available: int = Field(
         ..., description='Total number of entries matching the search query.'
     )
