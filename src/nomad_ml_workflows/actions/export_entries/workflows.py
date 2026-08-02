@@ -120,6 +120,9 @@ class ExportEntriesWorkflow:
             export_dataset_input.metadata.num_entries_available = (
                 manifest_output.num_entries_available
             )
+            export_dataset_input.metadata.num_entries_selected = (
+                manifest_output.num_entries_selected
+            )
             export_dataset_input.metadata.search_start_time = (
                 manifest_output.search_start_time
             )
@@ -129,7 +132,7 @@ class ExportEntriesWorkflow:
             export_dataset_input.metadata.reached_max_entries_limit = (
                 manifest_output.reached_max_entries_limit
             )
-            if manifest_output.num_entries_available == 0:
+            if manifest_output.num_entries_selected == 0:
                 # No pages to export, return early with an empty dataset
                 return ExportEntriesOutput(exported_dir_path='', workflow_duration=0.0)
 

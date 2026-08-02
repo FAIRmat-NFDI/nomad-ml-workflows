@@ -70,7 +70,7 @@ def prepare_manifest(data: PrepareManifestInput) -> PrepapeManifestOutput:
         data.num_entries_user_limit,
     )
     manifest: list = []
-    page_size = min(10000, max_num_entries_limit + 1)
+    page_size = min(10000, max_num_entries_limit)
     starttime = datetime.now(timezone.utc).isoformat()
     response = nomad_search(
         user_id=data.user_id,
@@ -79,6 +79,7 @@ def prepare_manifest(data: PrepareManifestInput) -> PrepapeManifestOutput:
         required=MetadataRequired(include=['entry_id', 'upload_id']),  # type: ignore
         pagination=MetadataPagination(page_size=page_size),  # type: ignore
     )
+    num_entries_available = response.pagination.total
     while True:
         manifest.extend(
             [
@@ -89,6 +90,7 @@ def prepare_manifest(data: PrepareManifestInput) -> PrepapeManifestOutput:
         if len(manifest) >= max_num_entries_limit:
             break
         if response.pagination.next_page_after_value is None:
+            # last page was already consumed
             break
         response = nomad_search(
             user_id=data.user_id,
@@ -102,19 +104,16 @@ def prepare_manifest(data: PrepareManifestInput) -> PrepapeManifestOutput:
         )
     endtime = datetime.now(timezone.utc).isoformat()
 
-    if len(manifest) > max_num_entries_limit:
-        reached_max_entries_limit = True
-        manifest = manifest[:max_num_entries_limit]  #  Apply max limit
-    else:
-        reached_max_entries_limit = False
-
-    num_entries_available = len(manifest)
+    reached_max_entries_limit = num_entries_available > max_num_entries_limit
+    manifest = manifest[:max_num_entries_limit]
+    num_entries_selected = len(manifest)
     write_dicts_to_json(manifest, data.manifest_file_path)
 
     return PrepapeManifestOutput(
         search_start_time=starttime,
         search_end_time=endtime,
         num_entries_available=num_entries_available,
+        num_entries_selected=num_entries_selected,
         reached_max_entries_limit=reached_max_entries_limit,
     )
 

@@ -263,7 +263,12 @@ class PrepareManifestInput(BaseModel):
 
 class PrepapeManifestOutput(BaseModel):
     num_entries_available: int = Field(
-        ..., description='Number of entries available for export.'
+        ..., description='Total number of entries matching the search query.'
+    )
+    num_entries_selected: int = Field(
+        ...,
+        description='Number of matching entries selected for export after applying '
+        'the export limit.',
     )
     search_start_time: str = Field(
         ..., description='UTC Timestamp (ISO) when the search started.'
@@ -273,7 +278,7 @@ class PrepapeManifestOutput(BaseModel):
     )
     reached_max_entries_limit: bool = Field(
         ...,
-        description='Whether the maximum number of entries export limit was reached.',
+        description='Whether the number of matching entries exceeded the export limit.',
     )
 
 
@@ -304,14 +309,18 @@ class ExportDatasetMetadata(BaseModel):
     )
     num_entries_available: int = Field(
         0,
-        description='Number of entries available for the given search query. Limited by '
-        'the maximum number of entries allowed.',
+        description='Total number of entries matching the search query.',
+    )
+    num_entries_selected: int = Field(
+        0,
+        description='Number of matching entries selected for export after applying '
+        'the export limit.',
     )
     reached_max_entries_limit: bool = Field(
         False,
-        description='Indicates whether the export reached the maximum number of '
-        'entries allowed. If true, the exported dataset contains the first N entries '
-        'up to the maximum limit.',
+        description='Indicates whether the number of matching entries exceeded the '
+        'export limit. If true, the exported dataset contains only the first N entries '
+        'up to that limit.',
     )
     search_start_time: str = Field(
         '',
