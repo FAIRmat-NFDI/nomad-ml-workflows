@@ -103,7 +103,7 @@ class ExportEntriesWorkflow:
         try:
             search_settings = NormalizedSearchSettings.from_user_input(data)
 
-            manifest_file_path = f'{artifact_subdirectory}/manifest.json'
+            manifest_file_path = f'{artifact_subdirectory}/selected_entries.json'
             manifest_output = await workflow.execute_activity(
                 prepare_manifest,
                 PrepareManifestInput(
