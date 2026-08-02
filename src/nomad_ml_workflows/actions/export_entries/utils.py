@@ -488,16 +488,18 @@ def generate_table_rows(
             all_unhandled_keys.update(table_row.unhandled_keys)
             yield table_row
         except Exception as e:
-            logger.error(
-                'failed to flatten archive '
-                f'(entry_id={entry_id} upload_id={upload_id})',
-                exc_info=e,
-            )
+            if logger:
+                logger.error(
+                    'failed to flatten archive '
+                    f'(entry_id={entry_id} upload_id={upload_id})',
+                    exc_info=e,
+                )
     if all_unhandled_keys and logger:
-        logger.warning(
-            f'Unhandled keys ({len(all_unhandled_keys)}) while flattening '
-            f'archives: {all_unhandled_keys}'
-        )
+        if logger:
+            logger.warning(
+                f'Unhandled keys ({len(all_unhandled_keys)}) while flattening '
+                f'archives: {all_unhandled_keys}'
+            )
 
 
 def write_dicts_to_json(items: Iterable[dict], output_file_path: str) -> int:
