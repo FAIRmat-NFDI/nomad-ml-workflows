@@ -2,9 +2,14 @@ import json
 import multiprocessing
 import os
 import shutil
+import time
+import traceback
+import uuid
 import zipfile
-from concurrent.futures import ProcessPoolExecutor
+from collections.abc import Iterable
 from datetime import datetime, timezone
+from multiprocessing.connection import Connection
+from typing import Any
 
 from nomad.actions.manager import action_artifacts_dir
 from nomad.app.v1.models.models import MetadataPagination, MetadataRequired
@@ -14,6 +19,7 @@ from nomad.search import search as nomad_search
 from nomad.uploads import get_upload_files
 from nomad.utils import get_logger
 from temporalio import activity
+from temporalio.exceptions import CancelledError
 
 from nomad_ml_workflows.actions.export_entries.models import (
     CleanupArtifactsInput,
@@ -38,6 +44,10 @@ config = nomad_config.get_plugin_entry_point(
     'nomad_ml_workflows.actions:export_entries'
 )
 logger = get_logger(__name__)
+
+_SUBPROCESS_POLL_INTERVAL_SECONDS = 1
+_SUBPROCESS_STOP_TIMEOUT_SECONDS = 5
+_PROGRESS_REPORT_INTERVAL = 100
 
 
 @activity.defn
@@ -118,24 +128,42 @@ def prepare_manifest(data: PrepareManifestInput) -> PrepareManifestOutput:
     )
 
 
-@activity.defn
-def read_archives_and_write_output_json(
-    data: ReadArchivesWorkflowInput,
-) -> OutputFile:
-    """
-    Reads the archives and writes the output JSON file.
-    """
-    output_file_path = f'{data.artifact_subdirectory}/data.{data.output_file_format}'
+def _with_subprocess_progress(
+    items: Iterable[Any], connection: Connection, phase: str
+) -> Iterable[Any]:
+    count = 0
+    connection.send(('progress', {'phase': phase, 'num_entries_processed': count}))
+    for item in items:
+        count += 1
+        if count % _PROGRESS_REPORT_INTERVAL == 0:
+            connection.send(
+                ('progress', {'phase': phase, 'num_entries_processed': count})
+            )
+        yield item
+    connection.send(('progress', {'phase': phase, 'num_entries_processed': count}))
 
+
+def _read_archives_and_write_output_json(
+    data: ReadArchivesWorkflowInput,
+    activity_type: str,
+    output_file_path: str,
+    progress_connection: Connection,
+) -> OutputFile:
     # load manifest
     with open(data.manifest_file_path, encoding='utf-8') as f:
         manifest = [ManifestEntry(**entry) for entry in json.load(f)]
 
-    info = activity.info()
-    activity_logger = logger.bind(activity_type=info.activity_type)
+    activity_logger = logger.bind(activity_type=activity_type)
 
     archives = generate_archives(manifest, data.required, data.user_id, activity_logger)
-    num_entries_exported = write_dicts_to_json(archives, output_file_path)
+    num_entries_exported = write_dicts_to_json(
+        _with_subprocess_progress(
+            archives,
+            progress_connection,
+            'reading_archives',
+        ),
+        output_file_path,
+    )
 
     return OutputFile(
         file_path=output_file_path,
@@ -145,12 +173,13 @@ def read_archives_and_write_output_json(
 
 
 def _read_archives_and_write_output_tabular(
-    data: ReadArchivesWorkflowInput, activity_type: str
+    data: ReadArchivesWorkflowInput,
+    activity_type: str,
+    output_file_path: str,
+    table_rows_file_path: str,
+    progress_connection: Connection,
 ) -> OutputFile:
     activity_logger = logger.bind(activity_type=activity_type)
-
-    table_rows_file_path = f'{data.artifact_subdirectory}/table_rows.tmp.ndjson'
-    output_file_path = f'{data.artifact_subdirectory}/data.{data.output_file_format}'
 
     # load manifest
     with open(data.manifest_file_path, encoding='utf-8') as f:
@@ -162,15 +191,30 @@ def _read_archives_and_write_output_tabular(
 
     activity_logger.info('Reading archives and building the schema...')
     columns_quantity_def = write_table_rows_to_ndjson(
-        rows_with_columns_quantity_def, table_rows_file_path
+        _with_subprocess_progress(
+            rows_with_columns_quantity_def,
+            progress_connection,
+            'reading_archives',
+        ),
+        table_rows_file_path,
     )
     activity_logger.info('Writing table rows to tabular file...')
+    progress_connection.send(('progress', {'phase': 'writing_output'}))
     num_entries_exported = write_table_rows_to_tabular_file(
         table_rows_file_path,
         output_file_path,
         columns_quantity_def,
         max_buffer_bytes=config.max_write_buffer_size_bytes,  # type: ignore
         logger=activity_logger,
+    )
+    progress_connection.send(
+        (
+            'progress',
+            {
+                'phase': 'writing_output',
+                'num_entries_processed': num_entries_exported,
+            },
+        )
     )
     activity_logger.info(
         f'{num_entries_exported} table rows written to '
@@ -184,33 +228,228 @@ def _read_archives_and_write_output_tabular(
     )
 
 
-@activity.defn
+def _read_archives_subprocess(
+    data: ReadArchivesWorkflowInput,
+    activity_type: str,
+    output_file_path: str,
+    table_rows_file_path: str,
+    connection: Connection,
+) -> None:
+    try:
+        worker_process_initializer()
+        if data.output_file_format == 'json':
+            output = _read_archives_and_write_output_json(
+                data,
+                activity_type,
+                output_file_path,
+                connection,
+            )
+        else:
+            output = _read_archives_and_write_output_tabular(
+                data,
+                activity_type,
+                output_file_path,
+                table_rows_file_path,
+                connection,
+            )
+        connection.send(('result', output.model_dump()))
+    except BaseException:
+        connection.send(('error', traceback.format_exc()))
+    finally:
+        connection.close()
+
+
+def _drain_subprocess_messages(
+    connection: Connection,
+    progress: dict[str, Any],
+) -> tuple[dict[str, Any] | None, str | None]:
+    result = None
+    error = None
+    while connection.poll():
+        try:
+            message_type, payload = connection.recv()
+        except EOFError:
+            break
+        if message_type == 'progress':
+            progress.update(payload)
+        elif message_type == 'result':
+            result = payload
+        elif message_type == 'error':
+            error = payload
+    return result, error
+
+
+def _stop_subprocess(process) -> None:
+    if not process.is_alive():
+        process.join()
+        return
+
+    process.terminate()
+    process.join(timeout=_SUBPROCESS_STOP_TIMEOUT_SECONDS)
+    if process.is_alive():
+        process.kill()
+        process.join()
+
+
+def _wait_for_subprocess(
+    process,
+    connection: Connection,
+    start_to_close_timeout_seconds: float | None,
+) -> OutputFile:
+    started_at = time.monotonic()
+    progress: dict[str, Any] = {
+        'phase': 'starting_subprocess',
+        'num_entries_processed': 0,
+    }
+    result = None
+    error = None
+
+    try:
+        while process.is_alive():
+            poll_interval = _SUBPROCESS_POLL_INTERVAL_SECONDS
+            if start_to_close_timeout_seconds is not None:
+                remaining_timeout = start_to_close_timeout_seconds - (
+                    time.monotonic() - started_at
+                )
+                if remaining_timeout <= 0:
+                    raise TimeoutError(
+                        'Archive export subprocess exceeded its start-to-close timeout.'
+                    )
+                poll_interval = min(poll_interval, remaining_timeout)
+
+            process.join(timeout=poll_interval)
+            new_result, new_error = _drain_subprocess_messages(connection, progress)
+            result = new_result or result
+            error = new_error or error
+            activity.heartbeat(progress)
+
+            if activity.is_cancelled():
+                raise CancelledError('Archive export activity was cancelled.')
+            if (
+                start_to_close_timeout_seconds is not None
+                and time.monotonic() - started_at >= start_to_close_timeout_seconds
+            ):
+                raise TimeoutError(
+                    'Archive export subprocess exceeded its start-to-close timeout.'
+                )
+
+        process.join()
+        new_result, new_error = _drain_subprocess_messages(connection, progress)
+        result = new_result or result
+        error = new_error or error
+        activity.heartbeat(progress)
+
+        if activity.is_cancelled():
+            raise CancelledError('Archive export activity was cancelled.')
+        if error is not None:
+            raise RuntimeError(f'Archive export subprocess failed:\n{error}')
+        if process.exitcode != 0:
+            raise RuntimeError(
+                f'Archive export subprocess exited with code {process.exitcode}.'
+            )
+        if result is None:
+            raise RuntimeError('Archive export subprocess returned no result.')
+        return OutputFile.model_validate(result)
+    except BaseException:
+        _stop_subprocess(process)
+        raise
+
+
+def _temporary_output_path(output_file_path: str, token: str) -> str:
+    base_path, extension = os.path.splitext(output_file_path)
+    return f'{base_path}.{token}.tmp{extension}'
+
+
+def _remove_temporary_file(file_path: str) -> None:
+    try:
+        os.remove(file_path)
+    except FileNotFoundError:
+        pass
+
+
+def _run_read_archives_activity(data: ReadArchivesWorkflowInput) -> OutputFile:
+    activity_started_at = time.monotonic()
+    activity_info = activity.info()
+    output_file_path = f'{data.artifact_subdirectory}/data.{data.output_file_format}'
+    temporary_token = uuid.uuid4().hex
+    temporary_output_file_path = _temporary_output_path(
+        output_file_path, temporary_token
+    )
+    temporary_table_rows_file_path = os.path.join(
+        data.artifact_subdirectory,
+        f'table_rows.{temporary_token}.tmp.ndjson',
+    )
+
+    context = multiprocessing.get_context('spawn')
+    parent_connection, child_connection = context.Pipe(duplex=False)
+    process = context.Process(
+        target=_read_archives_subprocess,
+        args=(
+            data,
+            activity_info.activity_type,
+            temporary_output_file_path,
+            temporary_table_rows_file_path,
+            child_connection,
+        ),
+    )
+    process_started = False
+
+    try:
+        process.start()
+        process_started = True
+        child_connection.close()
+
+        timeout = activity_info.start_to_close_timeout
+        remaining_timeout_seconds = None
+        if timeout is not None:
+            remaining_timeout_seconds = max(
+                0,
+                timeout.total_seconds() - (time.monotonic() - activity_started_at),
+            )
+        output = _wait_for_subprocess(
+            process,
+            parent_connection,
+            remaining_timeout_seconds,
+        )
+        os.replace(temporary_output_file_path, output_file_path)
+        return OutputFile(
+            file_path=output_file_path,
+            file_size=output.file_size,
+            num_entries_exported=output.num_entries_exported,
+        )
+    finally:
+        if process_started and process.is_alive():
+            _stop_subprocess(process)
+        child_connection.close()
+        parent_connection.close()
+        _remove_temporary_file(temporary_output_file_path)
+        _remove_temporary_file(temporary_table_rows_file_path)
+
+
+@activity.defn(no_thread_cancel_exception=True)
+def read_archives_and_write_output_json(
+    data: ReadArchivesWorkflowInput,
+) -> OutputFile:
+    """Read archives and write JSON in a cancellation-aware subprocess."""
+
+    if data.output_file_format != 'json':
+        raise ValueError('Unsupported JSON output format.')
+
+    return _run_read_archives_activity(data)
+
+
+@activity.defn(no_thread_cancel_exception=True)
 def read_archives_and_write_output_tabular(
     data: ReadArchivesWorkflowInput,
 ) -> OutputFile:
-    """
-    Reads archives and streams flattened table rows to Parquet or CSV.
-    Runs in an isolated process to ensure that memory is released after execution.
-    """
+    """Read archives and write tabular output in a cancellation-aware subprocess."""
 
     if data.output_file_format not in {'parquet', 'csv'}:
         raise ValueError(
             f'Unsupported tabular output format: {data.output_file_format}'
         )
 
-    activity_type = activity.info().activity_type
-
-    with ProcessPoolExecutor(
-        max_workers=1,
-        initializer=worker_process_initializer,
-        mp_context=multiprocessing.get_context('spawn'),
-    ) as executor:
-        future = executor.submit(
-            _read_archives_and_write_output_tabular,
-            data,
-            activity_type,
-        )
-        return future.result()
+    return _run_read_archives_activity(data)
 
 
 @activity.defn
@@ -279,10 +518,10 @@ async def export_dataset_to_upload(data: ExportDatasetInput) -> str:
     for filepath in exportable_filepaths:
         temp_path = os.path.join(exportable_dir_path, os.path.basename(filepath))
         shutil.copy2(filepath, temp_path)
-        # Add directory to the NOMAD Upload
-        upload_files.add_rawfiles(
-            target_path=exportable_dir_path, target_dir=exportable_dir_name
-        )
+    # Add directory to the NOMAD Upload
+    upload_files.add_rawfiles(
+        target_path=exportable_dir_path, target_dir=exportable_dir_name
+    )
     return exportable_dir_name
 
 
