@@ -242,6 +242,7 @@ def test_table_rows_to_arrow_batch_handles_failed_conversion_with_none(
 def test_write_table_rows_to_tabular_file_uses_normalized_schema(
     tmp_path,
     resolve_test_schema,
+    monkeypatch,
 ):
     rows_path = tmp_path / 'entries.ndjson'
     output_path = tmp_path / 'entries.parquet'
@@ -255,9 +256,9 @@ def test_write_table_rows_to_tabular_file_uses_normalized_schema(
             _archive('entry_2', {'count': '7'}),
         ]
     ]
+    monkeypatch.setattr(utils, 'generate_table_rows', lambda *_: iter(table_rows))
     columns_quantity_def = utils.write_table_rows_to_ndjson(
-        table_rows,
-        str(rows_path),
+        [], {}, 'user_id', str(rows_path)
     )
 
     count = utils.write_table_rows_to_tabular_file(
@@ -272,25 +273,26 @@ def test_write_table_rows_to_tabular_file_uses_normalized_schema(
     assert table[_column('count')].to_pylist() == [None, 7]
 
 
-def test_write_table_rows_to_ndjson_accepts_repeated_quantity_definition(tmp_path):
+def test_write_table_rows_to_ndjson_accepts_repeated_quantity_definition(
+    tmp_path, monkeypatch
+):
     output_path = tmp_path / 'rows.ndjson'
     quantity_def = Quantity(type=str)
+    table_rows = [
+        utils.FlatEntryArchive(
+            data_dict={'entry_id': 'one'},
+            columns_quantity_def={'value': quantity_def},
+            unhandled_keys=[],
+        ),
+        utils.FlatEntryArchive(
+            data_dict={'entry_id': 'two'},
+            columns_quantity_def={'value': quantity_def},
+            unhandled_keys=[],
+        ),
+    ]
+    monkeypatch.setattr(utils, 'generate_table_rows', lambda *_: iter(table_rows))
 
-    result = utils.write_table_rows_to_ndjson(
-        [
-            utils.FlatEntryArchive(
-                data_dict={'entry_id': 'one'},
-                columns_quantity_def={'value': quantity_def},
-                unhandled_keys=[],
-            ),
-            utils.FlatEntryArchive(
-                data_dict={'entry_id': 'two'},
-                columns_quantity_def={'value': quantity_def},
-                unhandled_keys=[],
-            ),
-        ],
-        str(output_path),
-    )
+    result = utils.write_table_rows_to_ndjson([], {}, 'user_id', str(output_path))
 
     assert result == {'value': quantity_def}
     assert output_path.read_text(encoding='utf-8') == (
