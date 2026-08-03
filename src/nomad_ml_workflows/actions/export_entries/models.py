@@ -284,7 +284,9 @@ class PrepareManifestOutput(BaseModel):
 
 class ReadArchivesWorkflowInput(BaseModel):
     user_id: str = Field(..., description='User ID performing the search.')
-    output_file_format: str = Field(..., description='Output file format.')
+    output_file_format: OutputFileFormatLiteral = Field(
+        ..., description='Output file format.'
+    )
     manifest_file_path: str = Field(..., description='Path to the manifest file.')
     artifact_subdirectory: str = Field(
         ..., description="Subdirectory where current workflow's artifacts are stored."

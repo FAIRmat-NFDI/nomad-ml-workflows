@@ -59,8 +59,6 @@ class ReadArchivesWorkflow:
                 retry_policy=retry_policy,
             )
 
-        raise ValueError(f'Unsupported output file format: {data.output_file_format}')
-
 
 @workflow.defn
 class ExportEntriesWorkflow:
@@ -117,14 +115,21 @@ class ExportEntriesWorkflow:
                 retry_policy=retry_policy,
             )
 
-            for k in [
-                'num_entries_available',
-                'num_entries_selected',
-                'search_start_time',
-                'search_end_time',
-                'reached_max_entries_limit',
-            ]:
-                setattr(export_dataset_input.metadata, k, getattr(manifest_output, k))
+            export_dataset_input.metadata.num_entries_available = (
+                manifest_output.num_entries_available
+            )
+            export_dataset_input.metadata.num_entries_selected = (
+                manifest_output.num_entries_selected
+            )
+            export_dataset_input.metadata.search_start_time = (
+                manifest_output.search_start_time
+            )
+            export_dataset_input.metadata.search_end_time = (
+                manifest_output.search_end_time
+            )
+            export_dataset_input.metadata.reached_max_entries_limit = (
+                manifest_output.reached_max_entries_limit
+            )
             export_dataset_input.source_paths = [manifest_file_path]
 
             if manifest_output.num_entries_selected > 0:

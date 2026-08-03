@@ -193,13 +193,10 @@ def read_archives_and_write_output_tabular(
     Runs in an isolated process to ensure that memory is released after execution.
     """
 
-    if data.output_file_format not in {'parquet', 'csv'}:
-        raise ValueError(
-            f'Unsupported tabular output format: {data.output_file_format}'
-        )
-
     activity_type = activity.info().activity_type
 
+    # TODO: add the temporal context to the subprocess for logging
+    # and propagating failure and cancellation policy
     with ProcessPoolExecutor(
         max_workers=1,
         initializer=worker_process_initializer,
