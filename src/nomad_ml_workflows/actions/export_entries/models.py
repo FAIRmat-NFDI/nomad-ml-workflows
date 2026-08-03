@@ -96,11 +96,11 @@ class SearchSettings(BaseModel):
     owner: OwnerLiteral = Field(
         'visible', description='Owner of the entries to be searched.'
     )
-    num_entries: int = Field(
+    max_entries: int = Field(
         config.max_entries_export_limit,  # type: ignore
         gt=0,
         le=config.max_entries_export_limit,  # type: ignore
-        description='Number of entries to be exported.',
+        description='Maximum number of entries to be exported.',
     )
     query: str = Field(
         ...,
@@ -163,7 +163,7 @@ class NormalizedSearchSettings(BaseModel):
     owner: OwnerLiteral = Field(..., description='Owner of the entries to be searched.')
     query: Query = Field(..., description='Search query parameters.')
     num_entries_user_limit: int = Field(
-        ..., description='Number of entries requested by the user.'
+        ..., description='Maximum number of entries requested by the user.'
     )
     required: str | dict[str, Any] = Field(
         '*',
@@ -241,7 +241,7 @@ class NormalizedSearchSettings(BaseModel):
             user_id=user_input.user_id,
             owner=user_input.search_settings.owner,
             query=query,
-            num_entries_user_limit=user_input.search_settings.num_entries,
+            num_entries_user_limit=user_input.search_settings.max_entries,
             required=archive_required,
         )
 
