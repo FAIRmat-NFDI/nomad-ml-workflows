@@ -4,6 +4,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import lru_cache
+from typing import Any
 
 from nomad.app.v1.models.models import User
 from nomad.archive.required import RequiredReader
@@ -423,7 +424,9 @@ def _stringify_nested_columns(
 def generate_archives(
     manifest: list[ManifestEntry], required: dict | str, user_id: str, logger=None
 ) -> Iterable[dict]:
-    """Generates entry archive dicts from the manifest and required fields."""
+    """
+    Yields entry archive dict using the manifest and required fields one at a time.
+    """
 
     # set up required reader
     required_reader = RequiredReader(
@@ -471,7 +474,7 @@ def generate_table_rows(
     manifest: list[ManifestEntry], required: dict | str, user_id: str, logger=None
 ) -> Iterable[FlatEntryArchive]:
     """
-    Generates table rows from the manifest and required fields.
+    Yields table row using the manifest and required fields one at a time.
     """
     archives = generate_archives(manifest, required, user_id, logger)
 
@@ -522,14 +525,22 @@ def write_dicts_to_json(items: Iterable[dict], output_file_path: str) -> int:
 
 
 def write_table_rows_to_ndjson(
-    table_rows: Iterable[FlatEntryArchive], output_file_path: str
+    manifest: list[ManifestEntry],
+    required: str | dict[str, Any],
+    user_id: str,
+    output_file_path: str,
+    logger=None,
 ) -> dict[str, Quantity]:
     if not output_file_path.endswith('.ndjson'):
         raise ValueError('ouput_file_path should have .ndjson extension.')
     columns_quantity_def: dict[str, Quantity] = {}
 
+    table_rows_with_columns_quantity_def = generate_table_rows(
+        manifest, required, user_id, logger
+    )
+
     with open(output_file_path, 'w', encoding='utf-8') as file:
-        for table_row in table_rows:
+        for table_row in table_rows_with_columns_quantity_def:
             # accumulate only the schema information
             for column, quantity_def in table_row.columns_quantity_def.items():
                 columns_quantity_def.setdefault(column, quantity_def)

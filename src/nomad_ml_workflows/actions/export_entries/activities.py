@@ -27,7 +27,6 @@ from nomad_ml_workflows.actions.export_entries.models import (
 )
 from nomad_ml_workflows.actions.export_entries.utils import (
     generate_archives,
-    generate_table_rows,
     worker_process_initializer,
     write_dicts_to_json,
     write_table_rows_to_ndjson,
@@ -156,13 +155,9 @@ def _read_archives_and_write_output_tabular(
     with open(data.manifest_file_path, encoding='utf-8') as f:
         manifest = [ManifestEntry(**entry) for entry in json.load(f)]
 
-    rows_with_columns_quantity_def = generate_table_rows(
-        manifest, data.required, data.user_id, activity_logger
-    )
-
     activity_logger.info('Reading archives and building the schema...')
     columns_quantity_def = write_table_rows_to_ndjson(
-        rows_with_columns_quantity_def, table_rows_file_path
+        manifest, data.required, data.user_id, table_rows_file_path, activity_logger
     )
     activity_logger.info('Writing table rows to tabular file...')
     num_entries_exported = write_table_rows_to_tabular_file(
