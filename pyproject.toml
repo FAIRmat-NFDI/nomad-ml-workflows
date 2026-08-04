@@ -24,7 +24,7 @@ maintainers = [
 ]
 license-files = ["LICENSE"]
 dependencies = [
-    "nomad-lab>=1.4.3",
+    "nomad-lab>=1.4.4",
     "huggingface-hub",
     "pydantic",
     "temporalio",
