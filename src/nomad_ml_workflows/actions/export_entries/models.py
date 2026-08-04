@@ -3,11 +3,16 @@ from typing import Annotated, Any, Literal
 
 from nomad.app.v1.models.models import Query
 from nomad.config import config as nomad_config
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
-OwnerLiteral = Literal['public', 'visible', 'shared', 'user', 'staging']
-BatchFileFormatLiteral = Literal['parquet', 'json']
-OutputFileFormatLiteral = Literal['parquet', 'csv', 'json']
+OwnerLiteral = Literal[
+    'visible',
+    'public',
+    'user',
+    'shared',
+    'staging',
+]
+DataFileFormatLiteral = Literal['parquet', 'csv', 'json']
 
 config = nomad_config.get_plugin_entry_point(
     'nomad_ml_workflows.actions:export_entries'
@@ -16,16 +21,34 @@ config = nomad_config.get_plugin_entry_point(
 
 class Include(BaseModel):
     type: Literal['include'] = Field('include')
-    path: str = Field(..., description='Archive paths to be included.')
+    path: str = Field(
+        ...,
+        title='Archive path',
+        description='Dot-separated path to an archive quantity or section for inclusion.',
+        json_schema_extra={
+            'ui:placeholder': 'results.method.method_name',
+        },
+    )
     resolve_references: bool = Field(
         False,
-        description='Recursively resolve references for the included path.',
+        title='Resolve references',
+        description='Include data reached through references below this path.',
+        json_schema_extra={
+            'ui:help': 'Include data reached through references below this path.',
+        },
     )
 
 
 class Exclude(BaseModel):
     type: Literal['exclude'] = Field('exclude')
-    path: str = Field(..., description='Archive paths to be excluded.')
+    path: str = Field(
+        ...,
+        title='Archive path',
+        description='Dot-separated path to an archive quantity or section for exclusion.',
+        json_schema_extra={
+            'ui:placeholder': 'metadata.search_quantities',
+        },
+    )
 
 
 Required = Annotated[Include, Field(discriminator='type')]
@@ -94,30 +117,59 @@ def _contains_include(required: str | dict[str, Any]) -> bool:
 
 class SearchSettings(BaseModel):
     owner: OwnerLiteral = Field(
-        'visible', description='Owner of the entries to be searched.'
+        'visible',
+        title='Ownership scope',
+        description='Choose which entries are eligible for export.',
+        json_schema_extra={
+            'uiSchema': {
+                'ui:enumNames': [
+                    'All entries visible to me (visible)',
+                    'Public entries (public)',
+                    'My entries (user)',
+                    'My and shared entries (shared)',
+                    'My and shared unpublished entries (staging)',
+                ],
+            }
+        },
     )
     max_entries: int = Field(
         min(1000, config.max_entries_export_limit),  # type: ignore
         gt=0,
         le=config.max_entries_export_limit,  # type: ignore
-        description='Maximum number of entries to be exported.',
+        title='Maximum entries',
+        description='Export at most this many matching entries.',
+        json_schema_extra={
+            'ui:description': (
+                'Export at most this many matching entries. The deployment limit is '
+                f'{config.max_entries_export_limit}.'  # type: ignore
+            ),
+        },
     )
     query: str = Field(
         ...,
-        description="""Query for extracting entries. Should be a valid dictionary
-        string. For example:
-        {
-            'entry_type': 'ELNSample'
-        }""",
+        title='Search query',
+        description='NOMAD search query written as a JSON object.',
         json_schema_extra={
-            'uiSchema': {'ui:widget': 'textarea', 'ui:options': {'rows': 5}}
+            'uiSchema': {
+                'ui:widget': 'textarea',
+                'ui:placeholder': '{\n  "entry_type": "ELNSample"\n}',
+                'ui:description': '',
+                'ui:help': (
+                    'NOMAD search query written as a JSON object. '
+                    'You can copy the `query` object from the **View API Call** '
+                    'dialog in a NOMAD search app.'
+                ),
+                'ui:options': {'rows': 5, 'enableMarkdownInHelp': True},
+            }
         },
     )
     required: list[Required] = Field(
-        [],
-        description='Required archive paths for filtering the search results. '
-        'Paths can target quantities like "results.method.method_name" or '
-        'sub-sections like "results".',
+        default_factory=list,
+        title='Archive required paths',
+        description=(
+            'Include or exclude the exported archive content using quantity or section paths. '
+            'Leave this empty to export the complete archive.'
+        ),
         json_schema_extra={
             'uiSchema': {
                 'items': {
@@ -128,30 +180,40 @@ class SearchSettings(BaseModel):
     )
 
 
-class OutputSettings(BaseModel):
-    output_file_format: OutputFileFormatLiteral = Field(
+class ExportSettings(BaseModel):
+    file_format: DataFileFormatLiteral = Field(
         'parquet',
-        description='Format of the output file.',
+        title='File format',
+        description='File format for the exported entry data.',
     )
-    zip_output: bool = Field(
+    create_zip_archive: bool = Field(
         True,
-        description='Whether to create a zip file for the output file(s). Set it '
-        'to true if you want download the dataset for external use. If you want to '
-        'work with the exported data in NOMAD, set it to false. This will export the '
-        'dataset as a directory in the specified project.',
+        title='Create ZIP archive',
+        description='Bundle all export artifacts into a ZIP archive.',
+        json_schema_extra={
+            'uiSchema': {
+                'ui:help': (
+                    'Bundle all export artifacts into a ZIP archive. Turn this '
+                    'off to save them as a project subdirectory.'
+                ),
+            }
+        },
     )
 
 
 class ExportEntriesUserInput(BaseModel):
-    upload_id: str = Field(
-        ...,
-        description='Unique identifier for the upload associated with the workflow.',
-    )
+    model_config = ConfigDict(title='')
+
     user_id: str = Field(
         ..., description='Unique identifier for the user who initiated the workflow.'
+    )  # required field that is not shown in the Action Form UI
+    upload_id: str = Field(
+        ...,
+        title='Destination project ID',
+        description='ID of the project/upload where the exported artifacts will be saved.',
     )
-    search_settings: SearchSettings
-    output_settings: OutputSettings
+    search_settings: SearchSettings = Field(..., title='Search options')
+    export_settings: ExportSettings = Field(..., title='Export options')
 
 
 class CreateArtifactSubdirectoryInput(BaseModel):
@@ -284,7 +346,7 @@ class PrepareManifestOutput(BaseModel):
 
 class ReadArchivesWorkflowInput(BaseModel):
     user_id: str = Field(..., description='User ID performing the search.')
-    output_file_format: OutputFileFormatLiteral = Field(
+    output_file_format: DataFileFormatLiteral = Field(
         ..., description='Output file format.'
     )
     manifest_file_path: str = Field(..., description='Path to the manifest file.')

@@ -93,7 +93,7 @@ class ExportEntriesWorkflow:
             exportable_dir_name=(
                 f'export_entries_{workflow.info().start_time.isoformat()}'
             ),
-            zip_output=data.output_settings.zip_output,
+            zip_output=data.export_settings.create_zip_archive,
             source_paths=[],
             metadata=ExportDatasetMetadata(user_input=data),  # type: ignore
         )
@@ -137,7 +137,7 @@ class ExportEntriesWorkflow:
                     ReadArchivesWorkflow.run,
                     ReadArchivesWorkflowInput(
                         user_id=data.user_id,
-                        output_file_format=data.output_settings.output_file_format,
+                        output_file_format=data.export_settings.file_format,
                         manifest_file_path=manifest_file_path,
                         artifact_subdirectory=artifact_subdirectory,
                         required=search_settings.required,
