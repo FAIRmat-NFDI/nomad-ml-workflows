@@ -1,12 +1,17 @@
 import json
 from typing import Annotated, Any, Literal
 
-from nomad.app.v1.models.models import MetadataPagination, Query
+from nomad.app.v1.models.models import Query
+from nomad.config import config as nomad_config
 from pydantic import BaseModel, Field
 
 OwnerLiteral = Literal['public', 'visible', 'shared', 'user', 'staging']
 BatchFileFormatLiteral = Literal['parquet', 'json']
 OutputFileFormatLiteral = Literal['parquet', 'csv', 'json']
+
+config = nomad_config.get_plugin_entry_point(
+    'nomad_ml_workflows.actions:export_entries'
+)
 
 
 class Include(BaseModel):
@@ -91,11 +96,11 @@ class SearchSettings(BaseModel):
     owner: OwnerLiteral = Field(
         'visible', description='Owner of the entries to be searched.'
     )
-    page_size: int = Field(
-        1000,
+    max_entries: int = Field(
+        min(1000, config.max_entries_export_limit),  # type: ignore
         gt=0,
-        description='Number of entries to be fetched and written per search page. '
-        'Use smaller page sizes when exporting large entries to reduce memory usage.',
+        le=config.max_entries_export_limit,  # type: ignore
+        description='Maximum number of entries to be exported.',
     )
     query: str = Field(
         ...,
@@ -108,8 +113,8 @@ class SearchSettings(BaseModel):
             'uiSchema': {'ui:widget': 'textarea', 'ui:options': {'rows': 5}}
         },
     )
-    required: list[Required] | None = Field(
-        None,
+    required: list[Required] = Field(
+        [],
         description='Required archive paths for filtering the search results. '
         'Paths can target quantities like "results.method.method_name" or '
         'sub-sections like "results".',
@@ -153,29 +158,21 @@ class CreateArtifactSubdirectoryInput(BaseModel):
     subdir_name: str = Field(..., description='Name of the subdirectory to be created.')
 
 
-class SearchPageInput(BaseModel):
+class NormalizedSearchSettings(BaseModel):
     user_id: str = Field(..., description='User ID performing the search.')
     owner: OwnerLiteral = Field(..., description='Owner of the entries to be searched.')
     query: Query = Field(..., description='Search query parameters.')
+    num_entries_user_limit: int = Field(
+        ..., description='Maximum number of entries requested by the user.'
+    )
     required: str | dict[str, Any] = Field(
         '*',
         description='Dictionary of required fields and directives compatible with '
         '`nomad.archive.required.RequiredReader` class.',
     )
-    pagination: MetadataPagination = Field(
-        ..., description='Pagination settings for the search results.'
-    )
-    batch_file_format: BatchFileFormatLiteral = Field(
-        ..., description='Format of the output file.'
-    )
-    output_file_path: str = Field(..., description='Path to the generated output file.')
-    max_entries_export_limit: int = Field(
-        ..., description='Maximum number of entries to be exported.'
-    )
-    page_num: int = Field(..., description='Page number for the search results.')
 
     @staticmethod
-    def build_archive_required(required: list[Required] | None) -> str | dict[str, Any]:
+    def build_archive_required(required: list[Required]) -> str | dict[str, Any]:
         """Convert archive paths to a RequiredReader specification."""
         if not required:
             return '*'
@@ -231,13 +228,7 @@ class SearchPageInput(BaseModel):
     def from_user_input(
         cls,
         user_input: ExportEntriesUserInput,
-        /,
-        page_num: int,
-        output_file_path: str,
-        max_entries_export_limit: int,
-    ) -> 'SearchPageInput':
-        """Convert from ExportEntriesUserInput to SearchPageInput"""
-
+    ) -> 'NormalizedSearchSettings':
         query = json.loads(
             _clean_field(user_input.search_settings.query).replace("'", '"')
         )
@@ -246,103 +237,100 @@ class SearchPageInput(BaseModel):
             user_input.search_settings.required
         )
 
-        pagination = MetadataPagination(page_size=user_input.search_settings.page_size)
-
-        batch_file_format = user_input.output_settings.output_file_format
-        if batch_file_format == 'csv':
-            batch_file_format = 'parquet'  # use parquet batches for csv
-
         return cls(
             user_id=user_input.user_id,
             owner=user_input.search_settings.owner,
             query=query,
+            num_entries_user_limit=user_input.search_settings.max_entries,
             required=archive_required,
-            pagination=pagination,
-            batch_file_format=batch_file_format,
-            page_num=page_num,
-            output_file_path=output_file_path,
-            max_entries_export_limit=max_entries_export_limit,
         )
 
 
-class SearchPageOutput(BaseModel):
-    num_entries_exported: int = Field(
-        ..., description='Number of entries exported to the output file.'
-    )
-    search_start_time: str = Field(
-        ..., description='UTC Timestamp (ISO) when the first search started.'
-    )
-    search_end_time: str = Field(
-        ..., description='UTC Timestamp (ISO) when the last search completed.'
-    )
+class ManifestEntry(BaseModel):
+    entry_id: str = Field(..., description='Entry ID.')
+    upload_id: str = Field(..., description='Upload ID.')
 
 
-class CollectCursorsInput(BaseModel):
+class PrepareManifestInput(BaseModel):
     user_id: str = Field(..., description='User ID performing the search.')
     owner: OwnerLiteral = Field(..., description='Owner of the entries to be searched.')
     query: Query = Field(..., description='Search query parameters.')
-    page_size: int = Field(..., description='Number of entries per page.')
-    max_entries_export_limit: int = Field(
-        ..., description='Maximum number of entries to be exported.'
+    num_entries_user_limit: int = Field(
+        ..., description='Number of entries requested by the user.'
     )
+    manifest_file_path: str = Field(..., description='Path to the manifest file.')
 
 
-class CollectCursorsOutput(BaseModel):
-    page_after_values: list[str | None] = Field(
-        ...,
-        description='List of page_after_value cursors, one per page. '
-        'The first entry is None (start of first page) when at least one page is '
-        'available. If num_entries_available is 0, it is an empty list.',
-    )
+class PrepareManifestOutput(BaseModel):
     num_entries_available: int = Field(
-        ...,
-        description='Total number of entries available for the given search query.',
+        ..., description='Total number of entries matching the search query.'
     )
-    num_pages: int = Field(
+    num_entries_selected: int = Field(
         ...,
-        description='Total number of pages needed to export the entries, based on the '
-        'page size and max entries export limit.',
+        description='Number of matching entries selected for export after applying '
+        'the export limit.',
+    )
+    search_start_time: str = Field(
+        ..., description='UTC Timestamp (ISO) when the search started.'
+    )
+    search_end_time: str = Field(
+        ..., description='UTC Timestamp (ISO) when the search ended.'
+    )
+    reached_max_entries_limit: bool = Field(
+        ...,
+        description='Whether the number of matching entries exceeded the export limit.',
     )
 
 
-class MergeOutputFilesInput(BaseModel):
-    artifact_subdirectory: str = Field(
-        ...,
-        description='Subdirectory where the merged output file will be stored.',
-    )
+class ReadArchivesWorkflowInput(BaseModel):
+    user_id: str = Field(..., description='User ID performing the search.')
     output_file_format: OutputFileFormatLiteral = Field(
-        ...,
-        description='Format of the output file.',
+        ..., description='Output file format.'
     )
-    generated_file_paths: list[str] = Field(
-        ...,
-        description='List of the generated file paths to be merged into a single file.',
+    manifest_file_path: str = Field(..., description='Path to the manifest file.')
+    artifact_subdirectory: str = Field(
+        ..., description="Subdirectory where current workflow's artifacts are stored."
     )
+    required: str | dict[str, Any] = Field(
+        '*',
+        description='Dictionary of required fields and directives compatible with '
+        '`nomad.archive.required.RequiredReader` class.',
+    )
+
+
+class OutputFile(BaseModel):
+    file_path: str = Field(..., description='Path to the output file.')
+    file_size: int = Field(..., description='Size of the output file in bytes.')
+    num_entries_exported: int = Field(..., description='Number of entries exported.')
 
 
 class ExportDatasetMetadata(BaseModel):
     num_entries_exported: int = Field(
         0,
-        description='Total number of entries exported in all the exported dataset '
-        'batches.',
+        description='Number of entries that were successfully exported in the data file. ',
     )
     num_entries_available: int = Field(
         0,
-        description='Total number of entries available for the given search query.',
+        description='Total number of entries matching the search query.',
+    )
+    num_entries_selected: int = Field(
+        0,
+        description='Number of matching entries selected for export after applying '
+        'the export limit.',
     )
     reached_max_entries_limit: bool = Field(
         False,
-        description='Indicates whether the export reached the maximum number of '
-        'entries allowed. If true, the exported dataset contains the first N entries '
-        'up to the maximum limit.',
+        description='Indicates whether the number of matching entries exceeded the '
+        'export limit. If true, the exported dataset contains only the first N entries '
+        'up to that limit.',
     )
     search_start_time: str = Field(
         '',
-        description='UTC Timestamp (ISO) when the first search batch started.',
+        description='UTC Timestamp (ISO) when the search for entries started.',
     )
     search_end_time: str = Field(
         '',
-        description='UTC Timestamp (ISO) when the last search batch completed.',
+        description='UTC Timestamp (ISO) when the search for entries ended.',
     )
     user_input: ExportEntriesUserInput | None = Field(
         None, description='Original user input for the export entries workflow.'
@@ -375,7 +363,7 @@ class ExportDatasetInput(BaseModel):
         'exported.',
     )
     source_paths: list[str] = Field(
-        ..., description='List of paths to the source files of the dataset.'
+        ..., description='Paths to the source files of the dataset.'
     )
     metadata: ExportDatasetMetadata = Field(
         ..., description='Metadata associated with the exported dataset.'

@@ -1,33 +1,41 @@
 import json
+import multiprocessing
 import os
 import shutil
 import zipfile
+from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime, timezone
-from math import ceil
 
-from nomad.actions.manager import action_artifacts_dir, get_upload_files
-from nomad.app.v1.models.models import MetadataPagination, MetadataRequired, User
+from nomad.actions.manager import action_artifacts_dir
+from nomad.app.v1.models.models import MetadataPagination, MetadataRequired
+from nomad.config import config as nomad_config
 from nomad.files import StagingUploadFiles
 from nomad.search import search as nomad_search
+from nomad.uploads import get_upload_files
 from nomad.utils import get_logger
 from temporalio import activity
 
 from nomad_ml_workflows.actions.export_entries.models import (
     CleanupArtifactsInput,
-    CollectCursorsInput,
-    CollectCursorsOutput,
     CreateArtifactSubdirectoryInput,
     ExportDatasetInput,
-    MergeOutputFilesInput,
-    SearchPageInput,
-    SearchPageOutput,
+    ManifestEntry,
+    OutputFile,
+    PrepareManifestInput,
+    PrepareManifestOutput,
+    ReadArchivesWorkflowInput,
 )
 from nomad_ml_workflows.actions.export_entries.utils import (
-    merge_files,
-    write_json_file,
-    write_parquet_file,
+    generate_archives,
+    worker_process_initializer,
+    write_dicts_to_json,
+    write_table_rows_to_ndjson,
+    write_table_rows_to_tabular_file,
 )
 
+config = nomad_config.get_plugin_entry_point(
+    'nomad_ml_workflows.actions:export_entries'
+)
 logger = get_logger(__name__)
 
 
@@ -55,195 +63,146 @@ async def create_artifact_subdirectory(data: CreateArtifactSubdirectoryInput) ->
 
 
 @activity.defn
-async def collect_page_cursors(data: CollectCursorsInput) -> CollectCursorsOutput:
-    """
-    Activity to serially walk NOMAD search pagination and collect all
-    page_after_value cursors needed for parallel page fetching.
-
-    Only entry IDs are requested to minimise payload size.
-
-    Assumption: The cursors are valid for any subsequent search with the same query,
-    regardless of the required fields used in those searches.
-
-    Args:
-        data (CollectCursorsInput): Input data specifying the search and limits.
-
-    Returns:
-        CollectCursorsOutput: All page cursors and the total entry count.
-    """
-
-    # Use minimal required fields so the probe searches are as fast as possible.
-    required = MetadataRequired(include=['entry_id'])
-
-    # First page: cursor is None (start of results).
-    pagination = MetadataPagination(page_size=data.page_size)
+def prepare_manifest(data: PrepareManifestInput) -> PrepareManifestOutput:
+    max_num_entries_limit = min(
+        config.max_entries_export_limit,  # type: ignore
+        data.num_entries_user_limit,
+    )
+    manifest: list = []
+    page_size = min(10000, max_num_entries_limit)
+    starttime = datetime.now(timezone.utc).isoformat()
     response = nomad_search(
         user_id=data.user_id,
         owner=data.owner,
         query=data.query,
-        required=required,
-        pagination=pagination,
-        aggregations={},
+        required=MetadataRequired(include=['entry_id', 'upload_id']),  # type: ignore
+        pagination=MetadataPagination(page_size=page_size),  # type: ignore
     )
-
-    # determine the number of pages needed, incl. the first page
     num_entries_available = response.pagination.total
-    num_entries_to_export = min(num_entries_available, data.max_entries_export_limit)
-    num_pages = (
-        ceil(num_entries_to_export / data.page_size) if num_entries_to_export > 0 else 0
-    )
-
-    if num_pages == 0:
-        return CollectCursorsOutput(
-            page_after_values=[],
-            num_entries_available=num_entries_available,
-            num_pages=num_pages,
+    while True:
+        manifest.extend(
+            [
+                {'entry_id': entry['entry_id'], 'upload_id': entry['upload_id']}
+                for entry in response.data
+            ]
         )
-
-    # Collect the page_after_value cursor for each page.
-    # The first page starts with a None cursor.
-    page_after_values: list[str | None] = [None]
-    cursor = response.pagination.next_page_after_value
-    for _ in range(num_pages - 1):
-        if cursor is None:
+        if len(manifest) >= max_num_entries_limit:
             break
-        page_after_values.append(cursor)
-        pagination = MetadataPagination(
-            page_size=data.page_size, page_after_value=cursor
-        )
+        if response.pagination.next_page_after_value is None:
+            # last page was already consumed
+            break
         response = nomad_search(
             user_id=data.user_id,
             owner=data.owner,
             query=data.query,
-            required=required,
-            pagination=pagination,
-            aggregations={},
+            required=MetadataRequired(include=['entry_id', 'upload_id']),  # type: ignore
+            pagination=MetadataPagination(
+                page_size=page_size,
+                page_after_value=response.pagination.next_page_after_value,
+            ),  # type: ignore
         )
-        cursor = response.pagination.next_page_after_value
+    endtime = datetime.now(timezone.utc).isoformat()
 
-    return CollectCursorsOutput(
-        page_after_values=page_after_values,
+    reached_max_entries_limit = num_entries_available > max_num_entries_limit
+    manifest = manifest[:max_num_entries_limit]
+    num_entries_selected = len(manifest)
+    write_dicts_to_json(manifest, data.manifest_file_path)
+
+    return PrepareManifestOutput(
+        search_start_time=starttime,
+        search_end_time=endtime,
         num_entries_available=num_entries_available,
-        num_pages=num_pages,
+        num_entries_selected=num_entries_selected,
+        reached_max_entries_limit=reached_max_entries_limit,
     )
 
 
 @activity.defn
-async def read_archives(data: SearchPageInput) -> SearchPageOutput:
+def read_archives_and_write_output_json(
+    data: ReadArchivesWorkflowInput,
+) -> OutputFile:
     """
-    Activity to read archives of the searched entries. The required fields are read
-    from the archives and written to a file in the specified format (Parquet or JSON)
-    in the artifacts directory.
-
-    Args:
-        data (ReadArchivesInput): Input data for the search activity.
-
-    Returns:
-        SearchPageOutput: Output data from the search and read archives activity.
+    Reads the archives and writes the output JSON file.
     """
-    from nomad.app.v1.routers.entries import _read_entry_from_archive, _Uploads
-    from nomad.archive.required import RequiredReader
+    output_file_path = f'{data.artifact_subdirectory}/data.{data.output_file_format}'
 
-    start = datetime.now(timezone.utc).isoformat()
+    # load manifest
+    with open(data.manifest_file_path, encoding='utf-8') as f:
+        manifest = [ManifestEntry(**entry) for entry in json.load(f)]
 
     info = activity.info()
+    activity_logger = logger.bind(activity_type=info.activity_type)
 
-    activity_logger = logger.bind(
-        activity_type=info.activity_type,
-        search_page_num=data.page_num,
+    archives = generate_archives(manifest, data.required, data.user_id, activity_logger)
+    num_entries_exported = write_dicts_to_json(archives, output_file_path)
+
+    return OutputFile(
+        file_path=output_file_path,
+        file_size=os.path.getsize(output_file_path),
+        num_entries_exported=num_entries_exported,
     )
 
-    # Find entries whose archives are to be read
-    response = nomad_search(
-        user_id=data.user_id,
-        owner=data.owner,
-        query=data.query,
-        required=MetadataRequired(include=['entry_id', 'upload_id']),
-        pagination=data.pagination,
+
+def _read_archives_and_write_output_tabular(
+    data: ReadArchivesWorkflowInput, activity_type: str
+) -> OutputFile:
+    activity_logger = logger.bind(activity_type=activity_type)
+
+    table_rows_file_path = f'{data.artifact_subdirectory}/table_rows.tmp.ndjson'
+    output_file_path = f'{data.artifact_subdirectory}/data.{data.output_file_format}'
+
+    # load manifest
+    with open(data.manifest_file_path, encoding='utf-8') as f:
+        manifest = [ManifestEntry(**entry) for entry in json.load(f)]
+
+    activity_logger.info('Reading archives and building the schema...')
+    columns_quantity_def = write_table_rows_to_ndjson(
+        manifest, data.required, data.user_id, table_rows_file_path, activity_logger
     )
-    entries: list = [
-        {
-            'entry_id': entry['entry_id'],
-            'upload_id': entry['upload_id'],
-        }
-        for entry in response.data
-    ]
-    entries = entries[: data.max_entries_export_limit]  #  Apply max limit
-
-    # setup required reader
-    required_reader = RequiredReader(
-        data.required,
-        resolve_inplace=True,
-        user=User(user_id=data.user_id),
+    activity_logger.info('Writing table rows to tabular file...')
+    num_entries_exported = write_table_rows_to_tabular_file(
+        table_rows_file_path,
+        output_file_path,
+        columns_quantity_def,
+        max_buffer_bytes=config.max_write_buffer_size_bytes,  # type: ignore
+        logger=activity_logger,
     )
-    entry_archives = []
-
-    # For each entry
-    with _Uploads() as uploads:
-        for entry in entries:
-            try:
-                entry_archive = _read_entry_from_archive(
-                    entry, uploads, required_reader
-                )
-                entry_archives.append(entry_archive)
-            except Exception as e:
-                activity_logger.error(
-                    'failed to read entry archive',
-                    entry_id=entry['entry_id'],
-                    exc_info=e,
-                )
-
-    end = datetime.now(timezone.utc).isoformat()
-
-    write_dataset_file = {
-        'parquet': write_parquet_file,
-        'json': write_json_file,
-    }.get(data.batch_file_format)
-    if write_dataset_file is None:
-        raise ValueError(f'Unsupported batch file format "{data.batch_file_format}". ')
-
-    if entry_archives:
-        num_entries_exported = write_dataset_file(
-            path=data.output_file_path,
-            data=entry_archives,
-            logger=activity_logger,
-        )
-    else:
-        num_entries_exported = 0
-
     activity_logger.info(
-        f'exported {num_entries_exported}/{len(entry_archives)} entries'
+        f'{num_entries_exported} table rows written to '
+        f'"data.{data.output_file_format}" file.'
     )
 
-    return SearchPageOutput(
-        search_start_time=start,
-        search_end_time=end,
+    return OutputFile(
+        file_path=output_file_path,
+        file_size=os.path.getsize(output_file_path),
         num_entries_exported=num_entries_exported,
     )
 
 
 @activity.defn
-async def merge_output_files(data: MergeOutputFilesInput) -> str | None:
+def read_archives_and_write_output_tabular(
+    data: ReadArchivesWorkflowInput,
+) -> OutputFile:
     """
-    Activity to merge multiple batch files into a single file.
-
-    Args:
-        data (MergeOutputFilesInput): Input data for merging files.
-
-    Returns:
-        str | None: Path of the merged output file, or None if no files were merged.
+    Reads archives and streams flattened table rows to Parquet or CSV.
+    Runs in an isolated process to ensure that memory is released after execution.
     """
 
-    if not data.generated_file_paths:
-        raise ValueError('No generated file paths provided for merging.')
+    activity_type = activity.info().activity_type
 
-    merged_file_path = os.path.join(
-        data.artifact_subdirectory, 'data.' + data.output_file_format
-    )
-
-    merge_files(data.generated_file_paths, data.output_file_format, merged_file_path)
-
-    return merged_file_path
+    # TODO: add the temporal context to the subprocess for logging
+    # and propagating failure and cancellation policy
+    with ProcessPoolExecutor(
+        max_workers=1,
+        initializer=worker_process_initializer,
+        mp_context=multiprocessing.get_context('spawn'),
+    ) as executor:
+        future = executor.submit(
+            _read_archives_and_write_output_tabular,
+            data,
+            activity_type,
+        )
+        return future.result()
 
 
 @activity.defn
@@ -272,9 +231,9 @@ async def export_dataset_to_upload(data: ExportDatasetInput) -> str:
             count += 1
 
     upload_files = get_upload_files(data.upload_id, data.user_id)
-    if not upload_files:
+    if not upload_files or not isinstance(upload_files, StagingUploadFiles):
         raise ValueError(
-            f'Upload with ID {data.upload_id} for user {data.user_id} not found.'
+            f'Staging upload with ID {data.upload_id} for user {data.user_id} not found.'
         )
 
     # Create a metadata.json file in the artifact subdirectory
@@ -288,7 +247,10 @@ async def export_dataset_to_upload(data: ExportDatasetInput) -> str:
     with open(metadata_path, 'w', encoding='utf-8') as metafile:
         json.dump(metadata_dict, metafile, indent=4)
 
-    exportable_filepaths = data.source_paths + [metadata_path]
+    exportable_filepaths = [metadata_path]
+    if data.source_paths:
+        exportable_filepaths.extend(data.source_paths)
+
     exportable_dir_name = unique_filename(data.exportable_dir_name, upload_files)
 
     # Create a zip file containing all the source paths and the metadata file

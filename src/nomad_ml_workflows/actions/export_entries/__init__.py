@@ -7,21 +7,21 @@ with workflow.unsafe.imports_passed_through():
 
 
 class ExportEntriesActionEntryPoint(ActionEntryPoint):
-    search_workflow_concurrency_limit: int = Field(
-        default=5,
-        description='Number of child search workflow instances to run concurrently in '
-        'the Export Entries action. Keep this low to avoid overwhelming the Temporal '
-        'server with too many concurrent activities.',
-    )
-    search_batch_timeout: int = Field(
-        default=7200,  # 2 hours
-        description='Timeout (in seconds) for each search batch in the Export Entries '
-        'action. Set this accordingly to time out longer searches.',
-    )
     max_entries_export_limit: int = Field(
         default=100000,
         description='Maximum number of entries that can be exported in a single '
         'Export Entries action.',
+    )
+    read_archives_timeout: int = Field(
+        default=7200,  # 2 hours
+        description='Timeout (in seconds) for the activity that reads '
+        'and writes the output file.',
+    )
+    max_write_buffer_size_bytes: int = Field(
+        default=1024 * 1024 * 4,  # 4 MB
+        description='Maximum number of bytes to buffer before writing to the output '
+        'tabular file. Increasing it can lead to higher memory usage but improved '
+        'compression ratios.',
     )
 
     def load(self):
@@ -29,35 +29,34 @@ class ExportEntriesActionEntryPoint(ActionEntryPoint):
 
         from nomad_ml_workflows.actions.export_entries.activities import (
             cleanup_artifacts,
-            collect_page_cursors,
             create_artifact_subdirectory,
             export_dataset_to_upload,
-            merge_output_files,
-            read_archives,
+            prepare_manifest,
+            read_archives_and_write_output_json,
+            read_archives_and_write_output_tabular,
         )
         from nomad_ml_workflows.actions.export_entries.workflows import (
             ExportEntriesWorkflow,
-            SearchPageWorkflow,
+            ReadArchivesWorkflow,
         )
 
         return Action(
             task_queue=self.task_queue,
             workflow=ExportEntriesWorkflow,
-            child_workflows=[SearchPageWorkflow],
+            child_workflows=[ReadArchivesWorkflow],
             activities=[
                 create_artifact_subdirectory,
-                collect_page_cursors,
-                read_archives,
-                merge_output_files,
+                prepare_manifest,
+                read_archives_and_write_output_json,
+                read_archives_and_write_output_tabular,
                 export_dataset_to_upload,
                 cleanup_artifacts,
             ],
         )
 
 
-export_entries = ExportEntriesActionEntryPoint(
+export_entries = ExportEntriesActionEntryPoint(  # type: ignore
     name='Export Entries Action',
-    description='An action to search entries and export them as a zip file in the '
-    'specified upload.',
+    description='An action to search entries and export them in the specified upload.',
     task_queue=TaskQueue.CPU,
 )
