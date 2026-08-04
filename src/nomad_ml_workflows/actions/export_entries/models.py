@@ -28,9 +28,7 @@ class Exclude(BaseModel):
     path: str = Field(..., description='Archive paths to be excluded.')
 
 
-Required = Annotated[Include, Field(discriminator='type')]
-# TODO: set Required = Annotated[Include | Exclude, Field(discriminator='type')]
-# once exclude directive is supported in RequiredReader
+Required = Annotated[Include | Exclude, Field(discriminator='type')]
 
 
 def _clean_field(field: str) -> str:
