@@ -97,7 +97,7 @@ class SearchSettings(BaseModel):
         'visible', description='Owner of the entries to be searched.'
     )
     max_entries: int = Field(
-        config.max_entries_export_limit,  # type: ignore
+        min(1000, config.max_entries_export_limit),  # type: ignore
         gt=0,
         le=config.max_entries_export_limit,  # type: ignore
         description='Maximum number of entries to be exported.',
@@ -113,8 +113,8 @@ class SearchSettings(BaseModel):
             'uiSchema': {'ui:widget': 'textarea', 'ui:options': {'rows': 5}}
         },
     )
-    required: list[Required] | None = Field(
-        None,
+    required: list[Required] = Field(
+        [],
         description='Required archive paths for filtering the search results. '
         'Paths can target quantities like "results.method.method_name" or '
         'sub-sections like "results".',
@@ -172,7 +172,7 @@ class NormalizedSearchSettings(BaseModel):
     )
 
     @staticmethod
-    def build_archive_required(required: list[Required] | None) -> str | dict[str, Any]:
+    def build_archive_required(required: list[Required]) -> str | dict[str, Any]:
         """Convert archive paths to a RequiredReader specification."""
         if not required:
             return '*'
