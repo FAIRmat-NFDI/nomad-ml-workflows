@@ -1,8 +1,49 @@
 from nomad_ml_workflows.actions.export_entries.models import (
     Exclude,
+    ExportEntriesUserInput,
     Include,
     NormalizedSearchSettings,
 )
+
+
+def test_user_input():
+    entry_limit = 25
+    user_input = ExportEntriesUserInput.model_validate(
+        {
+            'user_id': 'user-id',
+            'upload_id': 'project-id',
+            'search_settings': {
+                'owner': 'public',
+                'max_entries': entry_limit,
+                'query': '{\n  "entry_type": "ELNSample"\n}',
+                'required': [
+                    {
+                        'type': 'include',
+                        'path': 'results',
+                        'resolve_references': False,
+                    }
+                ],
+            },
+            'export_settings': {
+                'file_format': 'csv',
+                'create_zip_archive': False,
+            },
+        }
+    )
+
+    assert user_input.search_settings.owner == 'public'
+    assert user_input.search_settings.max_entries == entry_limit
+    assert user_input.search_settings.required == [
+        Include(type='include', path='results', resolve_references=False)
+    ]
+    assert user_input.export_settings.file_format == 'csv'
+    assert user_input.export_settings.create_zip_archive is False
+
+    normalized = NormalizedSearchSettings.from_user_input(user_input)
+    assert normalized.owner == 'public'
+    assert normalized.query == {'entry_type': 'ELNSample'}
+    assert normalized.num_entries_user_limit == entry_limit
+    assert normalized.required == {'results': 'include'}
 
 
 def test_build_archive_required_returns_wildcard_for_empty_paths():
