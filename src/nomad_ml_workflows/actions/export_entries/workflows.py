@@ -98,7 +98,7 @@ class ExportEntriesWorkflow:
             source_paths=[],
             metadata=ExportDatasetMetadata(
                 user_input=data,
-                nomad_deployment_url=nomad_config.services.api_url(),
+                nomad_deployment_api_host=nomad_config.services.api_host,
                 nomad_version=nomad_config.meta.version,
                 nomad_ml_workflows_version=nomad_ml_workflows_version,
             ),  # type: ignore

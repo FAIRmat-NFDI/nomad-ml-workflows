@@ -384,17 +384,17 @@ class ExportDatasetMetadata(BaseModel):
         '',
         description='UTC Timestamp (ISO) when the search for entries ended.',
     )
-    nomad_deployment_url: str = Field(
+    nomad_deployment_api_host: str = Field(
         '',
-        description='URL of the NOMAD deployment running this workflow.',
+        description=('API host of the NOMAD deployment that ran this workflow.'),
     )
     nomad_version: str = Field(
         '',
-        description='Version of nomad-lab package available on the server running this workflow.',
+        description='Version of nomad-lab package available on the server that ran this workflow.',
     )
     nomad_ml_workflows_version: str = Field(
         '',
-        description='Version of nomad-ml-workflows package available on the server running this workflow.',
+        description='Version of nomad-ml-workflows package available on the server that ran this workflow.',
     )
     user_input: ExportEntriesUserInput | None = Field(
         None, description='Original user input for the export entries workflow.'
