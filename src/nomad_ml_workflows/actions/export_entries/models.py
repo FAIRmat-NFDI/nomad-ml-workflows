@@ -128,13 +128,10 @@ class SearchSettings(BaseModel):
         gt=0,
         le=config.max_entries_export_limit,  # type: ignore
         title='Maximum entries',
-        description='Export at most this many matching entries.',
-        json_schema_extra={
-            'ui:description': (
-                'Export at most this many matching entries. The deployment limit is '
-                f'{config.max_entries_export_limit}.'  # type: ignore
-            ),
-        },
+        description=(
+            'Export at most this many matching entries. The deployment limit is '
+            f'{config.max_entries_export_limit}.'  # type: ignore
+        ),
     )
     query: str = Field(
         ...,
@@ -144,10 +141,8 @@ class SearchSettings(BaseModel):
             'uiSchema': {
                 'ui:widget': 'textarea',
                 'ui:placeholder': '{\n  "entry_type": "ELNSample"\n}',
-                'ui:description': '',
                 'ui:help': (
-                    'NOMAD search query written as a JSON object. '
-                    'You can copy the `query` object from the **View API Call** '
+                    'You can also copy the query from the **View API Call** '
                     'dialog in a NOMAD search app.'
                 ),
                 'ui:options': {'rows': 5, 'enableMarkdownInHelp': True},
