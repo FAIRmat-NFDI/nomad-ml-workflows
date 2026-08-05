@@ -7,6 +7,7 @@ from temporalio.exceptions import ApplicationError
 with workflow.unsafe.imports_passed_through():
     from nomad.config import config as nomad_config
 
+    from nomad_ml_workflows import __version__ as nomad_ml_workflows_version
     from nomad_ml_workflows.actions.export_entries.activities import (
         cleanup_artifacts,
         create_artifact_subdirectory,
@@ -95,7 +96,12 @@ class ExportEntriesWorkflow:
             ),
             zip_output=data.export_settings.create_zip_archive,
             source_paths=[],
-            metadata=ExportDatasetMetadata(user_input=data),  # type: ignore
+            metadata=ExportDatasetMetadata(
+                user_input=data,
+                nomad_deployment_url=nomad_config.meta.deployment_url,
+                nomad_version=nomad_config.meta.version,
+                nomad_ml_workflows_version=nomad_ml_workflows_version,
+            ),  # type: ignore
         )
 
         try:

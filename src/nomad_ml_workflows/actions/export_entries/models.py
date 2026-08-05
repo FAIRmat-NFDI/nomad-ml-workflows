@@ -394,6 +394,18 @@ class ExportDatasetMetadata(BaseModel):
         '',
         description='UTC Timestamp (ISO) when the search for entries ended.',
     )
+    nomad_deployment_url: str = Field(
+        '',
+        description='URL of the NOMAD deployment running this workflow.',
+    )
+    nomad_version: str = Field(
+        '',
+        description='Version of nomad-lab package available on the server running this workflow.',
+    )
+    nomad_ml_workflows_version: str = Field(
+        '',
+        description='Version of nomad-ml-workflows package available on the server running this workflow.',
+    )
     user_input: ExportEntriesUserInput | None = Field(
         None, description='Original user input for the export entries workflow.'
     )
