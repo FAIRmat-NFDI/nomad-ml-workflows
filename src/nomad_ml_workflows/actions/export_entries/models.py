@@ -25,17 +25,11 @@ class Include(BaseModel):
         ...,
         title='Archive path',
         description='Dot-separated path to an archive quantity or section for inclusion.',
-        json_schema_extra={
-            'ui:placeholder': 'results.method.method_name',
-        },
     )
     resolve_references: bool = Field(
         False,
         title='Resolve references',
         description='Include data reached through references below this path.',
-        json_schema_extra={
-            'ui:help': 'Include data reached through references below this path.',
-        },
     )
 
 
@@ -45,9 +39,6 @@ class Exclude(BaseModel):
         ...,
         title='Archive path',
         description='Dot-separated path to an archive quantity or section for exclusion.',
-        json_schema_extra={
-            'ui:placeholder': 'metadata.search_quantities',
-        },
     )
 
 
@@ -167,13 +158,17 @@ class SearchSettings(BaseModel):
         default_factory=list,
         title='Archive required paths',
         description=(
-            'Include or exclude the exported archive content using quantity or section paths. '
+            'Customize the exported archive content using quantity or section paths. '
             'Leave this empty to export the complete archive.'
         ),
         json_schema_extra={
             'uiSchema': {
                 'items': {
                     'type': {'ui:widget': 'hidden'},
+                    'path': {'ui:placeholder': 'results.method.method_name'},
+                    'resolve_references': {
+                        'ui:help': 'Include data reached through references below this path.',
+                    },
                 },
             },
         },
