@@ -29,7 +29,6 @@ class ExportEntriesActionEntryPoint(ActionEntryPoint):
 
         from nomad_ml_workflows.actions.export_entries.activities import (
             cleanup_artifacts,
-            create_artifact_subdirectory,
             export_dataset_to_upload,
             prepare_manifest,
             read_archives_and_write_output_json,
@@ -45,7 +44,6 @@ class ExportEntriesActionEntryPoint(ActionEntryPoint):
             workflow=ExportEntriesWorkflow,
             child_workflows=[ReadArchivesWorkflow],
             activities=[
-                create_artifact_subdirectory,
                 prepare_manifest,
                 read_archives_and_write_output_json,
                 read_archives_and_write_output_tabular,

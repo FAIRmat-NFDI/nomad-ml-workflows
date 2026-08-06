@@ -10,7 +10,6 @@ with workflow.unsafe.imports_passed_through():
     from nomad_ml_workflows import __version__ as nomad_ml_workflows_version
     from nomad_ml_workflows.actions.export_entries.activities import (
         cleanup_artifacts,
-        create_artifact_subdirectory,
         export_dataset_to_upload,
         prepare_manifest,
         read_archives_and_write_output_json,
@@ -18,7 +17,6 @@ with workflow.unsafe.imports_passed_through():
     )
     from nomad_ml_workflows.actions.export_entries.models import (
         CleanupArtifactsInput,
-        CreateArtifactSubdirectoryInput,
         ExportDatasetInput,
         ExportDatasetMetadata,
         ExportEntriesOutput,
@@ -51,8 +49,7 @@ class ReadArchivesWorkflow:
                 start_to_close_timeout=timedelta(seconds=config.read_archives_timeout),  # type: ignore
                 retry_policy=retry_policy,
             )
-
-        if data.output_file_format in ['parquet', 'csv']:
+        else:
             return await workflow.execute_activity(
                 read_archives_and_write_output_tabular,
                 data,
@@ -81,16 +78,10 @@ class ExportEntriesWorkflow:
         """
         starttime = workflow.time()
         retry_policy = RetryPolicy(maximum_attempts=1)
-        artifact_subdirectory = await workflow.execute_activity(
-            create_artifact_subdirectory,
-            CreateArtifactSubdirectoryInput(subdir_name=workflow.info().workflow_id),
-            start_to_close_timeout=timedelta(minutes=10),
-            retry_policy=retry_policy,
-        )
         export_dataset_input = ExportDatasetInput(
+            export_entries_workflow_id=workflow.info().workflow_id,
             user_id=data.user_id,
             upload_id=data.upload_id,
-            artifact_subdirectory=artifact_subdirectory,
             exportable_dir_name=(
                 f'export_entries_{workflow.info().start_time.isoformat()}'
             ),
@@ -107,15 +98,14 @@ class ExportEntriesWorkflow:
         try:
             search_settings = NormalizedSearchSettings.from_user_input(data)
 
-            manifest_file_path = f'{artifact_subdirectory}/selected_entries.json'
             manifest_output = await workflow.execute_activity(
                 prepare_manifest,
                 PrepareManifestInput(
+                    export_entries_workflow_id=workflow.info().workflow_id,
                     user_id=search_settings.user_id,
                     owner=search_settings.owner,
                     query=search_settings.query,
                     num_entries_user_limit=search_settings.num_entries_user_limit,  # type: ignore
-                    manifest_file_path=manifest_file_path,
                 ),
                 start_to_close_timeout=timedelta(hours=2),
                 retry_policy=retry_policy,
@@ -136,16 +126,17 @@ class ExportEntriesWorkflow:
             export_dataset_input.metadata.reached_max_entries_limit = (
                 manifest_output.reached_max_entries_limit
             )
-            export_dataset_input.source_paths = [manifest_file_path]
+            export_dataset_input.source_paths = [
+                manifest_output.manifest_file.file_path
+            ]
 
             if manifest_output.num_entries_selected > 0:
                 output_file: OutputFile = await workflow.execute_child_workflow(
                     ReadArchivesWorkflow.run,
                     ReadArchivesWorkflowInput(
+                        export_entries_workflow_id=workflow.info().workflow_id,
                         user_id=data.user_id,
                         output_file_format=data.export_settings.file_format,
-                        manifest_file_path=manifest_file_path,
-                        artifact_subdirectory=artifact_subdirectory,
                         required=search_settings.required,
                     ),
                     id=f'{workflow.info().workflow_id}-read-archives-and-write-file',
@@ -156,7 +147,7 @@ class ExportEntriesWorkflow:
                     output_file.num_entries_exported
                 )
                 export_dataset_input.source_paths = [
-                    manifest_file_path,
+                    manifest_output.manifest_file.file_path,
                     output_file.file_path,
                 ]
 
@@ -179,7 +170,9 @@ class ExportEntriesWorkflow:
 
             await workflow.execute_activity(
                 cleanup_artifacts,
-                CleanupArtifactsInput(subdir_path=artifact_subdirectory),
+                CleanupArtifactsInput(
+                    export_entries_workflow_id=workflow.info().workflow_id
+                ),
                 start_to_close_timeout=timedelta(hours=2),
                 retry_policy=retry_policy,
             )
@@ -189,4 +182,4 @@ class ExportEntriesWorkflow:
                 workflow_duration=round(workflow.time() - starttime, 6),
             )
 
-        return output
+            return output

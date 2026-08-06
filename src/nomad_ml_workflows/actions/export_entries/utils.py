@@ -4,7 +4,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from nomad.app.v1.models.models import User
 from nomad.archive.required import RequiredReader
@@ -23,6 +23,10 @@ except ImportError as e:
     raise ImportError(
         'pyarrow is required. Install with: pip install nomad-ml-workflows[cpu-action]'
     ) from e
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
 
 IGNORED_KEYS = ['m_def', 'm_def_id', 'm_ref_archives']
 
@@ -505,7 +509,7 @@ def generate_table_rows(
             )
 
 
-def write_dicts_to_json(items: Iterable[dict], output_file_path: str) -> int:
+def write_dicts_to_json(items: Iterable[dict], output_file_path: 'Path') -> int:
     first_item = True
     count = 0
 
@@ -528,10 +532,10 @@ def write_table_rows_to_ndjson(
     manifest: list[ManifestEntry],
     required: str | dict[str, Any],
     user_id: str,
-    output_file_path: str,
+    output_file_path: 'Path',
     logger=None,
 ) -> dict[str, Quantity]:
-    if not output_file_path.endswith('.ndjson'):
+    if not output_file_path.suffix == '.ndjson':
         raise ValueError('ouput_file_path should have .ndjson extension.')
     columns_quantity_def: dict[str, Quantity] = {}
 
@@ -552,15 +556,15 @@ def write_table_rows_to_ndjson(
     return columns_quantity_def
 
 
-def _tabular_output_file_format(output_file_path: str) -> str:
-    output_file_format = output_file_path.rpartition('.')[2]
+def _tabular_output_file_format(output_file_path: 'Path') -> str:
+    output_file_format = output_file_path.suffix.lstrip('.')
     if output_file_format not in {'parquet', 'csv'}:
         raise ValueError('Unsupported output file format. Please use parquet or csv.')
     return output_file_format
 
 
 def _create_tabular_writer(
-    output_file_path: str,
+    output_file_path: 'Path',
     output_file_format: str,
     schema: pa.Schema,
 ):
@@ -584,8 +588,8 @@ def _write_tabular_table(writer, table: pa.Table, output_file_format: str) -> No
 
 
 def write_table_rows_to_tabular_file(
-    table_rows_file_path: str,
-    output_file_path: str,
+    table_rows_file_path: 'Path',
+    output_file_path: 'Path',
     columns_quantity_def: dict[str, Quantity],
     max_buffer_bytes: int = 4 * 1024 * 1024,
     logger=None,
