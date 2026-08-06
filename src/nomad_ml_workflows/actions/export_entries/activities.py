@@ -123,6 +123,9 @@ def read_archives_and_write_output_json(
     )
     manifest_file_path = artifacts_subdirectory / f'{MANIFEST_FILE_NAME}.json'
     output_file_path = artifacts_subdirectory / f'{DATA_FILE_NAME}.json'
+    temporary_output_file_path = output_file_path.with_stem(
+        f'{output_file_path.stem}.tmp'
+    )
 
     # load manifest
     with open(manifest_file_path, encoding='utf-8') as f:
@@ -132,7 +135,8 @@ def read_archives_and_write_output_json(
     activity_logger = logger.bind(activity_type=info.activity_type)
 
     archives = generate_archives(manifest, data.required, data.user_id, activity_logger)
-    num_entries_exported = write_dicts_to_json(archives, output_file_path)
+    num_entries_exported = write_dicts_to_json(archives, temporary_output_file_path)
+    temporary_output_file_path.replace(output_file_path)
 
     return OutputFile(
         file_path=output_file_path.as_posix(),
@@ -153,6 +157,9 @@ def _read_archives_and_write_output_tabular(
     output_file_path = (
         artifacts_subdirectory / f'{DATA_FILE_NAME}.{data.output_file_format}'
     )
+    temporary_output_file_path = output_file_path.with_stem(
+        f'{output_file_path.stem}.tmp'
+    )
 
     # load manifest
     with open(manifest_file_path, encoding='utf-8') as f:
@@ -165,11 +172,12 @@ def _read_archives_and_write_output_tabular(
     activity_logger.info('Writing table rows to tabular file...')
     num_entries_exported = write_table_rows_to_tabular_file(
         table_rows_file_path,
-        output_file_path,
+        temporary_output_file_path,
         columns_quantity_def,
         max_buffer_bytes=config.max_write_buffer_size_bytes,  # type: ignore
         logger=activity_logger,
     )
+    temporary_output_file_path.replace(output_file_path)
     activity_logger.info(
         f'{num_entries_exported} table rows written to '
         f'"data.{data.output_file_format}" file.'
