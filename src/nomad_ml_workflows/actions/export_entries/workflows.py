@@ -14,6 +14,7 @@ with workflow.unsafe.imports_passed_through():
         prepare_manifest,
         read_archives_and_write_output_json,
         read_archives_and_write_output_tabular,
+        write_metadata_file,
     )
     from nomad_ml_workflows.actions.export_entries.models import (
         CleanupArtifactsInput,
@@ -21,10 +22,13 @@ with workflow.unsafe.imports_passed_through():
         ExportDatasetMetadata,
         ExportEntriesOutput,
         ExportEntriesUserInput,
+        ExtractEntriesWorkflowInput,
+        ExtractEntriesWorkflowOutput,
         NormalizedSearchSettings,
         OutputFile,
         PrepareManifestInput,
         ReadArchivesWorkflowInput,
+        WriteMetadataFileInput,
     )
 
 config = nomad_config.get_plugin_entry_point(
@@ -59,127 +63,143 @@ class ReadArchivesWorkflow:
 
 
 @workflow.defn
-class ExportEntriesWorkflow:
+class ExtractEntriesWorkflow:
     @workflow.run
-    async def run(self, data: ExportEntriesUserInput) -> ExportEntriesOutput:
+    async def run(
+        self, data: ExtractEntriesWorkflowInput
+    ) -> ExtractEntriesWorkflowOutput:
         """
-        Workflow to search entries and export them into a datafile in the specified
-        upload.
-
-        All search pages are fetched in parallel using child workflows. A lightweight
-        cursor-collection activity first walks the pagination to determine the
-        page_after_value for every page, then one SearchPageWorkflow child workflow
-        is launched per page and all are awaited concurrently.
-
-        Args:
-            data (ExportEntriesUserInput): Input data for the export entries workflow.
-        Returns:
-            str: Path to the saved dataset in the upload's `raw` folder.
+        Find matching entries and write their archives to action artifact subdirectory.
         """
-        starttime = workflow.time()
         retry_policy = RetryPolicy(maximum_attempts=1)
-        export_dataset_input = ExportDatasetInput(
-            export_entries_workflow_id=workflow.info().workflow_id,
-            user_id=data.user_id,
-            upload_id=data.upload_id,
-            exportable_dir_name=(
-                f'export_entries_{workflow.info().start_time.isoformat()}'
-            ),
-            zip_output=data.export_settings.create_zip_archive,
-            source_paths=[],
-            metadata=ExportDatasetMetadata(
-                user_input=data,
-                nomad_deployment_api_host=nomad_config.services.api_host,
-                nomad_version=nomad_config.meta.version,
-                nomad_ml_workflows_version=nomad_ml_workflows_version,
-            ),  # type: ignore
-        )
+        user_input = data.user_input
+        metadata = ExportDatasetMetadata(
+            user_input=user_input,
+            nomad_deployment_api_host=nomad_config.services.api_host,
+            nomad_version=nomad_config.meta.version,
+            nomad_ml_workflows_version=nomad_ml_workflows_version,
+        )  # type: ignore
+        workflow_output = ExtractEntriesWorkflowOutput()  # type: ignore
 
         try:
-            search_settings = NormalizedSearchSettings.from_user_input(data)
+            search_settings = NormalizedSearchSettings.from_user_input(user_input)
 
             manifest_output = await workflow.execute_activity(
                 prepare_manifest,
                 PrepareManifestInput(
-                    export_entries_workflow_id=workflow.info().workflow_id,
+                    export_entries_workflow_id=data.export_entries_workflow_id,
                     user_id=search_settings.user_id,
                     owner=search_settings.owner,
                     query=search_settings.query,
-                    num_entries_user_limit=search_settings.num_entries_user_limit,  # type: ignore
+                    num_entries_user_limit=search_settings.num_entries_user_limit,
                 ),
                 start_to_close_timeout=timedelta(hours=2),
                 retry_policy=retry_policy,
             )
+            workflow_output.manifest_file_path = manifest_output.manifest_file.file_path
 
-            export_dataset_input.metadata.num_entries_available = (
-                manifest_output.num_entries_available
-            )
-            export_dataset_input.metadata.num_entries_selected = (
-                manifest_output.num_entries_selected
-            )
-            export_dataset_input.metadata.search_start_time = (
-                manifest_output.search_start_time
-            )
-            export_dataset_input.metadata.search_end_time = (
-                manifest_output.search_end_time
-            )
-            export_dataset_input.metadata.reached_max_entries_limit = (
+            metadata.num_entries_available = manifest_output.num_entries_available
+            metadata.num_entries_selected = manifest_output.num_entries_selected
+            metadata.reached_max_entries_limit = (
                 manifest_output.reached_max_entries_limit
             )
-            export_dataset_input.source_paths = [
-                manifest_output.manifest_file.file_path
-            ]
+            metadata.search_start_time = manifest_output.search_start_time
+            metadata.search_end_time = manifest_output.search_end_time
 
             if manifest_output.num_entries_selected > 0:
                 output_file: OutputFile = await workflow.execute_child_workflow(
                     ReadArchivesWorkflow.run,
                     ReadArchivesWorkflowInput(
-                        export_entries_workflow_id=workflow.info().workflow_id,
-                        user_id=data.user_id,
-                        output_file_format=data.export_settings.file_format,
+                        export_entries_workflow_id=data.export_entries_workflow_id,
+                        user_id=user_input.user_id,
+                        output_file_format=user_input.export_settings.file_format,
                         required=search_settings.required,
                     ),
                     id=f'{workflow.info().workflow_id}-read-archives-and-write-file',
                     parent_close_policy=workflow.ParentClosePolicy.TERMINATE,
                     retry_policy=retry_policy,
                 )
-                export_dataset_input.metadata.num_entries_exported = (
-                    output_file.num_entries_exported
-                )
-                export_dataset_input.source_paths = [
-                    manifest_output.manifest_file.file_path,
-                    output_file.file_path,
-                ]
+                metadata.num_entries_exported = output_file.num_entries_exported
+                workflow_output.data_file_path = output_file.file_path
 
         except Exception as e:
-            # Capture error info to include in metadata
+            # Add error info to metadata and re-raise
             import traceback
 
-            export_dataset_input.metadata.error_info = traceback.format_exc()
+            metadata.error_info = traceback.format_exc()
+
             raise ApplicationError(
-                'Encountered an error during export entries workflow.',
+                'Encountered an error during reading archives and writing data file.',
             ) from e
 
         finally:
-            exported_dir_path = await workflow.execute_activity(
-                export_dataset_to_upload,
-                export_dataset_input,
+            metadata_file = await workflow.execute_activity(
+                write_metadata_file,
+                WriteMetadataFileInput(
+                    export_entries_workflow_id=data.export_entries_workflow_id,
+                    metadata=metadata,
+                ),
                 start_to_close_timeout=timedelta(hours=2),
                 retry_policy=retry_policy,
             )
+            workflow_output.metadata_file_path = metadata_file.file_path
 
-            await workflow.execute_activity(
-                cleanup_artifacts,
-                CleanupArtifactsInput(
-                    export_entries_workflow_id=workflow.info().workflow_id
+        return workflow_output
+
+
+@workflow.defn
+class ExportEntriesWorkflow:
+    @workflow.run
+    async def run(self, data: ExportEntriesUserInput) -> ExportEntriesOutput:
+        """
+        Extract matching entries and export the generated files to an upload.
+        """
+        starttime = workflow.time()
+        retry_policy = RetryPolicy(maximum_attempts=1)
+
+        try:
+            await workflow.execute_child_workflow(
+                ExtractEntriesWorkflow.run,
+                ExtractEntriesWorkflowInput(
+                    export_entries_workflow_id=workflow.info().workflow_id,
+                    user_input=data,
+                ),
+                id=f'{workflow.info().workflow_id}-extract-entries',
+                parent_close_policy=workflow.ParentClosePolicy.TERMINATE,
+                retry_policy=retry_policy,
+            )
+        except Exception as e:
+            raise ApplicationError(
+                'Encountered an error during extract entries workflow.',
+            ) from e
+        finally:
+            # Always export artifacts once extraction workflow is triggered
+            exported_dir_path = await workflow.execute_activity(
+                export_dataset_to_upload,
+                ExportDatasetInput(
+                    export_entries_workflow_id=workflow.info().workflow_id,
+                    user_id=data.user_id,
+                    upload_id=data.upload_id,
+                    exportable_dir_name=(
+                        f'export_entries_{workflow.info().start_time.isoformat()}'
+                    ),
+                    zip_output=data.export_settings.create_zip_archive,
                 ),
                 start_to_close_timeout=timedelta(hours=2),
                 retry_policy=retry_policy,
             )
 
-            output = ExportEntriesOutput(
-                exported_dir_path=exported_dir_path,
-                workflow_duration=round(workflow.time() - starttime, 6),
-            )
+        # Cleanup artifacts only if extraction workflow succeeded
+        await workflow.execute_activity(
+            cleanup_artifacts,
+            CleanupArtifactsInput(
+                export_entries_workflow_id=workflow.info().workflow_id
+            ),
+            start_to_close_timeout=timedelta(hours=2),
+            retry_policy=retry_policy,
+        )
 
-        return output
+        return ExportEntriesOutput(
+            exported_dir_path=exported_dir_path,
+            workflow_duration=round(workflow.time() - starttime, 6),
+        )
