@@ -302,6 +302,16 @@ async def cleanup_artifacts(data: CleanupArtifactsInput) -> None:
     Args:
         data (CleanupArtifactsInput): Input data for cleaning up artifacts.
     """
+    activity_logger = None
+    try:
+        info = activity.info()
+        activity_logger = logger.bind(activity_type=info.activity_type)
+        artifact_subdirectory = Path(
+            action_instance_artifacts_dir(data.export_entries_workflow_id)
+        )
+        if os.path.exists(artifact_subdirectory):
+            shutil.rmtree(artifact_subdirectory)
 
-    if os.path.exists(data.subdir_path):
-        shutil.rmtree(data.subdir_path)
+    except Exception as e:
+        if activity_logger is not None:
+            activity_logger.error('error cleaning up artifacts', exc_info=e)
