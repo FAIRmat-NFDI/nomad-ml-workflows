@@ -258,12 +258,12 @@ def test_write_table_rows_to_tabular_file_uses_normalized_schema(
     ]
     monkeypatch.setattr(utils, 'generate_table_rows', lambda *_: iter(table_rows))
     columns_quantity_def = utils.write_table_rows_to_ndjson(
-        [], {}, 'user_id', str(rows_path)
+        [], {}, 'user_id', rows_path
     )
 
     count = utils.write_table_rows_to_tabular_file(
-        str(rows_path),
-        str(output_path),
+        rows_path,
+        output_path,
         columns_quantity_def,
     )
 
@@ -292,7 +292,7 @@ def test_write_table_rows_to_ndjson_accepts_repeated_quantity_definition(
     ]
     monkeypatch.setattr(utils, 'generate_table_rows', lambda *_: iter(table_rows))
 
-    result = utils.write_table_rows_to_ndjson([], {}, 'user_id', str(output_path))
+    result = utils.write_table_rows_to_ndjson([], {}, 'user_id', output_path)
 
     assert result == {'value': quantity_def}
     assert output_path.read_text(encoding='utf-8') == (
@@ -311,8 +311,8 @@ def test_write_table_rows_to_tabular_file_reads_ndjson(tmp_path):
     )
 
     count = utils.write_table_rows_to_tabular_file(
-        str(rows_path),
-        str(output_path),
+        rows_path,
+        output_path,
         {'value': quantity_def},
     )
 
