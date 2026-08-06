@@ -210,6 +210,25 @@ class CreateArtifactSubdirectoryInput(BaseModel):
     subdir_name: str = Field(..., description='Name of the subdirectory to be created.')
 
 
+class ExtractEntriesWorkflowInput(BaseModel):
+    export_entries_workflow_id: str = Field(
+        ..., description='ID of the export entries workflow.'
+    )
+    user_input: ExportEntriesUserInput = Field(
+        ..., description='Original user input for the export entries workflow.'
+    )
+
+
+class ExtractEntriesWorkflowOutput(BaseModel):
+    metadata_file_path: str = Field(
+        '', description='Path to the generated metadata file.'
+    )
+    data_file_path: str = Field('', description='Path to the generated data file.')
+    manifest_file_path: str = Field(
+        '', description='Path to the generated manifest file.'
+    )
+
+
 class NormalizedSearchSettings(BaseModel):
     user_id: str = Field(..., description='User ID performing the search.')
     owner: OwnerLiteral = Field(..., description='Owner of the entries to be searched.')
