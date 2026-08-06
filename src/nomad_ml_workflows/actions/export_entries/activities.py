@@ -258,7 +258,9 @@ async def export_dataset_to_upload(data: ExportDatasetInput) -> str:
         'data': data.metadata.model_dump(),
         'schema': data.metadata.model_json_schema(),
     }
-    metadata_path = os.path.join(data.artifact_subdirectory, 'metadata.json')
+    metadata_path = artifact_subdirectory.with_name(METADATA_FILE_NAME).with_suffix(
+        '.json'
+    )
     with open(metadata_path, 'w', encoding='utf-8') as metafile:
         json.dump(metadata_dict, metafile, indent=4)
 
