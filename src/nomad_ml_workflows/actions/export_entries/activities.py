@@ -89,12 +89,10 @@ def prepare_manifest(data: PrepareManifestInput) -> PrepareManifestOutput:
     manifest = manifest[:max_num_entries_limit]
     num_entries_selected = len(manifest)
 
-    artifact_subdirectory = action_instance_artifacts_dir(
-        data.export_entries_workflow_id
+    artifacts_subdirectory = Path(
+        action_instance_artifacts_dir(data.export_entries_workflow_id)
     )
-    manifest_file_path = (
-        Path(artifact_subdirectory).with_name(MANIFEST_FILE_NAME).with_suffix('.json')
-    )
+    manifest_file_path = artifacts_subdirectory / f'{MANIFEST_FILE_NAME}.json'
     write_dicts_to_json(manifest, manifest_file_path)
 
     manifest_file = ManifestFile(
@@ -119,15 +117,11 @@ def read_archives_and_write_output_json(
     """
     Reads the archives and writes the output JSON file.
     """
-    artifact_subdirectory = action_instance_artifacts_dir(
-        data.export_entries_workflow_id
+    artifacts_subdirectory = Path(
+        action_instance_artifacts_dir(data.export_entries_workflow_id)
     )
-    manifest_file_path = (
-        Path(artifact_subdirectory).with_name(MANIFEST_FILE_NAME).with_suffix('.json')
-    )
-    output_file_path = (
-        Path(artifact_subdirectory).with_name(DATA_FILE_NAME).with_suffix('.json')
-    )
+    manifest_file_path = artifacts_subdirectory / f'{MANIFEST_FILE_NAME}.json'
+    output_file_path = artifacts_subdirectory / f'{DATA_FILE_NAME}.json'
 
     # load manifest
     with open(manifest_file_path, encoding='utf-8') as f:
@@ -150,17 +144,13 @@ def _read_archives_and_write_output_tabular(
     data: ReadArchivesWorkflowInput, activity_type: str
 ) -> OutputFile:
     activity_logger = logger.bind(activity_type=activity_type)
-    artifact_subdirectory = Path(
+    artifacts_subdirectory = Path(
         action_instance_artifacts_dir(data.export_entries_workflow_id)
     )
-    manifest_file_path = artifact_subdirectory.with_name(
-        MANIFEST_FILE_NAME
-    ).with_suffix('.json')
-    table_rows_file_path = artifact_subdirectory.with_name(
-        'table_rows.tmp'
-    ).with_suffix('.ndjson')
-    output_file_path = artifact_subdirectory.with_name(DATA_FILE_NAME).with_suffix(
-        data.output_file_format
+    manifest_file_path = artifacts_subdirectory / f'{MANIFEST_FILE_NAME}.json'
+    table_rows_file_path = artifacts_subdirectory / 'table_rows.tmp.ndjson'
+    output_file_path = (
+        artifacts_subdirectory / f'{DATA_FILE_NAME}.{data.output_file_format}'
     )
 
     # load manifest
@@ -248,7 +238,7 @@ async def export_dataset_to_upload(data: ExportDatasetInput) -> str:
             f'Staging upload with ID {data.upload_id} for user {data.user_id} not found.'
         )
 
-    artifact_subdirectory = Path(
+    artifacts_subdirectory = Path(
         action_instance_artifacts_dir(data.export_entries_workflow_id)
     )
     # Create a metadata.json file in the artifact subdirectory
@@ -258,13 +248,11 @@ async def export_dataset_to_upload(data: ExportDatasetInput) -> str:
         'data': data.metadata.model_dump(),
         'schema': data.metadata.model_json_schema(),
     }
-    metadata_path = artifact_subdirectory.with_name(METADATA_FILE_NAME).with_suffix(
-        '.json'
-    )
+    metadata_path = artifacts_subdirectory / f'{METADATA_FILE_NAME}.json'
     with open(metadata_path, 'w', encoding='utf-8') as metafile:
         json.dump(metadata_dict, metafile, indent=4)
 
-    exportable_filepaths = [metadata_path]
+    exportable_filepaths = [metadata_path.as_posix()]
     if data.source_paths:
         exportable_filepaths.extend(data.source_paths)
 
@@ -272,9 +260,7 @@ async def export_dataset_to_upload(data: ExportDatasetInput) -> str:
 
     # Create a zip file containing all the source paths and the metadata file
     if data.zip_output:
-        zippath = artifact_subdirectory.with_name(exportable_dir_name).with_suffix(
-            '.zip'
-        )
+        zippath = artifacts_subdirectory / f'{exportable_dir_name}.zip'
         with zipfile.ZipFile(zippath, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
             for filepath in exportable_filepaths:
                 arcname = os.path.basename(filepath)
@@ -284,7 +270,7 @@ async def export_dataset_to_upload(data: ExportDatasetInput) -> str:
         return zippath.as_posix()
 
     # If not zipping, copy files to directory named exportable_dir_name
-    exportable_dir_path = artifact_subdirectory.with_name(exportable_dir_name)
+    exportable_dir_path = artifacts_subdirectory / exportable_dir_name
     os.mkdir(exportable_dir_path)
     for filepath in exportable_filepaths:
         temp_path = os.path.join(exportable_dir_path, os.path.basename(filepath))
@@ -308,12 +294,11 @@ async def cleanup_artifacts(data: CleanupArtifactsInput) -> None:
     try:
         info = activity.info()
         activity_logger = logger.bind(activity_type=info.activity_type)
-        artifact_subdirectory = Path(
+        artifacts_subdirectory = Path(
             action_instance_artifacts_dir(data.export_entries_workflow_id)
         )
-        if os.path.exists(artifact_subdirectory):
-            shutil.rmtree(artifact_subdirectory)
-
+        if os.path.exists(artifacts_subdirectory):
+            shutil.rmtree(artifacts_subdirectory)
     except Exception as e:
         if activity_logger is not None:
             activity_logger.error('error cleaning up artifacts', exc_info=e)
