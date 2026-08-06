@@ -33,6 +33,7 @@ class ExportEntriesActionEntryPoint(ActionEntryPoint):
             prepare_manifest,
             read_archives_and_write_output_json,
             read_archives_and_write_output_tabular,
+            write_metadata_file,
         )
         from nomad_ml_workflows.actions.export_entries.workflows import (
             ExportEntriesWorkflow,
@@ -50,6 +51,7 @@ class ExportEntriesActionEntryPoint(ActionEntryPoint):
                 read_archives_and_write_output_tabular,
                 export_dataset_to_upload,
                 cleanup_artifacts,
+                write_metadata_file,
             ],
         )
 
