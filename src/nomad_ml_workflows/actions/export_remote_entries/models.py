@@ -1,3 +1,7 @@
+"""
+Data models and schemas for Export Remote Entries workflows and activities.
+"""
+
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_serializer
@@ -9,6 +13,8 @@ from nomad_ml_workflows.actions.export_entries.models import (
 
 
 class S3StorageSettings(BaseModel):
+    """Configuration settings for S3-compatible remote object storage."""
+
     storage_type: Literal['s3'] = Field('s3', title='Storage Protocol')
     bucket: str = Field(..., title='Bucket Name', description='S3 bucket name.')
     prefix: str = Field(
@@ -49,7 +55,7 @@ class S3StorageSettings(BaseModel):
         return v.get_secret_value() if v else None
 
     def dump_redacted(self) -> dict[str, Any]:
-        """Return model dict with secret credentials masked with **********."""
+        """Return model dictionary with secret credentials masked as '**********'."""
         data = self.model_dump()
         for key in ('access_key_id', 'secret_access_key', 'session_token'):
             if data.get(key) is not None:
@@ -64,17 +70,65 @@ RemoteStorageSettings = Annotated[
 
 
 class ExportRemoteEntriesUserInput(BaseModel):
+    """User-provided parameters for the Export Remote Entries workflow."""
+
     model_config = ConfigDict(title='')
 
     user_id: str = Field(
         ..., description='Unique identifier for the user who initiated the workflow.'
     )
+    target_oases: list[str] = Field(
+        title='Target Oases',
+        description='Select target Oases for entry extraction.',
+        # json_schema_extra={
+        #     'enum': ['local'],
+        #     'uiSchema': {
+        #         'ui:widget': 'checkboxes',
+        #         'ui:enumNames': ['Local Oasis'],
+        #     },
+        # },
+    )
     search_settings: SearchSettings = Field(..., title='Search options')
     export_settings: ExportSettings = Field(..., title='Export options')
     storage_settings: RemoteStorageSettings = Field(..., title='Remote storage options')
 
+    @classmethod
+    def get_schema_for_entry_point(
+        cls, entry_point_config: Any
+    ) -> type['ExportRemoteEntriesUserInput']:
+        """Dynamically construct a subclass of ExportRemoteEntriesUserInput with
+        updated Pydantic field metadata (enum and uiSchema) reflecting configured
+        remote Nexus endpoints.
+        """
+        options = ['local']
+        labels = [getattr(entry_point_config, 'local_display_name', 'Local Oasis')]
+
+        nexus_endpoints = getattr(entry_point_config, 'nexus_endpoints', None)
+        if isinstance(nexus_endpoints, dict):
+            for key, ep in nexus_endpoints.items():
+                options.append(key)
+                labels.append(getattr(ep, 'display_name', key))
+
+        class DynamicExportRemoteEntriesUserInput(cls):  # type: ignore
+            target_oases: list[str] = Field(
+                default=['local'],
+                title='Target Oases',
+                description='Select target Oases for entry extraction.',
+                json_schema_extra={
+                    'enum': options,
+                    'uiSchema': {
+                        'ui:widget': 'checkboxes',
+                        'ui:enumNames': labels,
+                    },
+                },
+            )
+
+        return DynamicExportRemoteEntriesUserInput
+
 
 class ExportRemoteDatasetInput(BaseModel):
+    """Input parameters for uploading exported dataset files to remote storage."""
+
     export_entries_workflow_id: str = Field(
         ..., description='ID of the export entries workflow.'
     )
@@ -90,10 +144,32 @@ class ExportRemoteDatasetInput(BaseModel):
     )
 
 
+class OasisExecutionResult(BaseModel):
+    """Execution status and output summary for a target Oasis."""
+
+    target_key: str = Field(..., description='Key identifying the target Oasis.')
+    status: str = Field(..., description='Execution status (SUCCESS or FAILED).')
+    is_remote: bool = Field(..., description='Whether execution was remote via Nexus.')
+    num_entries_exported: int = Field(0, description='Number of entries exported.')
+    remote_uri: str | None = Field(None, description='Remote URI for uploaded dataset.')
+    error_message: str | None = Field(
+        None, description='Error message if execution failed.'
+    )
+
+
 class ExportRemoteEntriesOutput(BaseModel):
+    """Final summary output returned by the Export Remote Entries workflow."""
+
+    results: dict[str, OasisExecutionResult] = Field(
+        default_factory=dict,
+        description='Execution results per target Oasis.',
+    )
+    total_entries_exported: int = Field(
+        0, description='Total entries exported across all target Oases.'
+    )
     remote_uri: str = Field(
-        ...,
-        description='URI of the exported dataset on remote storage (e.g. s3://bucket/prefix/file.zip).',
+        '',
+        description='Primary URI of the exported dataset on remote storage (e.g. s3://bucket/prefix/file.zip).',
     )
     workflow_duration: float = Field(
         ...,

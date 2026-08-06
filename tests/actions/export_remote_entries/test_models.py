@@ -89,3 +89,29 @@ def test_export_remote_dataset_input_and_output():
     )
     assert output.remote_uri == 's3://b1/p1/export_entries_2026-08-06.zip'
     assert output.workflow_duration == 12.34
+
+
+def test_get_schema_for_entry_point():
+    class DummyEndpoint:
+        def __init__(self, display_name):
+            self.display_name = display_name
+
+    class DummyEntryPointConfig:
+        local_display_name = 'Local (Oasis A)'
+        nexus_endpoints = {
+            'oasis_b': DummyEndpoint('Oasis B (DESY)'),
+            'oasis_c': DummyEndpoint('Oasis C (HZB)'),
+        }
+
+    DynamicModel = ExportRemoteEntriesUserInput.get_schema_for_entry_point(
+        DummyEntryPointConfig()
+    )
+    schema = DynamicModel.model_json_schema()
+    target_oases_props = schema['properties']['target_oases']
+
+    assert target_oases_props['enum'] == ['local', 'oasis_b', 'oasis_c']
+    assert target_oases_props['uiSchema']['ui:enumNames'] == [
+        'Local (Oasis A)',
+        'Oasis B (DESY)',
+        'Oasis C (HZB)',
+    ]

@@ -1,12 +1,14 @@
+"""
+Temporal workflows for managing local and remote entry exports.
+"""
+
+import asyncio
 from datetime import timedelta
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
-from temporalio.exceptions import ApplicationError
 
 with workflow.unsafe.imports_passed_through():
-    from nomad.config import config as nomad_config
-
     from nomad_ml_workflows.actions.export_entries.activities import (
         cleanup_artifacts,
     )
@@ -25,72 +27,157 @@ with workflow.unsafe.imports_passed_through():
         ExportRemoteDatasetInput,
         ExportRemoteEntriesOutput,
         ExportRemoteEntriesUserInput,
+        OasisExecutionResult,
+    )
+    from nomad_ml_workflows.actions.export_remote_entries.nexus_contract import (
+        RemoteExtractInput,
+        RemoteExtractOutput,
     )
 
-config = nomad_config.get_plugin_entry_point(
-    'nomad_ml_workflows.actions:export_remote_entries'
-)
+def _select_primary_remote_uri(
+    results_dict: dict[str, OasisExecutionResult],
+    results_list: list[OasisExecutionResult],
+) -> str:
+    """Determine the primary remote URI from execution results."""
+    local_res = results_dict.get('local')
+    if local_res and local_res.remote_uri:
+        return local_res.remote_uri
+
+    for res in results_list:
+        if res.remote_uri:
+            return res.remote_uri
+
+    return ''
 
 
-@workflow.defn
-class ExportRemoteEntriesWorkflow:
-    @workflow.run
-    async def run(
-        self, data: ExportRemoteEntriesUserInput
-    ) -> ExportRemoteEntriesOutput:
-        """
-        Extract matching entries and export generated files to remote storage.
-        """
-        starttime = workflow.time()
-        retry_policy = RetryPolicy(maximum_attempts=1)
+async def _execute_local(
+    data: ExportRemoteEntriesUserInput, retry_policy: RetryPolicy
+) -> OasisExecutionResult:
+    """Execute entry extraction and storage upload locally."""
+    workflow_id = workflow.info().workflow_id
+    extract_user_input = ExportEntriesUserInput(
+        user_id=data.user_id,
+        upload_id='',
+        search_settings=data.search_settings,
+        export_settings=data.export_settings,
+    )
 
-        extract_user_input = ExportEntriesUserInput(
-            user_id=data.user_id,
-            upload_id='',
-            search_settings=data.search_settings,
-            export_settings=data.export_settings,
+    try:
+        await workflow.execute_child_workflow(
+            ExtractEntriesWorkflow.run,
+            ExtractEntriesWorkflowInput(
+                export_entries_workflow_id=workflow_id,
+                user_input=extract_user_input,
+            ),
+            id=f'{workflow_id}-extract-entries',
+            parent_close_policy=workflow.ParentClosePolicy.TERMINATE,
+            retry_policy=retry_policy,
         )
-
-        try:
-            await workflow.execute_child_workflow(
-                ExtractEntriesWorkflow.run,
-                ExtractEntriesWorkflowInput(
-                    export_entries_workflow_id=workflow.info().workflow_id,
-                    user_input=extract_user_input,
-                ),
-                id=f'{workflow.info().workflow_id}-extract-entries',
-                parent_close_policy=workflow.ParentClosePolicy.TERMINATE,
-                retry_policy=retry_policy,
-            )
-        except Exception as e:
-            raise ApplicationError(
-                'Encountered an error during extract entries workflow.',
-            ) from e
-        finally:
-            remote_uri = await workflow.execute_activity(
-                upload_dataset_to_remote_storage,
-                ExportRemoteDatasetInput(
-                    export_entries_workflow_id=workflow.info().workflow_id,
-                    storage_settings=data.storage_settings,
-                    exportable_dir_name=(
-                        f'export_entries_{workflow.info().start_time.isoformat()}'
-                    ),
-                    zip_output=data.export_settings.create_zip_archive,
-                ),
-                start_to_close_timeout=timedelta(hours=2),
-                retry_policy=retry_policy,
-            )
-
-        await workflow.execute_activity(
-            cleanup_artifacts,
-            CleanupArtifactsInput(
-                export_entries_workflow_id=workflow.info().workflow_id
+        timestamp_str = workflow.info().start_time.isoformat()
+        remote_uri = await workflow.execute_activity(
+            upload_dataset_to_remote_storage,
+            ExportRemoteDatasetInput(
+                export_entries_workflow_id=workflow_id,
+                storage_settings=data.storage_settings,
+                exportable_dir_name=f'export_entries_{timestamp_str}',
+                zip_output=data.export_settings.create_zip_archive,
             ),
             start_to_close_timeout=timedelta(hours=2),
             retry_policy=retry_policy,
         )
+        return OasisExecutionResult(
+            target_key='local',
+            status='SUCCESS',
+            is_remote=False,
+            remote_uri=remote_uri,
+        )
+    except Exception as exc:
+        workflow.logger.error(f'Local extraction failed: {exc}')
+        return OasisExecutionResult(
+            target_key='local',
+            status='FAILED',
+            is_remote=False,
+            error_message=str(exc),
+        )
+    finally:
+        await workflow.execute_activity(
+            cleanup_artifacts,
+            CleanupArtifactsInput(export_entries_workflow_id=workflow_id),
+            start_to_close_timeout=timedelta(hours=2),
+            retry_policy=retry_policy,
+        )
+
+
+async def _execute_remote_nexus(
+    target_key: str,
+    endpoint_name: str,
+    data: ExportRemoteEntriesUserInput,
+) -> OasisExecutionResult:
+    """Execute entry extraction on a remote Oasis via Temporal Nexus RPC."""
+    try:
+        nexus_client = workflow.create_nexus_client(
+            endpoint=endpoint_name,
+            service='ExportRemoteEntriesService',
+        )
+        nexus_result: RemoteExtractOutput = await nexus_client.execute_operation(
+            'export_remote_entries',
+            RemoteExtractInput(
+                user_id=data.user_id,
+                search_settings=data.search_settings,
+                export_settings=data.export_settings,
+                storage_settings=data.storage_settings,
+            ),
+            schedule_to_close_timeout=timedelta(hours=2),
+        )
+        return OasisExecutionResult(
+            target_key=target_key,
+            status=nexus_result.status,
+            is_remote=True,
+            num_entries_exported=nexus_result.num_entries_exported,
+            remote_uri=nexus_result.remote_uri,
+            error_message=nexus_result.error_message,
+        )
+    except Exception as exc:
+        workflow.logger.error(
+            f'Remote Nexus extraction for target "{target_key}" failed: {exc}'
+        )
+        raise
+
+
+@workflow.defn
+class ExportRemoteEntriesWorkflow:
+    """Workflow to coordinate dataset extraction across local and remote Oases."""
+
+    @workflow.run
+    async def run(
+        self, data: ExportRemoteEntriesUserInput
+    ) -> ExportRemoteEntriesOutput:
+        """Extract matching entries across target Oases (local and/or remote Nexus endpoints)."""
+        start_time = workflow.time()
+        retry_policy = RetryPolicy(maximum_attempts=1)
+
+        tasks = []
+        for target in data.target_oases:
+            if target == 'local':
+                tasks.append(_execute_local(data, retry_policy))
+            else:
+                tasks.append(
+                    _execute_remote_nexus(
+                        target_key=target,
+                        endpoint_name=target,
+                        data=data,
+                    )
+                )
+
+        results_list: list[OasisExecutionResult] = await asyncio.gather(*tasks)
+        results_dict = {res.target_key: res for res in results_list}
+        total_exported = sum(res.num_entries_exported for res in results_list)
+
+        primary_uri = _select_primary_remote_uri(results_dict, results_list)
 
         return ExportRemoteEntriesOutput(
-            remote_uri=remote_uri,
-            workflow_duration=round(workflow.time() - starttime, 6),
+            results=results_dict,
+            total_entries_exported=total_exported,
+            remote_uri=primary_uri,
+            workflow_duration=round(workflow.time() - start_time, 6),
         )
