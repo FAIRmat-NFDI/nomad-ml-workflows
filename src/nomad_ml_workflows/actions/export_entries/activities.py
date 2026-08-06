@@ -20,10 +20,12 @@ from nomad_ml_workflows.actions.export_entries.models import (
     ExportDatasetInput,
     ManifestEntry,
     ManifestFile,
+    MetadataFile,
     OutputFile,
     PrepareManifestInput,
     PrepareManifestOutput,
     ReadArchivesWorkflowInput,
+    WriteMetadataFileInput,
 )
 from nomad_ml_workflows.actions.export_entries.utils import (
     generate_archives,
@@ -207,15 +209,38 @@ def read_archives_and_write_output_tabular(
 
 
 @activity.defn
+async def write_metadata_file(data: WriteMetadataFileInput) -> MetadataFile:
+    """Create a metadata.json file in the artifact subdirectory"""
+    artifact_subdirectory = Path(
+        action_instance_artifacts_dir(data.export_entries_workflow_id)
+    )
+    metadata_file_path = artifact_subdirectory / f'{METADATA_FILE_NAME}.json'
+    metadata_dict = {
+        'note': 'This metadata file contains information about the exported dataset '
+        'and the conditions under which it was generated.',
+        'data': data.metadata.model_dump(),
+        'schema': data.metadata.model_json_schema(),
+    }
+    with open(metadata_file_path, 'w', encoding='utf-8') as metafile:
+        json.dump(metadata_dict, metafile, indent=2)
+
+    return MetadataFile(
+        file_path=metadata_file_path.as_posix(),
+        file_size=metadata_file_path.stat().st_size,
+    )
+
+
+@activity.defn
 async def export_dataset_to_upload(data: ExportDatasetInput) -> str:
     """
-    Activity to export the generated dataset files as a zip file to the specified
-    upload. A metadata file is also included in the zip.
+    Activity to export the generated dataset files to the specified upload.
+    Creates a ZIP archive if `data.zip_output` is `True`.
 
     Args:
         data (ExportDatasetInput): Input data for exporting the dataset to the upload.
     Returns:
-        str: Path to the saved zip file in the upload.
+        str: Relative path, within the upload raw directory, of the directory
+            containing the exported dataset.
     """
 
     def unique_filename(filename: str, upload_files: StagingUploadFiles) -> str:
@@ -242,23 +267,7 @@ async def export_dataset_to_upload(data: ExportDatasetInput) -> str:
     artifacts_subdirectory = Path(
         action_instance_artifacts_dir(data.export_entries_workflow_id)
     )
-    # Create a metadata.json file in the artifact subdirectory
-    metadata_dict = {
-        'note': 'This metadata file contains information about the exported dataset '
-        'and the conditions under which it was generated.',
-        'data': data.metadata.model_dump(),
-        'schema': data.metadata.model_json_schema(),
-    }
-    metadata_path = artifacts_subdirectory / f'{METADATA_FILE_NAME}.json'
-    with open(metadata_path, 'w', encoding='utf-8') as metafile:
-        json.dump(metadata_dict, metafile, indent=4)
-
-    exportable_filepaths = [metadata_path]
-    if data.source_paths:
-        exportable_filepaths.extend(
-            Path(source_path) for source_path in data.source_paths
-        )
-
+    exportable_filepaths = [Path(source_path) for source_path in data.source_paths]
     exportable_dir_name = unique_filename(data.exportable_dir_name, upload_files)
 
     # Create a zip file containing all the source paths and the metadata file

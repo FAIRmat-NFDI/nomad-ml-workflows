@@ -415,6 +415,21 @@ class ExportDatasetMetadata(BaseModel):
     )
 
 
+class WriteMetadataFileInput(BaseModel):
+    export_entries_workflow_id: str = Field(
+        ...,
+        description='ID of the export entries workflow.',
+    )
+    metadata: ExportDatasetMetadata = Field(
+        ..., description='Metadata to be written to the metadata file.'
+    )
+
+
+class MetadataFile(BaseModel):
+    file_path: str = Field(..., description='Path to the metadata file.')
+    file_size: int = Field(..., description='Size of the metadata file in bytes.')
+
+
 class ExportDatasetInput(BaseModel):
     export_entries_workflow_id: str = Field(
         ..., description='ID of the export entries workflow.'
@@ -436,9 +451,6 @@ class ExportDatasetInput(BaseModel):
     )
     source_paths: list[str] = Field(
         ..., description='Paths to the source files of the dataset.'
-    )
-    metadata: ExportDatasetMetadata = Field(
-        ..., description='Metadata associated with the exported dataset.'
     )
 
 
