@@ -161,6 +161,7 @@ class ExportEntriesWorkflow:
             ) from e
 
         finally:
+            # Always export artifacts once extraction workflow is triggered
             exported_dir_path = await workflow.execute_activity(
                 export_dataset_to_upload,
                 export_dataset_input,
@@ -168,18 +169,17 @@ class ExportEntriesWorkflow:
                 retry_policy=retry_policy,
             )
 
-            await workflow.execute_activity(
-                cleanup_artifacts,
-                CleanupArtifactsInput(
-                    export_entries_workflow_id=workflow.info().workflow_id
-                ),
-                start_to_close_timeout=timedelta(hours=2),
-                retry_policy=retry_policy,
-            )
+        # Cleanup artifacts only if extraction workflow succeeded
+        await workflow.execute_activity(
+            cleanup_artifacts,
+            CleanupArtifactsInput(
+                export_entries_workflow_id=workflow.info().workflow_id
+            ),
+            start_to_close_timeout=timedelta(hours=2),
+            retry_policy=retry_policy,
+        )
 
-            output = ExportEntriesOutput(
-                exported_dir_path=exported_dir_path,
-                workflow_duration=round(workflow.time() - starttime, 6),
-            )
-
-        return output
+        return ExportEntriesOutput(
+            exported_dir_path=exported_dir_path,
+            workflow_duration=round(workflow.time() - starttime, 6),
+        )
