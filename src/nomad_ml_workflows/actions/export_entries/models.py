@@ -304,13 +304,20 @@ class ManifestEntry(BaseModel):
 
 
 class PrepareManifestInput(BaseModel):
+    export_entries_workflow_id: str = Field(
+        ..., description='ID for the export entries workflow.'
+    )
     user_id: str = Field(..., description='User ID performing the search.')
     owner: OwnerLiteral = Field(..., description='Owner of the entries to be searched.')
     query: Query = Field(..., description='Search query parameters.')
     num_entries_user_limit: int = Field(
         ..., description='Number of entries requested by the user.'
     )
-    manifest_file_path: str = Field(..., description='Path to the manifest file.')
+
+
+class ManifestFile(BaseModel):
+    file_path: str = Field(..., description='Path to the manifest file.')
+    file_size: int = Field(..., description='Size of the manifest file in bytes.')
 
 
 class PrepareManifestOutput(BaseModel):
@@ -332,16 +339,18 @@ class PrepareManifestOutput(BaseModel):
         ...,
         description='Whether the number of matching entries exceeded the export limit.',
     )
+    manifest_file: ManifestFile = Field(
+        ..., description='Manifest file containing the list of entries to export.'
+    )
 
 
 class ReadArchivesWorkflowInput(BaseModel):
+    export_entries_workflow_id: str = Field(
+        ..., description='ID of the export entries workflow.'
+    )
     user_id: str = Field(..., description='User ID performing the search.')
     output_file_format: DataFileFormatLiteral = Field(
         ..., description='Output file format.'
-    )
-    manifest_file_path: str = Field(..., description='Path to the manifest file.')
-    artifact_subdirectory: str = Field(
-        ..., description="Subdirectory where current workflow's artifacts are stored."
     )
     required: str | dict[str, Any] = Field(
         '*',
@@ -407,15 +416,14 @@ class ExportDatasetMetadata(BaseModel):
 
 
 class ExportDatasetInput(BaseModel):
+    export_entries_workflow_id: str = Field(
+        ..., description='ID of the export entries workflow.'
+    )
     user_id: str = Field(
         ..., description='User ID performing the export dataset operation.'
     )
     upload_id: str = Field(
         ..., description='Upload ID associated with the export dataset operation.'
-    )
-    artifact_subdirectory: str = Field(
-        ...,
-        description='Subdirectory where the exported dataset zip file will be stored.',
     )
     zip_output: bool = Field(
         ...,
@@ -435,8 +443,8 @@ class ExportDatasetInput(BaseModel):
 
 
 class CleanupArtifactsInput(BaseModel):
-    subdir_path: str = Field(
-        ..., description='Path to the subdirectory to be cleaned up.'
+    export_entries_workflow_id: str = Field(
+        ..., description='ID of the export entries workflow.'
     )
 
 
