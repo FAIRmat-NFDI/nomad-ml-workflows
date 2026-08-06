@@ -236,8 +236,6 @@ async def export_dataset_to_upload(data: ExportDatasetInput) -> str:
     Activity to export the generated dataset files to the specified upload.
     Creates a ZIP archive if `data.zip_output` is `True`.
 
-    Args:
-        data (ExportDatasetInput): Input data for exporting the dataset to the upload.
     Returns:
         str: Relative path, within the upload raw directory, of the directory
             containing the exported dataset.
@@ -263,12 +261,22 @@ async def export_dataset_to_upload(data: ExportDatasetInput) -> str:
         raise ValueError(
             f'Staging upload with ID {data.upload_id} for user {data.user_id} not found.'
         )
+    exportable_dir_name = unique_filename(data.exportable_dir_name, upload_files)
 
     artifacts_subdirectory = Path(
         action_instance_artifacts_dir(data.export_entries_workflow_id)
     )
-    exportable_filepaths = [Path(source_path) for source_path in data.source_paths]
-    exportable_dir_name = unique_filename(data.exportable_dir_name, upload_files)
+
+    # Discover metadata, manifest, and data files in the artifacts subdirectory
+    export_order = (METADATA_FILE_NAME, MANIFEST_FILE_NAME, DATA_FILE_NAME)
+    files_by_stem = {
+        path.stem: path
+        for path in artifacts_subdirectory.iterdir()
+        if path.is_file() and path.stem in export_order
+    }
+    exportable_filepaths = [
+        files_by_stem[stem] for stem in export_order if stem in files_by_stem
+    ]
 
     # Create a zip file containing all the source paths and the metadata file
     if data.zip_output:

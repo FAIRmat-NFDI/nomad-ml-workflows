@@ -449,9 +449,6 @@ class ExportDatasetInput(BaseModel):
         description='Name of the directory containing the dataset that will be '
         'exported.',
     )
-    source_paths: list[str] = Field(
-        ..., description='Paths to the source files of the dataset.'
-    )
 
 
 class CleanupArtifactsInput(BaseModel):
