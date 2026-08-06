@@ -139,6 +139,7 @@ class ExtractEntriesWorkflow:
                     export_entries_workflow_id=data.export_entries_workflow_id,
                     metadata=metadata,
                 ),
+                start_to_close_timeout=timedelta(hours=2),
                 retry_policy=retry_policy,
             )
             workflow_output.metadata_file_path = metadata_file.file_path
