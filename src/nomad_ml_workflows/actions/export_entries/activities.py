@@ -1,6 +1,5 @@
 import json
 import multiprocessing
-import os
 import shutil
 import zipfile
 from concurrent.futures import ProcessPoolExecutor
@@ -224,10 +223,12 @@ async def export_dataset_to_upload(data: ExportDatasetInput) -> str:
         if not upload_files.raw_path_exists(filename):
             return filename
 
+        filename_path = Path(filename)
         count = 1
         while True:
-            name, ext = os.path.splitext(filename)
-            _filename = f'{name}({count}){ext}'
+            _filename = filename_path.with_name(
+                f'{filename_path.stem}({count}){filename_path.suffix}'
+            ).as_posix()
             if not upload_files.raw_path_exists(_filename):
                 return _filename
             count += 1
@@ -252,9 +253,11 @@ async def export_dataset_to_upload(data: ExportDatasetInput) -> str:
     with open(metadata_path, 'w', encoding='utf-8') as metafile:
         json.dump(metadata_dict, metafile, indent=4)
 
-    exportable_filepaths = [metadata_path.as_posix()]
+    exportable_filepaths = [metadata_path]
     if data.source_paths:
-        exportable_filepaths.extend(data.source_paths)
+        exportable_filepaths.extend(
+            Path(source_path) for source_path in data.source_paths
+        )
 
     exportable_dir_name = unique_filename(data.exportable_dir_name, upload_files)
 
@@ -263,17 +266,16 @@ async def export_dataset_to_upload(data: ExportDatasetInput) -> str:
         zippath = artifacts_subdirectory / f'{exportable_dir_name}.zip'
         with zipfile.ZipFile(zippath, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
             for filepath in exportable_filepaths:
-                arcname = os.path.basename(filepath)
-                zipf.write(filepath, arcname=arcname)
+                zipf.write(filepath, arcname=filepath.name)
         # Add zip file to the NOMAD Upload
         upload_files.add_rawfiles(target_path=zippath.as_posix(), auto_decompress=False)
         return zippath.as_posix()
 
     # If not zipping, copy files to directory named exportable_dir_name
     exportable_dir_path = artifacts_subdirectory / exportable_dir_name
-    os.mkdir(exportable_dir_path)
+    exportable_dir_path.mkdir(exist_ok=True)
     for filepath in exportable_filepaths:
-        temp_path = os.path.join(exportable_dir_path, os.path.basename(filepath))
+        temp_path = exportable_dir_path / filepath.name
         shutil.copy2(filepath, temp_path)
         # Add directory to the NOMAD Upload
         upload_files.add_rawfiles(
@@ -297,7 +299,7 @@ async def cleanup_artifacts(data: CleanupArtifactsInput) -> None:
         artifacts_subdirectory = Path(
             action_instance_artifacts_dir(data.export_entries_workflow_id)
         )
-        if os.path.exists(artifacts_subdirectory):
+        if artifacts_subdirectory.exists():
             shutil.rmtree(artifacts_subdirectory)
     except Exception as e:
         if activity_logger is not None:
