@@ -14,6 +14,7 @@ from nomad_ml_workflows.actions.export_entries.models import (
     SearchSettings,
 )
 from nomad_ml_workflows.actions.export_remote_entries.models import (
+    ExportRemoteEntriesOutput,
     RemoteStorageSettings,
 )
 
@@ -34,23 +35,13 @@ class RemoteExtractInput(BaseModel):
     )
 
 
-class RemoteExtractOutput(BaseModel):
-    """Output result returned by remote extraction via Nexus RPC."""
-
-    target_oasis_key: str = Field('', description='Key identifying the target Oasis.')
-    status: str = Field(..., description='Status of extraction (SUCCESS or FAILED).')
-    num_entries_exported: int = Field(0, description='Number of entries exported.')
-    remote_uri: str | None = Field(
-        None, description='Remote URI or S3 URI if uploaded.'
-    )
-    error_message: str | None = Field(None, description='Error message if failed.')
-
-
 @nexusrpc.service
 class ExportRemoteEntriesService:
     """Nexus RPC service defining remote entry export operations."""
 
-    export_remote_entries: nexusrpc.Operation[RemoteExtractInput, RemoteExtractOutput]
+    export_remote_entries: nexusrpc.Operation[
+        RemoteExtractInput, ExportRemoteEntriesOutput
+    ]
 
 
 @nexusrpc.handler.service_handler(service=ExportRemoteEntriesService)
@@ -58,12 +49,12 @@ class ExportRemoteEntriesServiceHandler:
     """Service handler executing Export Remote Entries operations."""
 
     @nexus.workflow_run_operation
-    def export_remote_entries(
+    async def export_remote_entries(
         self,
         ctx: nexus.WorkflowRunOperationContext,
         extract_input: RemoteExtractInput,
-    ) -> nexus.WorkflowHandle[RemoteExtractOutput]:
-        """Initiate the ExportRemoteEntriesWorkflow for a Nexus RPC request."""
+    ) -> nexus.WorkflowHandle[ExportRemoteEntriesOutput]:
+        """Start the existing export workflow for a remote request."""
         from nomad_ml_workflows.actions.export_remote_entries.models import (
             ExportRemoteEntriesUserInput,
             S3StorageSettings,
@@ -82,7 +73,7 @@ class ExportRemoteEntriesServiceHandler:
             export_settings=extract_input.export_settings,
             storage_settings=storage_settings,
         )
-        return ctx.start_workflow(
+        return await ctx.start_workflow(
             ExportRemoteEntriesWorkflow.run,
             user_input,
             id=f'export-remote-entries-{extract_input.user_id}-{uuid.uuid4()}',

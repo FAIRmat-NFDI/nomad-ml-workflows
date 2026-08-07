@@ -80,7 +80,10 @@ class ExportRemoteEntriesActionEntryPoint(ActionEntryPoint):
         return Action(
             task_queue=self.task_queue,
             workflow=ExportRemoteEntriesWorkflow,
-            child_workflows=[ExtractEntriesWorkflow, ReadArchivesWorkflow],
+            child_workflows=[
+                ExtractEntriesWorkflow,
+                ReadArchivesWorkflow,
+            ],
             activities=[
                 prepare_manifest,
                 read_archives_and_write_output_json,

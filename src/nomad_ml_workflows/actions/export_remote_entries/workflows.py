@@ -7,6 +7,7 @@ from datetime import timedelta
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
+from temporalio.exceptions import ApplicationError
 
 with workflow.unsafe.imports_passed_through():
     from nomad_ml_workflows.actions.export_entries.activities import (
@@ -30,8 +31,8 @@ with workflow.unsafe.imports_passed_through():
         OasisExecutionResult,
     )
     from nomad_ml_workflows.actions.export_remote_entries.nexus_contract import (
+        ExportRemoteEntriesService,
         RemoteExtractInput,
-        RemoteExtractOutput,
     )
 
 def _select_primary_remote_uri(
@@ -93,11 +94,9 @@ async def _execute_local(
         )
     except Exception as exc:
         workflow.logger.error(f'Local extraction failed: {exc}')
-        return OasisExecutionResult(
-            target_key='local',
-            status='FAILED',
-            is_remote=False,
-            error_message=str(exc),
+        raise ApplicationError(
+            f'Local export failed: {exc}',
+            type='RemoteExportActivityError',
         )
     finally:
         await workflow.execute_activity(
@@ -117,10 +116,10 @@ async def _execute_remote_nexus(
     try:
         nexus_client = workflow.create_nexus_client(
             endpoint=endpoint_name,
-            service='ExportRemoteEntriesService',
+            service=ExportRemoteEntriesService,
         )
-        nexus_result: RemoteExtractOutput = await nexus_client.execute_operation(
-            'export_remote_entries',
+        nexus_result: ExportRemoteEntriesOutput = await nexus_client.execute_operation(
+            ExportRemoteEntriesService.export_remote_entries,
             RemoteExtractInput(
                 user_id=data.user_id,
                 search_settings=data.search_settings,
@@ -129,13 +128,18 @@ async def _execute_remote_nexus(
             ),
             schedule_to_close_timeout=timedelta(hours=2),
         )
+        local_result = nexus_result.results.get('local')
+        if local_result is None:
+            raise ApplicationError(
+                'Remote export completed without a local execution result.'
+            )
         return OasisExecutionResult(
             target_key=target_key,
-            status=nexus_result.status,
+            status=local_result.status,
             is_remote=True,
-            num_entries_exported=nexus_result.num_entries_exported,
-            remote_uri=nexus_result.remote_uri,
-            error_message=nexus_result.error_message,
+            num_entries_exported=local_result.num_entries_exported,
+            remote_uri=local_result.remote_uri,
+            error_message=local_result.error_message,
         )
     except Exception as exc:
         workflow.logger.error(
@@ -146,13 +150,13 @@ async def _execute_remote_nexus(
 
 @workflow.defn
 class ExportRemoteEntriesWorkflow:
-    """Workflow to coordinate dataset extraction across local and remote Oases."""
+    """Workflow entry point for the action's aggregate result."""
 
     @workflow.run
     async def run(
         self, data: ExportRemoteEntriesUserInput
     ) -> ExportRemoteEntriesOutput:
-        """Extract matching entries across target Oases (local and/or remote Nexus endpoints)."""
+        """Extract matching entries across the requested Oases."""
         start_time = workflow.time()
         retry_policy = RetryPolicy(maximum_attempts=1)
 
