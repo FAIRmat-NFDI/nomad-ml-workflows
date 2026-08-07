@@ -22,9 +22,11 @@ with workflow.unsafe.imports_passed_through():
         ExtractEntriesWorkflow,
     )
     from nomad_ml_workflows.actions.export_remote_entries.activities import (
+        copy_remote_dataset_to_upload,
         upload_dataset_to_remote_storage,
     )
     from nomad_ml_workflows.actions.export_remote_entries.models import (
+        CopyRemoteDatasetToUploadInput,
         ExportRemoteDatasetInput,
         ExportRemoteEntriesOutput,
         ExportRemoteEntriesUserInput,
@@ -49,6 +51,29 @@ def _select_primary_remote_uri(
             return res.remote_uri
 
     return ''
+
+
+async def _save_dataset_to_upload(
+    data: ExportRemoteEntriesUserInput, remote_uri: str
+) -> None:
+    """Optionally copy the S3 dataset into the requested staging upload."""
+    if not data.save_to_upload:
+        return
+    if not data.upload_id:
+        raise ApplicationError('upload_id is required when save_to_upload is enabled.')
+
+    await workflow.execute_activity(
+        copy_remote_dataset_to_upload,
+        CopyRemoteDatasetToUploadInput(
+            user_id=data.user_id,
+            upload_id=data.upload_id,
+            remote_uri=remote_uri,
+            storage_settings=data.storage_settings,
+            zip_output=data.export_settings.create_zip_archive,
+        ),
+        start_to_close_timeout=timedelta(hours=2),
+        retry_policy=RetryPolicy(maximum_attempts=1),
+    )
 
 
 async def _execute_local(
@@ -86,6 +111,7 @@ async def _execute_local(
             start_to_close_timeout=timedelta(hours=2),
             retry_policy=retry_policy,
         )
+        await _save_dataset_to_upload(data, remote_uri)
         return OasisExecutionResult(
             target_key='local',
             status='SUCCESS',
@@ -133,6 +159,13 @@ async def _execute_remote_nexus(
             raise ApplicationError(
                 'Remote export completed without a local execution result.'
             )
+        if local_result.status != 'SUCCESS':
+            raise ApplicationError(
+                local_result.error_message or 'Remote export failed.'
+            )
+        if not local_result.remote_uri:
+            raise ApplicationError('Remote export completed without an S3 URI.')
+        await _save_dataset_to_upload(data, local_result.remote_uri)
         return OasisExecutionResult(
             target_key=target_key,
             status=local_result.status,

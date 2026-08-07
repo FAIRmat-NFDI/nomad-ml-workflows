@@ -68,6 +68,7 @@ class ExportRemoteEntriesActionEntryPoint(ActionEntryPoint):
             ReadArchivesWorkflow,
         )
         from nomad_ml_workflows.actions.export_remote_entries.activities import (
+            copy_remote_dataset_to_upload,
             upload_dataset_to_remote_storage,
         )
         from nomad_ml_workflows.actions.export_remote_entries.nexus_contract import (
@@ -89,6 +90,7 @@ class ExportRemoteEntriesActionEntryPoint(ActionEntryPoint):
                 read_archives_and_write_output_json,
                 read_archives_and_write_output_tabular,
                 upload_dataset_to_remote_storage,
+                copy_remote_dataset_to_upload,
                 cleanup_artifacts,
                 write_metadata_file,
             ],

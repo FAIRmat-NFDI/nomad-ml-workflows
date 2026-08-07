@@ -1,12 +1,15 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from nomad.files import StagingUploadFiles
 from pydantic import SecretStr
 
 from nomad_ml_workflows.actions.export_remote_entries.activities import (
+    copy_remote_dataset_to_upload,
     upload_dataset_to_remote_storage,
 )
 from nomad_ml_workflows.actions.export_remote_entries.models import (
+    CopyRemoteDatasetToUploadInput,
     ExportRemoteDatasetInput,
     S3StorageSettings,
 )
@@ -107,3 +110,78 @@ async def test_upload_dataset_to_remote_storage_s3_unzipped(
     assert 'export_entries_2026/selected_entries.json' in uploaded_keys
     assert 'export_entries_2026/data.csv' in uploaded_keys
     assert remote_uri == 's3://my-bucket/export_entries_2026/'
+
+
+@pytest.mark.asyncio
+@patch('nomad_ml_workflows.actions.export_remote_entries.activities.boto3.client')
+@patch(
+    'nomad_ml_workflows.actions.export_remote_entries.activities.get_upload_files'
+)
+async def test_copy_remote_dataset_to_upload_s3_zipped(
+    mock_get_upload_files, mock_boto_client
+):
+    mock_upload_files = MagicMock(spec=StagingUploadFiles)
+    mock_upload_files.raw_path_exists.return_value = False
+    mock_get_upload_files.return_value = mock_upload_files
+
+    mock_s3 = MagicMock()
+    mock_boto_client.return_value = mock_s3
+
+    data = CopyRemoteDatasetToUploadInput(
+        user_id='user-123',
+        upload_id='upload-123',
+        remote_uri='s3://my-bucket/exports/dataset.zip',
+        storage_settings=S3StorageSettings(
+            bucket='my-bucket',
+            endpoint_url='https://s3.example.com',
+        ),
+        zip_output=True,
+    )
+
+    result = await copy_remote_dataset_to_upload(data)
+
+    assert result == 'dataset.zip'
+    mock_s3.download_file.assert_called_once()
+    download_args = mock_s3.download_file.call_args[0]
+    assert download_args[:2] == ('my-bucket', 'exports/dataset.zip')
+    mock_upload_files.add_rawfiles.assert_called_once_with(
+        target_path=download_args[2], auto_decompress=False
+    )
+
+
+@pytest.mark.asyncio
+@patch('nomad_ml_workflows.actions.export_remote_entries.activities.boto3.client')
+@patch(
+    'nomad_ml_workflows.actions.export_remote_entries.activities.get_upload_files'
+)
+async def test_copy_remote_dataset_to_upload_s3_directory(
+    mock_get_upload_files, mock_boto_client
+):
+    mock_upload_files = MagicMock(spec=StagingUploadFiles)
+    mock_upload_files.raw_path_exists.return_value = False
+    mock_get_upload_files.return_value = mock_upload_files
+
+    mock_s3 = MagicMock()
+    mock_s3.list_objects_v2.return_value = {
+        'Contents': [
+            {'Key': 'exports/dataset/metadata.json'},
+            {'Key': 'exports/dataset/data.csv'},
+        ]
+    }
+    mock_boto_client.return_value = mock_s3
+
+    data = CopyRemoteDatasetToUploadInput(
+        user_id='user-123',
+        upload_id='upload-123',
+        remote_uri='s3://my-bucket/exports/dataset/',
+        storage_settings=S3StorageSettings(bucket='my-bucket'),
+        zip_output=False,
+    )
+
+    result = await copy_remote_dataset_to_upload(data)
+
+    assert result == 'dataset'
+    expected_download_count = 2
+    assert mock_s3.download_file.call_count == expected_download_count
+    mock_upload_files.add_rawfiles.assert_called_once()
+    assert mock_upload_files.add_rawfiles.call_args.kwargs['target_dir'] == 'dataset'

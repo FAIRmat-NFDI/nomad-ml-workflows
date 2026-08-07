@@ -4,7 +4,14 @@ Data models and schemas for Export Remote Entries workflows and activities.
 
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_serializer
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SecretStr,
+    field_serializer,
+    model_validator,
+)
 
 from nomad_ml_workflows.actions.export_entries.models import (
     ExportSettings,
@@ -77,6 +84,16 @@ class ExportRemoteEntriesUserInput(BaseModel):
     user_id: str = Field(
         ..., description='Unique identifier for the user who initiated the workflow.'
     )
+    save_to_upload: bool = Field(
+        False,
+        title='Save dataset to upload',
+        description='Copy the exported dataset from S3 into a staging upload.',
+    )
+    upload_id: str | None = Field(
+        None,
+        title='Destination project ID',
+        description='Staging project/upload that receives the copied dataset.',
+    )
     target_oases: list[str] = Field(
         title='Target Oases',
         description='Select target Oases for entry extraction.',
@@ -91,6 +108,13 @@ class ExportRemoteEntriesUserInput(BaseModel):
     search_settings: SearchSettings = Field(..., title='Search options')
     export_settings: ExportSettings = Field(..., title='Export options')
     storage_settings: RemoteStorageSettings = Field(..., title='Remote storage options')
+
+    @model_validator(mode='after')
+    def validate_upload_destination(self) -> 'ExportRemoteEntriesUserInput':
+        """Require an upload destination when saving the dataset locally."""
+        if self.save_to_upload and not self.upload_id:
+            raise ValueError('upload_id is required when save_to_upload is enabled.')
+        return self
 
     @classmethod
     def get_schema_for_entry_point(
@@ -141,6 +165,20 @@ class ExportRemoteDatasetInput(BaseModel):
     exportable_dir_name: str = Field(
         ...,
         description='Name of the directory containing the dataset that will be exported.',
+    )
+
+
+class CopyRemoteDatasetToUploadInput(BaseModel):
+    """Input parameters for copying an S3 dataset into a staging upload."""
+
+    user_id: str = Field(..., description='User ID performing the copy.')
+    upload_id: str = Field(..., description='Destination staging upload ID.')
+    remote_uri: str = Field(..., description='S3 URI of the exported dataset.')
+    storage_settings: RemoteStorageSettings = Field(
+        ..., description='S3 storage configuration.'
+    )
+    zip_output: bool = Field(
+        ..., description='Whether the remote dataset is a ZIP archive.'
     )
 
 

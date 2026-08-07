@@ -1,5 +1,6 @@
 import json
 
+import pytest
 from pydantic import SecretStr
 
 from nomad_ml_workflows.actions.export_remote_entries.models import (
@@ -69,6 +70,29 @@ def test_export_remote_entries_user_input_discriminated_union():
     assert user_input.storage_settings.bucket == 'my-remote-bucket'
     assert user_input.storage_settings.endpoint_url == 'https://minio.example.com'
     assert user_input.storage_settings.access_key_id.get_secret_value() == 'key_123'
+
+
+def test_save_to_upload_requires_upload_id():
+    with pytest.raises(ValueError, match='upload_id is required'):
+        ExportRemoteEntriesUserInput(
+            user_id='user_123',
+            save_to_upload=True,
+            target_oases=['local'],
+            search_settings={
+                'owner': 'visible',
+                'max_entries': 100,
+                'query': '{}',
+                'required': [],
+            },
+            export_settings={
+                'file_format': 'parquet',
+                'create_zip_archive': True,
+            },
+            storage_settings={
+                'storage_type': 's3',
+                'bucket': 'test-bucket',
+            },
+        )
 
 
 def test_export_remote_dataset_input_and_output():
