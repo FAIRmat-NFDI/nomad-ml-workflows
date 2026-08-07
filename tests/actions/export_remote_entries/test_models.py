@@ -40,6 +40,7 @@ def test_s3_storage_settings_defaults_and_secrets():
 def test_export_remote_entries_user_input_discriminated_union():
     user_input_data = {
         'user_id': 'user_123',
+        'target_oases': ['local'],
         'search_settings': {
             'owner': 'visible',
             'max_entries': 100,
@@ -83,12 +84,13 @@ def test_export_remote_dataset_input_and_output():
     assert dataset_input.export_entries_workflow_id == 'workflow-123'
     assert dataset_input.zip_output is True
 
+    expected_workflow_duration = 12.34
     output = ExportRemoteEntriesOutput(
         remote_uri='s3://b1/p1/export_entries_2026-08-06.zip',
-        workflow_duration=12.34,
+        workflow_duration=expected_workflow_duration,
     )
     assert output.remote_uri == 's3://b1/p1/export_entries_2026-08-06.zip'
-    assert output.workflow_duration == 12.34
+    assert output.workflow_duration == expected_workflow_duration
 
 
 def test_get_schema_for_entry_point():

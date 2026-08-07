@@ -100,7 +100,8 @@ async def test_upload_dataset_to_remote_storage_s3_unzipped(
 
     remote_uri = await upload_dataset_to_remote_storage(dataset_input)
 
-    assert mock_s3.upload_file.call_count == 3
+    expected_upload_count = 3
+    assert mock_s3.upload_file.call_count == expected_upload_count
     uploaded_keys = [call[0][2] for call in mock_s3.upload_file.call_args_list]
     assert 'export_entries_2026/metadata.json' in uploaded_keys
     assert 'export_entries_2026/selected_entries.json' in uploaded_keys
