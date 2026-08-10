@@ -31,6 +31,12 @@ class NexusEndpointConfig(BaseModel):
 class ExportRemoteEntriesActionEntryPoint(ActionEntryPoint):
     """Action entry point for exporting entries across local and remote Oases."""
 
+    # Defaulting users to ['admin'] makes this workflow opt-in; deployment admins
+    # must explicitly override the allowed user IDs/groups in their nomad.yaml.
+    users: list[str] | None = Field(
+        default=['admin'],
+        description='List of user IDs that are allowed to start/execute the given action.',
+    )
     local_display_name: str = Field(
         default='Local Oasis',
         description='Display name for local execution on this deployment.',
@@ -102,4 +108,5 @@ export_remote_entries = ExportRemoteEntriesActionEntryPoint(  # type: ignore
     name='Export Remote Entries Action',
     description='An action to search entries and export them to remote storage.',
     task_queue=TaskQueue.CPU,
+    users=['admin'],
 )
