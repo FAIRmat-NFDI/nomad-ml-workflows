@@ -26,7 +26,6 @@ maintainers = [
 license = { file = "LICENSE" }
 dependencies = [
     "nomad-lab>=1.4.3",
-    "json-stream",
     "pydantic",
     "temporalio",
 ]
