@@ -29,6 +29,7 @@ from nomad_ml_workflows.actions.export_entries.models import (
 )
 from nomad_ml_workflows.actions.export_entries.utils import (
     generate_archives,
+    require_pyarrow,
     worker_process_initializer,
     write_dicts_to_json,
     write_table_rows_to_ndjson,
@@ -196,8 +197,10 @@ def read_archives_and_write_output_tabular(
 ) -> OutputFile:
     """
     Reads archives and streams flattened table rows to Parquet or CSV.
+    Uses `pyarrow` for tabular output.
     Runs in an isolated process to ensure that memory is released after execution.
     """
+    require_pyarrow()
 
     activity_type = activity.info().activity_type
 
