@@ -45,18 +45,6 @@ class ExportRemoteEntriesActionEntryPoint(ActionEntryPoint):
         default=None,
         description='Mapping of remote Oasis keys to their Nexus endpoint configurations.',
     )
-    max_entries_export_limit: int = Field(
-        default=100000,
-        description='Maximum number of entries that can be exported in a single action.',
-    )
-    read_archives_timeout: int = Field(
-        default=7200,  # 2 hours
-        description='Timeout (in seconds) for reading archives and writing output.',
-    )
-    max_write_buffer_size_bytes: int = Field(
-        default=1024 * 1024 * 4,  # 4 MB
-        description='Maximum bytes to buffer before writing output tabular file.',
-    )
 
     def load(self) -> 'Action':
         """Load and assemble the Export Remote Entries Action instance."""
@@ -75,6 +63,7 @@ class ExportRemoteEntriesActionEntryPoint(ActionEntryPoint):
         )
         from nomad_ml_workflows.actions.export_remote_entries.activities import (
             copy_remote_dataset_to_upload,
+            read_num_entries_exported,
             upload_dataset_to_remote_storage,
         )
         from nomad_ml_workflows.actions.export_remote_entries.nexus_contract import (
@@ -97,6 +86,7 @@ class ExportRemoteEntriesActionEntryPoint(ActionEntryPoint):
                 read_archives_and_write_output_tabular,
                 upload_dataset_to_remote_storage,
                 copy_remote_dataset_to_upload,
+                read_num_entries_exported,
                 cleanup_artifacts,
                 write_metadata_file,
             ],
@@ -106,7 +96,10 @@ class ExportRemoteEntriesActionEntryPoint(ActionEntryPoint):
 
 export_remote_entries = ExportRemoteEntriesActionEntryPoint(  # type: ignore
     name='Export Remote Entries Action',
-    description='An action to search entries and export them to remote storage.',
+    description=(
+        'Search entries by running extraction on remote Oases over the Nexus network, '
+        'then export the results to shared remote storage and, optionally, a local upload.'
+    ),
     task_queue=TaskQueue.CPU,
     users=['admin'],
 )

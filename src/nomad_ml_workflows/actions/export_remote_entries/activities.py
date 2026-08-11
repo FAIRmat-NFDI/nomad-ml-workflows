@@ -2,6 +2,7 @@
 Activities for uploading exported dataset files to remote storage providers.
 """
 
+import json
 import zipfile
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -195,6 +196,34 @@ def _copy_dataset_from_s3_to_upload(
             target_path=local_directory.as_posix(), target_dir=directory_name
         )
         return directory_name
+
+
+@activity.defn
+def read_num_entries_exported(export_entries_workflow_id: str) -> int:
+    """Read the exported-entry count from the generated metadata file."""
+    artifacts_dir = Path(action_instance_artifacts_dir(export_entries_workflow_id))
+    metadata_file_path = artifacts_dir / f'{METADATA_FILE_NAME}.json'
+
+    with open(metadata_file_path, encoding='utf-8') as metadata_file:
+        metadata = json.load(metadata_file)
+
+    try:
+        num_entries_exported = metadata['data']['num_entries_exported']
+    except (KeyError, TypeError) as exc:
+        raise ValueError(
+            f'Metadata file {metadata_file_path} does not contain '
+            'data.num_entries_exported.'
+        ) from exc
+
+    if not isinstance(num_entries_exported, int) or isinstance(
+        num_entries_exported, bool
+    ):
+        raise ValueError(
+            f'Metadata file {metadata_file_path} contains an invalid '
+            'data.num_entries_exported value.'
+        )
+
+    return num_entries_exported
 
 
 @activity.defn

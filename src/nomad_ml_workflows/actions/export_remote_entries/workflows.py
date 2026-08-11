@@ -23,6 +23,7 @@ with workflow.unsafe.imports_passed_through():
     )
     from nomad_ml_workflows.actions.export_remote_entries.activities import (
         copy_remote_dataset_to_upload,
+        read_num_entries_exported,
         upload_dataset_to_remote_storage,
     )
     from nomad_ml_workflows.actions.export_remote_entries.models import (
@@ -36,6 +37,7 @@ with workflow.unsafe.imports_passed_through():
         ExportRemoteEntriesService,
         RemoteExtractInput,
     )
+
 
 def _select_primary_remote_uri(
     results_dict: dict[str, OasisExecutionResult],
@@ -112,10 +114,17 @@ async def _execute_local(
             retry_policy=retry_policy,
         )
         await _save_dataset_to_upload(data, remote_uri)
+        num_entries_exported = await workflow.execute_activity(
+            read_num_entries_exported,
+            workflow_id,
+            start_to_close_timeout=timedelta(hours=2),
+            retry_policy=retry_policy,
+        )
         return OasisExecutionResult(
             target_key='local',
             status='SUCCESS',
             is_remote=False,
+            num_entries_exported=num_entries_exported,
             remote_uri=remote_uri,
         )
     except Exception as exc:
@@ -178,7 +187,14 @@ async def _execute_remote_nexus(
         workflow.logger.error(
             f'Remote Nexus extraction for target "{target_key}" failed: {exc}'
         )
-        raise
+        return OasisExecutionResult(
+            target_key=target_key,
+            status='FAILED',
+            is_remote=True,
+            num_entries_exported=0,
+            remote_uri=endpoint_name,
+            error_message=str(exc),
+        )
 
 
 @workflow.defn

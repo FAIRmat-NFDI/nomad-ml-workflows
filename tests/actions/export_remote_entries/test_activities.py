@@ -6,6 +6,7 @@ from pydantic import SecretStr
 
 from nomad_ml_workflows.actions.export_remote_entries.activities import (
     copy_remote_dataset_to_upload,
+    read_num_entries_exported,
     upload_dataset_to_remote_storage,
 )
 from nomad_ml_workflows.actions.export_remote_entries.models import (
@@ -13,6 +14,21 @@ from nomad_ml_workflows.actions.export_remote_entries.models import (
     ExportRemoteDatasetInput,
     S3StorageSettings,
 )
+
+
+@patch(
+    'nomad_ml_workflows.actions.export_remote_entries.activities.action_instance_artifacts_dir'
+)
+def test_read_num_entries_exported(mock_artifacts_dir, tmp_path):
+    expected_num_entries = 42
+    artifacts_dir = tmp_path / 'artifacts'
+    artifacts_dir.mkdir()
+    (artifacts_dir / 'metadata.json').write_text(
+        f'{{"data": {{"num_entries_exported": {expected_num_entries}}}}}'
+    )
+    mock_artifacts_dir.return_value = artifacts_dir.as_posix()
+
+    assert read_num_entries_exported('wf-001') == expected_num_entries
 
 
 @pytest.mark.asyncio
