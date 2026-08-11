@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import importlib
 import json
 from collections import defaultdict
@@ -17,6 +19,8 @@ from nomad_ml_workflows.actions.export_entries.models import ManifestEntry
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    import pyarrow as pa
 
 
 IGNORED_KEYS = ['m_def', 'm_def_id', 'm_ref_archives']
