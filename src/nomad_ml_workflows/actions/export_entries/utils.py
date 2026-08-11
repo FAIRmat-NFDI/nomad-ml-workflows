@@ -15,20 +15,26 @@ from nomad.metainfo.metainfo import Quantity, Reference, Section
 
 from nomad_ml_workflows.actions.export_entries.models import ManifestEntry
 
-try:
-    import pyarrow as pa
-    import pyarrow.csv as pcsv
-    import pyarrow.parquet as pq
-except ImportError as e:
-    raise ImportError(
-        'pyarrow is required. Install with: pip install nomad-ml-workflows[cpu-action]'
-    ) from e
-
 if TYPE_CHECKING:
     from pathlib import Path
 
 
 IGNORED_KEYS = ['m_def', 'm_def_id', 'm_ref_archives']
+
+
+@lru_cache(maxsize=1)
+def require_pyarrow() -> tuple[Any, Any, Any]:
+    """Load the optional PyArrow modules when tabular export needs them."""
+    try:
+        import pyarrow as pa
+        import pyarrow.csv as pcsv
+        import pyarrow.parquet as pq
+    except ImportError as e:
+        raise ImportError(
+            'pyarrow is required. Install with: '
+            'pip install nomad-ml-workflows[cpu-action]'
+        ) from e
+    return pa, pcsv, pq
 
 
 @dataclass(frozen=True)
@@ -84,6 +90,7 @@ def _quantity_to_arrow_column_config(quantity_def: Quantity) -> _ArrowColumnConf
     assigns the appropriate Arrow data type and stringify_json flag. If the quantity's shape is
     available, integrates it into the Arrow data type.
     """
+    pa, _, _ = require_pyarrow()
     quantity_type = quantity_def.type
 
     if isinstance(quantity_type, Reference):
@@ -131,6 +138,7 @@ def _json_stringify(value):
 
 def _is_list_of_string(arrow_type: pa.DataType) -> bool:
     """Return whether the given Arrow type is a list or nested list of strings."""
+    pa, _, _ = require_pyarrow()
     if pa.types.is_list(arrow_type):
         if pa.types.is_string(arrow_type.value_type):
             return True
@@ -146,6 +154,7 @@ def _cast_arrow_value(value, arrow_type: pa.DataType):
     Arrow can cast homogeneous lists directly, but cannot infer a source type for
     heterogeneous lists. Recursion lets each list element be cast independently.
     """
+    pa, _, _ = require_pyarrow()
     if value is None:
         return None
     if pa.types.is_list(arrow_type):
@@ -167,6 +176,7 @@ def _normalize_arrow_column(
     Build a typed Arrow array. It converts mismatched values, when needed, using Arrow's
     safe cast.
     """
+    pa, _, _ = require_pyarrow()
     if config.stringify_json:
         try:
             return pa.array(
@@ -358,6 +368,7 @@ def _table_column_configs(
     Build ordered Arrow column configs based on the columns quantity definition.
     Adds 'entry_id' and 'upload_id' columns to the configs.
     """
+    pa, _, _ = require_pyarrow()
     configs = {
         column: _quantity_to_arrow_column_config(quantity_def)
         for column, quantity_def in columns_quantity_def.items()
@@ -374,6 +385,7 @@ def _table_rows_to_arrow_batch(
     logger=None,
 ) -> pa.RecordBatch:
     """Convert a batch of flattened rows using a fixed Arrow schema."""
+    pa, _, _ = require_pyarrow()
     arrays = [
         _normalize_arrow_column(
             [row.get(column_name) for row in rows],
@@ -388,11 +400,13 @@ def _table_rows_to_arrow_batch(
 
 def _is_nested_type(dtype: pa.DataType) -> bool:
     """Check if a PyArrow type is nested."""
+    pa, _, _ = require_pyarrow()
     return pa.types.is_nested(dtype)
 
 
 def _get_csv_compatible_schema(schema: pa.Schema) -> pa.Schema:
     """Convert schema to CSV-compatible format by changing nested types to strings."""
+    pa, _, _ = require_pyarrow()
     new_fields = []
     for field in schema:
         if _is_nested_type(field.type):
@@ -406,6 +420,7 @@ def _stringify_nested_columns(
     batch: pa.RecordBatch, csv_schema: pa.Schema
 ) -> pa.RecordBatch:
     """Convert nested columns (list, struct) in a batch to JSON strings."""
+    pa, _, _ = require_pyarrow()
     new_columns = []
     for i, column in enumerate(batch.columns):
         if _is_nested_type(batch.schema.field(i).type):
@@ -568,6 +583,7 @@ def _create_tabular_writer(
     output_file_format: str,
     schema: pa.Schema,
 ):
+    _, pcsv, pq = require_pyarrow()
     if output_file_format == 'csv':
         return pcsv.CSVWriter(output_file_path, schema)
     return pq.ParquetWriter(
@@ -605,6 +621,7 @@ def write_table_rows_to_tabular_file(
     A single row is always accepted. If it is larger than ``max_buffer_bytes``, it is
     logged and written immediately.
     """
+    pa, _, _ = require_pyarrow()
     output_file_format = _tabular_output_file_format(output_file_path)
     if max_buffer_bytes < 1:
         raise ValueError('max_buffer_bytes must be at least 1.')
