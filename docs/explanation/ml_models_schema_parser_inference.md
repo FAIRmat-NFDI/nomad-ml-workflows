@@ -1,5 +1,3 @@
-# ML Models in NOMAD
-
 ## Overview
 
 This document describes the design for adding ML model support to NOMAD through
@@ -30,20 +28,18 @@ NOMAD already manages structured scientific data, workflows, and provenance.
 ML models are increasingly used as scientific artifacts in their own right and
 need comparable support:
 
-- a stable schema for metadata and artifact references
-- a searchable representation in the NOMAD UI
+- a base schema for metadata and artifact references
+- a searchable representation in the NOMAD UI (with entries and apps)
 - a safe way to derive structured metadata from uploaded model files
 - a reusable interface for inference-oriented workflows
 
-The current design focuses on ONNX because it offers a practical and relatively
-safe path for both metadata extraction and runtime execution without depending
-on framework-specific checkpoint loading.
+In addition to building schema for ML models, the current design also focuses on loading ONNX models because it offers a practical and relatively safe path for both metadata extraction and runtime execution without depending on framework-specific checkpoint loading.
 
 ## Goals
 
-- Define a NOMAD-native `MLModel` schema for model entries
+- Define a extendable `MLModel` schema for model entries
 - Make `MLModel` entries searchable through a dedicated search app
-- Provide automated parsing of `.onnx` files into `MLModel` entries
+- Provide parsing of `.onnx` files into `MLModel` entries through entry normalization
 - Provide a generic inference Action for `MLModel` entries backed by `.onnx`
 artifacts
 
@@ -56,15 +52,31 @@ artifacts
 - Infer complete provenance automatically from model contents
 - Implement import/export integrations for Hugging Face or similar registries
 
+## Interfaces
+
+- Create entry
+    - Users can create an `MLModel` entry manually and fill in metadata.
+    - When `.onnx` files are uploaded as artifacts, entry normalization loads them and automatically populates the fields.
+- Search App
+    - Users can search, filter, and inspect available ML model entries.
+- Run inference
+    - Users can trigger an Action that runs inference for a selected ONNX-backed
+    model using provided inputs.
+
+These interfaces are consistent with the NOMAD model of uploads/projects,
+entries, and Actions, so the new feature fits naturally into existing workflows.
+
 ## `MLModel` schema
 
-`MLModel` should be implemented as a top-level NOMAD schema entry using `Entity` and `Schema`.
+`MLModel` should be implemented as a top-level NOMAD schema entry using `Entity` and `Schema`. The schema remains NOMAD-native and is not a direct copy of an external ML
+metadata standard.
 
 The schema should separate three concerns:
 
 - user-authored descriptive metadata
 - artifact-level technical metadata extracted from files
 - execution-related metadata required for inference
+- training-related metadata and provenance
 
 Recommended content of the schema:
 
@@ -90,13 +102,11 @@ Recommended content of the schema:
     - references to training datasets
     - references to workflows or related entries
     - references to evaluation results
-
-Design rules:
-
-- The schema remains NOMAD-native and is not a direct copy of an external ML
-metadata standard.
-- Missing metadata is preferable to guessed metadata.
-- The schema must support manual entry creation even when no parser is used. Model entries can in principle be created manually for non-`.onnx` artifacts by uploading a populated `archive.json` file along with the artifacts, or by using the ELN functionality.
+- Training metadata
+    - optimizer specifications
+    - learning rates
+    - epochs
+    - batch size
 
 ## Search App configurations
 
@@ -141,26 +151,17 @@ Important limitations:
 
 - ONNX is not the canonical source for retraining a model. Exporting into ONNX usually does not preserve optimizer state, scheduler state, or framework-specific checkpoint semantics.
 
-The design therefore treats ONNX primarily as:
-
-- a metadata source for safe parser-based entry creation
-- an interchange artifact
-- an inference artifact
-
 ## ONNX parsing
 
-Parsing can be implemented in two different ways:
+Parsed when `MLModel` entry containing `.onnx` artifacts is processed
 
-- Option A: as an Action that is run at the upload level on-demand by the user. Parses all (or some based on the implementation) the `.onnx` files in the upload.
-    - Action can run on `cpu` task queue, not competing with day-to-day processing in NOMAD.
-- Option B: as an `ElnMatchingParser` that matches and parses `.onnx` files automatically when uploaded to the upload.
-    - Runs on `internal` task queue, parsing will compete with general NOMAD processing. If the memory limits are hit for a large model, the `internal` worker will crash.
+- Runs on `internal` task queue, parsing will compete with general NOMAD processing.
 
 Expected parser responsibilities:
 
 - inspect `.onnx` files without executing model code using `onnx.checker.check_model`
 - extract basic artifact and graph metadata
-- create or overwrite an `MLModel` entry with parser-derived information
+- Populate `MLModel` entry with parser-derived information
 
 Fields that should be populated when available:
 
@@ -175,19 +176,8 @@ Fields that should be populated when available:
 
 Parsing rules:
 
-- The parser must not attempt to reconstruct training provenance from the ONNX
-graph alone.
-- The parser must not guess semantic metadata such as scientific task or model
-purpose if it is not explicitly present.
-- User-supplied metadata should take precedence over parsed data in certain cases.
-
-Resulting user flow:
-
-- user uploads one or more `.onnx` files
-- user triggers the parse Action for the upload (option A) or files are automatically parsed (option B)
-- parsing creates `MLModel` entries
-- entries become searchable and usable for inference
-- user supplements the entries with additional metadata
+- The parser must not guess semantic metadata such as a task or reconstruct training provenance from the ONNX graph alone.
+- User-supplied metadata should take precedence over parsed data in certain cases (use `merge_section` utils like in other ELN measurement parser).
 
 ## ONNX inference runtime
 
@@ -213,31 +203,12 @@ Input validation against the model input layer should include required input pre
 
 Output handling should capture raw inference, reference to the model used, and the execution time.
 
-Design constraints:
+Inference rules:
 
-- inference is only enabled for entries with a valid ONNX artifact
-- runtime execution must fail clearly when the artifact or inputs are invalid
-- the first version should prioritize a generic execution path over
+- Inference is only enabled for entries with a valid ONNX artifact
+- Runtime execution must fail clearly when the artifact or inputs are invalid
+- The first version should prioritize a generic execution path over
 model-specific pre-processing or visualization
-
-## Interfaces
-
-- Create entry
-    - Users can create an `MLModel` entry manually and fill in metadata without
-    parser support.
-- Parse `.onnx` file
-    - Option A: Users can trigger an Action that parses all `.onnx` files in an upload into
-    `MLModel` entries.
-    - Option B: User can upload `.onnx` files and a `ElnMatchingParser` processes them
-    - TBD which option to go with!
-- Search App
-    - Users can search, filter, and inspect available ML model entries.
-- Run inference
-    - Users can trigger an Action that runs inference for a selected ONNX-backed
-    model using provided inputs.
-
-These interfaces are consistent with the NOMAD model of uploads/projects,
-entries, and Actions, so the new feature fits naturally into existing workflows.
 
 ## Code ownership
 
