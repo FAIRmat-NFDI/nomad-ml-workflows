@@ -24,11 +24,7 @@ maintainers = [
     { name = "Sarthak Kapoor", email = "sarthak.kapoor@physik.hu-berlin.de" },
 ]
 license = { file = "LICENSE" }
-dependencies = [
-    "nomad-lab>=1.4.3",
-    "pydantic",
-    "temporalio",
-]
+dependencies = ["nomad-lab>=1.4.3", "pydantic", "temporalio"]
 
 [project.urls]
 Repository = "https://github.com/FAIRmat-NFDI/nomad-ml-workflows"
@@ -47,12 +43,13 @@ dev = [
     "pytest-asyncio",
 ]
 cpu-action = [
-    "pyarrow",  # for parquet support
+    "pyarrow", # for parquet support
+    "boto3",   # s3 storage
 ]
 
 [tool.uv]
 extra-index-url = [
-  "https://gitlab.mpcdf.mpg.de/api/v4/projects/2187/packages/pypi/simple",
+    "https://gitlab.mpcdf.mpg.de/api/v4/projects/2187/packages/pypi/simple",
 ]
 
 [tool.ruff]
@@ -101,9 +98,9 @@ select = [
 ]
 
 ignore = [
-    "F403", # 'from module import *' used; unable to detect undefined names
+    "F403",    # 'from module import *' used; unable to detect undefined names
     "PLC0415", # `import` should be at the top-level of a file
-    "E501", # line too long
+    "E501",    # line too long
 ]
 
 fixable = ["ALL"]
@@ -142,3 +139,4 @@ skip = [".github/*"]
 
 [project.entry-points.'nomad.plugin']
 export_entries_action_entry_point = "nomad_ml_workflows.actions:export_entries"
+export_remote_entries_action_entry_point = "nomad_ml_workflows.actions:export_remote_entries"
