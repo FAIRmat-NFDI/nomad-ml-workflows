@@ -54,8 +54,9 @@ class ExportRemoteEntriesActionEntryPoint(ActionEntryPoint):
             cleanup_artifacts,
             prepare_manifest,
             read_archives_and_write_output_json,
-            read_archives_and_write_output_tabular,
+            read_archives_and_write_table_rows,
             write_metadata_file,
+            write_output_tabular,
         )
         from nomad_ml_workflows.actions.export_entries.workflows import (
             ExtractEntriesWorkflow,
@@ -83,12 +84,13 @@ class ExportRemoteEntriesActionEntryPoint(ActionEntryPoint):
             activities=[
                 prepare_manifest,
                 read_archives_and_write_output_json,
-                read_archives_and_write_output_tabular,
+                read_archives_and_write_table_rows,
                 upload_dataset_to_remote_storage,
                 copy_remote_dataset_to_upload,
                 read_num_entries_exported,
                 cleanup_artifacts,
                 write_metadata_file,
+                write_output_tabular,
             ],
             nexus_service_handlers=[ExportRemoteEntriesServiceHandler()],
         )
