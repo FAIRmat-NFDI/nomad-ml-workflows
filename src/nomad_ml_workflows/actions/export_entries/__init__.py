@@ -19,9 +19,8 @@ class ExportEntriesActionEntryPoint(ActionEntryPoint):
     )
     max_write_buffer_size_bytes: int = Field(
         default=1024 * 1024 * 4,  # 4 MB
-        description='Maximum number of bytes to buffer before writing to the output '
-        'tabular file. Increasing it can lead to higher memory usage but improved '
-        'compression ratios.',
+        description='Maximum number of encoded NDJSON input bytes represented by '
+        'parsed rows buffered before writing to the output tabular file.',
     )
 
     def load(self):
