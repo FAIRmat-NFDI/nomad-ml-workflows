@@ -18,7 +18,7 @@ class ExportEntriesActionEntryPoint(ActionEntryPoint):
         'and writes the output file.',
     )
     max_write_buffer_size_bytes: int = Field(
-        default=1024 * 1024 * 4,  # 4 MB
+        default=1024 * 1024 * 64,  # 64 MB
         description='Maximum number of encoded NDJSON input bytes represented by '
         'parsed rows buffered before writing to the output tabular file.',
     )

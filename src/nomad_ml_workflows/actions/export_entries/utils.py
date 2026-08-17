@@ -613,7 +613,7 @@ def write_table_rows_to_tabular_file(
     table_rows_file_path: Path,
     output_file_path: Path,
     columns_quantity_def: dict[str, Quantity],
-    max_buffer_bytes: int = 4 * 1024 * 1024,
+    max_buffer_bytes: int = 64 * 1024 * 1024,
     logger=None,
 ) -> int:
     """
