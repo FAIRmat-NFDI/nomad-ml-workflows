@@ -672,6 +672,10 @@ def write_table_rows_to_tabular_file(
                 batch = _stringify_nested_columns(batch, output_schema)
             table = pa.Table.from_batches([batch], schema=output_schema)
             _write_tabular_table(writer, table, output_file_format)
+            if logger:
+                logger.info(
+                    f'Flushed {len(buffered_rows)} rows, {buffered_input_bytes} bytes'
+                )
             count += table.num_rows
             buffered_rows.clear()
             buffered_input_bytes = 0
