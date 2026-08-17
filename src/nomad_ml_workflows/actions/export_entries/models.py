@@ -13,6 +13,7 @@ OwnerLiteral = Literal[
     'staging',
 ]
 DataFileFormatLiteral = Literal['parquet', 'csv', 'json']
+TabularFileFormatLiteral = Literal['parquet', 'csv']
 
 config = nomad_config.get_plugin_entry_point(
     'nomad_ml_workflows.actions:export_entries'
@@ -375,6 +376,30 @@ class ReadArchivesWorkflowInput(BaseModel):
         '*',
         description='Dictionary of required fields and directives compatible with '
         '`nomad.archive.required.RequiredReader` class.',
+    )
+
+
+class TableRowsFileOutput(BaseModel):
+    table_rows_file_path: str = Field(
+        ..., description='Path to the temporary flattened NDJSON rows.'
+    )
+    schema_file_path: str = Field(
+        ..., description='Path to the temporary Arrow IPC schema sidecar.'
+    )
+
+
+class WriteTabularFileInput(BaseModel):
+    export_entries_workflow_id: str = Field(
+        ..., description='ID of the export entries workflow.'
+    )
+    output_file_format: TabularFileFormatLiteral = Field(
+        ..., description='Output tabular file format.'
+    )
+    table_rows_file_path: str = Field(
+        ..., description='Path to the temporary flattened NDJSON rows.'
+    )
+    schema_file_path: str = Field(
+        ..., description='Path to the temporary Arrow IPC schema sidecar.'
     )
 
 
