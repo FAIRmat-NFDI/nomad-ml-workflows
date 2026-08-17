@@ -607,28 +607,32 @@ def _write_tabular_table(writer, table: pa.Table, output_file_format: str) -> No
         writer.write_table(table)
 
 
-def write_table_rows_to_tabular_file(
+def write_table_rows_to_tabular_file(  # noqa: PLR0913
     table_rows_file_path: Path,
     output_file_path: Path,
     columns_quantity_def: dict[str, Quantity],
-    max_buffer_bytes: int = 4 * 1024 * 1024,
+    *,
+    max_buffer_bytes: int = 64 * 1024 * 1024,
+    max_buffer_rows: int = 512,
     logger=None,
 ) -> int:
     """
-    Stream flattened rows from NDJSON into byte-bounded Parquet or CSV batches.
+    Stream flattened rows from NDJSON into bounded Parquet or CSV batches.
 
     The complete set of quantity definitions is collected before this function is
-    called, allowing each row to be normalized once into a RecordBatch with the same
-    schema. Record batches are buffered until their total uncompressed Arrow size
-    reaches ``max_buffer_bytes``.
+    called, allowing buffered rows to be normalized into one RecordBatch with a fixed
+    schema. Parsed rows are flushed when either their count reaches
+    ``max_buffer_rows`` or their encoded NDJSON input reaches ``max_buffer_bytes``.
 
-    A single row is always accepted. If it is larger than ``max_buffer_bytes``, it is
-    logged and written immediately.
+    A single row is always accepted. If its NDJSON input is larger than
+    ``max_buffer_bytes``, it is logged and written immediately.
     """
     pa, _, _ = require_pyarrow()
     output_file_format = _tabular_output_file_format(output_file_path)
     if max_buffer_bytes < 1:
         raise ValueError('max_buffer_bytes must be at least 1.')
+    if max_buffer_rows < 1:
+        raise ValueError('max_buffer_rows must be at least 1.')
 
     column_configs = _table_column_configs(columns_quantity_def)
     arrow_schema = pa.schema(
@@ -643,60 +647,70 @@ def write_table_rows_to_tabular_file(
         else arrow_schema
     )
 
-    buffered_batches: list[pa.RecordBatch] = []
-    buffered_bytes = 0
+    buffered_rows: list[dict] = []
+    buffered_input_bytes = 0
     count = 0
 
     with (
-        open(table_rows_file_path, encoding='utf-8') as input_file,
+        open(table_rows_file_path, 'rb') as input_file,
         _create_tabular_writer(
             output_file_path, output_file_format, output_schema
         ) as writer,
     ):
 
         def flush_batch() -> None:
-            nonlocal buffered_bytes, count  # update from flush
-            if not buffered_batches:
+            nonlocal buffered_input_bytes, count  # update from flush
+            if not buffered_rows:
                 return
 
-            table = pa.Table.from_batches(buffered_batches, schema=output_schema)
-            _write_tabular_table(writer, table, output_file_format)
-            count += table.num_rows
-            buffered_batches.clear()
-            buffered_bytes = 0
-
-        for line in input_file:
-            standard_row = json.loads(line)
-            if not isinstance(standard_row, dict):
-                raise ValueError('Each table row must be a JSON object.')
-            row_batch = _table_rows_to_arrow_batch(
-                [standard_row],
+            batch = _table_rows_to_arrow_batch(
+                buffered_rows,
                 column_configs,
                 arrow_schema,
                 logger=logger,
             )
             if output_file_format == 'csv':
-                row_batch = _stringify_nested_columns(row_batch, output_schema)
-            row_size_bytes = row_batch.nbytes
+                batch = _stringify_nested_columns(batch, output_schema)
+            table = pa.Table.from_batches([batch], schema=output_schema)
+            _write_tabular_table(writer, table, output_file_format)
+            if logger:
+                logger.info(
+                    f'Flushed {len(buffered_rows)} rows, {buffered_input_bytes} bytes'
+                )
+            count += table.num_rows
+            buffered_rows.clear()
+            buffered_input_bytes = 0
 
-            if buffered_batches and buffered_bytes + row_size_bytes > max_buffer_bytes:
+        for line in input_file:
+            row_input_bytes = len(line)
+
+            if buffered_rows and (
+                len(buffered_rows) >= max_buffer_rows
+                or buffered_input_bytes + row_input_bytes > max_buffer_bytes
+            ):
                 flush_batch()
 
-            buffered_batches.append(row_batch)
-            buffered_bytes += row_size_bytes
+            standard_row = json.loads(line)
+            if not isinstance(standard_row, dict):
+                raise ValueError('Each table row must be a JSON object.')
+            buffered_rows.append(standard_row)
+            buffered_input_bytes += row_input_bytes
 
-            if row_size_bytes > max_buffer_bytes:
+            if row_input_bytes > max_buffer_bytes:
                 if logger:
                     logger.warning(
-                        'Tabular row exceeds the uncompressed buffer size and '
+                        'Tabular row exceeds the NDJSON input buffer size and '
                         'will be written immediately.',
                         entry_id=standard_row.get('entry_id'),
                         output_file_format=output_file_format,
-                        row_size_bytes=row_size_bytes,
+                        row_input_bytes=row_input_bytes,
                         max_buffer_bytes=max_buffer_bytes,
                     )
                 flush_batch()
-            elif buffered_bytes >= max_buffer_bytes:
+            elif (
+                len(buffered_rows) >= max_buffer_rows
+                or buffered_input_bytes >= max_buffer_bytes
+            ):
                 flush_batch()
 
         flush_batch()

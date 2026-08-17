@@ -176,6 +176,7 @@ def _read_archives_and_write_output_tabular(
         temporary_output_file_path,
         columns_quantity_def,
         max_buffer_bytes=config.max_write_buffer_size_bytes,  # type: ignore
+        max_buffer_rows=config.max_write_buffer_size_rows,  # type: ignore
         logger=activity_logger,
     )
     temporary_output_file_path.replace(output_file_path)

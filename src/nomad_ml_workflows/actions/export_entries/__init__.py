@@ -9,19 +9,27 @@ with workflow.unsafe.imports_passed_through():
 class ExportEntriesActionEntryPoint(ActionEntryPoint):
     max_entries_export_limit: int = Field(
         default=100000,
+        gt=0,
         description='Maximum number of entries that can be exported in a single '
         'Export Entries action.',
     )
     read_archives_timeout: int = Field(
         default=7200,  # 2 hours
+        gt=0,
         description='Timeout (in seconds) for the activity that reads '
         'and writes the output file.',
     )
     max_write_buffer_size_bytes: int = Field(
-        default=1024 * 1024 * 4,  # 4 MB
-        description='Maximum number of bytes to buffer before writing to the output '
-        'tabular file. Increasing it can lead to higher memory usage but improved '
-        'compression ratios.',
+        default=1024 * 1024 * 64,  # 64 MB
+        gt=0,
+        description='Maximum number of encoded NDJSON input bytes represented by '
+        'parsed rows buffered before writing to the output tabular file.',
+    )
+    max_write_buffer_size_rows: int = Field(
+        default=512,
+        gt=0,
+        description='Maximum number of parsed rows buffered before writing to the '
+        'output tabular file.',
     )
 
     def load(self):

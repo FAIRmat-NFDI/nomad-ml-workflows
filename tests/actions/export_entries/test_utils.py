@@ -1,3 +1,4 @@
+import csv
 import json
 from datetime import datetime
 
@@ -321,3 +322,163 @@ def test_write_table_rows_to_tabular_file_reads_ndjson(tmp_path):
     assert table.column_names == ['entry_id', 'upload_id', 'value']
     assert table['entry_id'].to_pylist() == ['one', 'two']
     assert table['value'].to_pylist() == ['first', 'second']
+
+
+def test_write_table_rows_to_tabular_file_builds_wide_multi_row_batches(
+    tmp_path,
+    monkeypatch,
+):
+    rows_path = tmp_path / 'rows.ndjson'
+    output_path = tmp_path / 'rows.parquet'
+    quantity_defs = {f'value_{index:03}': Quantity(type=str) for index in range(64)}
+    rows = [
+        {
+            'entry_id': f'entry_{index}',
+            'upload_id': 'upload',
+            f'value_{index:03}': f'content_{index}',
+        }
+        for index in range(5)
+    ]
+    rows_path.write_text(
+        ''.join(f'{json.dumps(row, separators=(",", ":"))}\n' for row in rows),
+        encoding='utf-8',
+    )
+    batch_sizes = []
+    original_converter = utils._table_rows_to_arrow_batch
+
+    def capture_batch_size(batch_rows, *args, **kwargs):
+        batch_sizes.append(len(batch_rows))
+        return original_converter(batch_rows, *args, **kwargs)
+
+    monkeypatch.setattr(utils, '_table_rows_to_arrow_batch', capture_batch_size)
+    count = utils.write_table_rows_to_tabular_file(
+        rows_path,
+        output_path,
+        quantity_defs,
+        max_buffer_bytes=1024 * 1024,
+        max_buffer_rows=3,
+    )
+
+    table = pq.read_table(output_path)
+    parquet_file = pq.ParquetFile(output_path)
+    expected_batch_sizes = [3, 2]
+    assert count == len(rows)
+    assert batch_sizes == expected_batch_sizes
+    assert parquet_file.metadata.num_row_groups == len(expected_batch_sizes)
+    assert table['entry_id'].to_pylist() == [row['entry_id'] for row in rows]
+
+
+def test_write_table_rows_to_tabular_file_flushes_on_input_bytes(
+    tmp_path,
+    monkeypatch,
+):
+    rows_path = tmp_path / 'rows.ndjson'
+    output_path = tmp_path / 'rows.parquet'
+    rows = [
+        {'entry_id': f'entry_{index}', 'upload_id': 'upload', 'value': 'content'}
+        for index in range(3)
+    ]
+    encoded_lines = [
+        f'{json.dumps(row, separators=(",", ":"))}\n'.encode() for row in rows
+    ]
+    rows_path.write_bytes(b''.join(encoded_lines))
+    batch_sizes = []
+    original_converter = utils._table_rows_to_arrow_batch
+
+    def capture_batch_size(batch_rows, *args, **kwargs):
+        batch_sizes.append(len(batch_rows))
+        return original_converter(batch_rows, *args, **kwargs)
+
+    monkeypatch.setattr(utils, '_table_rows_to_arrow_batch', capture_batch_size)
+
+    count = utils.write_table_rows_to_tabular_file(
+        rows_path,
+        output_path,
+        {'value': Quantity(type=str)},
+        max_buffer_bytes=len(encoded_lines[0]) + len(encoded_lines[1]),
+    )
+
+    expected_batch_sizes = [2, 1]
+    assert count == len(rows)
+    assert batch_sizes == expected_batch_sizes
+    assert pq.ParquetFile(output_path).metadata.num_row_groups == len(
+        expected_batch_sizes
+    )
+
+
+def test_write_table_rows_to_tabular_file_writes_oversized_row_immediately(
+    tmp_path,
+    monkeypatch,
+):
+    rows_path = tmp_path / 'rows.ndjson'
+    output_path = tmp_path / 'rows.parquet'
+    rows = [
+        {'entry_id': 'large', 'upload_id': 'upload', 'value': 'x' * 1000},
+        {'entry_id': 'small', 'upload_id': 'upload', 'value': 'x'},
+    ]
+    encoded_lines = [
+        f'{json.dumps(row, separators=(",", ":"))}\n'.encode() for row in rows
+    ]
+    rows_path.write_bytes(b''.join(encoded_lines))
+    batch_sizes = []
+    warnings = []
+    original_converter = utils._table_rows_to_arrow_batch
+
+    def capture_batch_size(batch_rows, *args, **kwargs):
+        batch_sizes.append(len(batch_rows))
+        return original_converter(batch_rows, *args, **kwargs)
+
+    class CapturingLogger:
+        def info(self, message):
+            pass
+
+        def warning(self, message, **kwargs):
+            warnings.append((message, kwargs))
+
+    monkeypatch.setattr(utils, '_table_rows_to_arrow_batch', capture_batch_size)
+
+    count = utils.write_table_rows_to_tabular_file(
+        rows_path,
+        output_path,
+        {'value': Quantity(type=str)},
+        max_buffer_bytes=len(encoded_lines[1]) + 1,
+        logger=CapturingLogger(),
+    )
+
+    assert count == len(rows)
+    assert batch_sizes == [1, 1]
+    assert len(warnings) == 1
+    assert warnings[0][1]['entry_id'] == 'large'
+    assert warnings[0][1]['row_input_bytes'] == len(encoded_lines[0])
+
+
+def test_write_table_rows_to_tabular_file_stringifies_nested_csv_values(tmp_path):
+    rows_path = tmp_path / 'rows.ndjson'
+    output_path = tmp_path / 'rows.csv'
+    values = [['one', 'two'], None, ['three']]
+    rows = [
+        {
+            'entry_id': f'entry_{index}',
+            'upload_id': 'upload',
+            'values': value,
+        }
+        for index, value in enumerate(values)
+    ]
+    rows_path.write_text(
+        ''.join(f'{json.dumps(row, separators=(",", ":"))}\n' for row in rows),
+        encoding='utf-8',
+    )
+    count = utils.write_table_rows_to_tabular_file(
+        rows_path,
+        output_path,
+        {'values': Quantity(type=str, shape=['*'])},
+        max_buffer_rows=2,
+    )
+
+    with output_path.open(newline='', encoding='utf-8') as output_file:
+        output_rows = list(csv.DictReader(output_file))
+    assert count == len(rows)
+    assert [row['entry_id'] for row in output_rows] == [row['entry_id'] for row in rows]
+    assert [
+        json.loads(row['values']) if row['values'] else None for row in output_rows
+    ] == values
