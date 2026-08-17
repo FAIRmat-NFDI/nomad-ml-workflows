@@ -24,8 +24,6 @@ if TYPE_CHECKING:
 
 
 IGNORED_KEYS = ['m_def', 'm_def_id', 'm_ref_archives']
-# Bound Arrow conversion work even when individual NDJSON rows are very small.
-MAX_TABULAR_BUFFER_ROWS = 512
 
 
 @lru_cache(maxsize=1)
@@ -609,11 +607,13 @@ def _write_tabular_table(writer, table: pa.Table, output_file_format: str) -> No
         writer.write_table(table)
 
 
-def write_table_rows_to_tabular_file(
+def write_table_rows_to_tabular_file(  # noqa: PLR0913
     table_rows_file_path: Path,
     output_file_path: Path,
     columns_quantity_def: dict[str, Quantity],
+    *,
     max_buffer_bytes: int = 64 * 1024 * 1024,
+    max_buffer_rows: int = 512,
     logger=None,
 ) -> int:
     """
@@ -622,8 +622,7 @@ def write_table_rows_to_tabular_file(
     The complete set of quantity definitions is collected before this function is
     called, allowing buffered rows to be normalized into one RecordBatch with a fixed
     schema. Parsed rows are flushed when either their count reaches
-    ``MAX_TABULAR_BUFFER_ROWS`` or their encoded NDJSON input reaches
-    ``max_buffer_bytes``.
+    ``max_buffer_rows`` or their encoded NDJSON input reaches ``max_buffer_bytes``.
 
     A single row is always accepted. If its NDJSON input is larger than
     ``max_buffer_bytes``, it is logged and written immediately.
@@ -632,6 +631,8 @@ def write_table_rows_to_tabular_file(
     output_file_format = _tabular_output_file_format(output_file_path)
     if max_buffer_bytes < 1:
         raise ValueError('max_buffer_bytes must be at least 1.')
+    if max_buffer_rows < 1:
+        raise ValueError('max_buffer_rows must be at least 1.')
 
     column_configs = _table_column_configs(columns_quantity_def)
     arrow_schema = pa.schema(
@@ -684,7 +685,7 @@ def write_table_rows_to_tabular_file(
             row_input_bytes = len(line)
 
             if buffered_rows and (
-                len(buffered_rows) >= MAX_TABULAR_BUFFER_ROWS
+                len(buffered_rows) >= max_buffer_rows
                 or buffered_input_bytes + row_input_bytes > max_buffer_bytes
             ):
                 flush_batch()
@@ -707,7 +708,7 @@ def write_table_rows_to_tabular_file(
                     )
                 flush_batch()
             elif (
-                len(buffered_rows) >= MAX_TABULAR_BUFFER_ROWS
+                len(buffered_rows) >= max_buffer_rows
                 or buffered_input_bytes >= max_buffer_bytes
             ):
                 flush_batch()

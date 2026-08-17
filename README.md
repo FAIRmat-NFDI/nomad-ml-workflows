@@ -104,9 +104,13 @@ plugins:
         # Start-to-close timeout, in seconds, for reading archives and
         # writing the selected output format.
 
-        max_write_buffer_size_bytes: 4194304
-        # Target maximum uncompressed Arrow bytes accumulated before a
-        # Parquet or CSV flush. One oversized row may exceed this target.
+        max_write_buffer_size_bytes: 67108864  # 64 MB
+        # Target maximum number of encoded NDJSON input bytes before
+        # converting the buffer into a Arrow RecordBatch. One oversized
+        # row may exceed this target.
+
+        max_write_buffer_size_rows: 512
+        # Maximum number of parsed rows converted in one Arrow RecordBatch.
 ```
 
 ## 🚀 Adding this plugin to NOMAD
