@@ -32,7 +32,6 @@ from nomad_ml_workflows.actions.export_entries.models import (
 from nomad_ml_workflows.actions.export_entries.utils import (
     generate_archives,
     require_pyarrow,
-    worker_process_initializer,
     write_dicts_to_json,
     write_table_rows_to_ndjson,
     write_table_rows_to_tabular_file,
@@ -245,7 +244,6 @@ def write_output_tabular(data: WriteTabularFileInput) -> OutputFile:
     # and propagating failure and cancellation policy
     with ProcessPoolExecutor(
         max_workers=1,
-        initializer=worker_process_initializer,
         mp_context=multiprocessing.get_context('spawn'),
     ) as executor:
         future = executor.submit(

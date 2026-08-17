@@ -775,9 +775,3 @@ def write_table_rows_to_tabular_file(  # noqa: PLR0913
         flush_batch()
 
     return count
-
-
-def worker_process_initializer() -> None:
-    from nomad.infrastructure import setup_mongo
-
-    setup_mongo()
