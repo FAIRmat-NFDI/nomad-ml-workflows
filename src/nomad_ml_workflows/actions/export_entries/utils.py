@@ -3,9 +3,10 @@ from __future__ import annotations
 import importlib
 import json
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from functools import lru_cache
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from nomad.app.v1.models.models import User
@@ -16,12 +17,12 @@ from nomad.metainfo import data_type as nomad_data_type
 from nomad.metainfo.metainfo import Quantity, Reference, Section
 
 from nomad_ml_workflows.actions.export_entries.models import ManifestEntry
+from nomad_ml_workflows.actions.export_entries.tabular_writers import (
+    create_tabular_writer,
+)
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     import pyarrow as pa
-
 
 IGNORED_KEYS = ['m_def', 'm_def_id', 'm_ref_archives']
 _STRINGIFY_JSON_KEY = b'nomad:stringify-json'
@@ -514,9 +515,42 @@ def _stringify_nested_columns(
     return pa.RecordBatch.from_arrays(new_columns, schema=csv_schema)
 
 
+def artifact_size(path: Path) -> int:
+    """Return the aggregate byte size of a file or dataset directory."""
+    if path.is_file():
+        return path.stat().st_size
+    return sum(child.stat().st_size for child in path.rglob('*') if child.is_file())
+
+
+def discover_exportable_artifacts(
+    artifacts_directory: Path, export_order: tuple[str, ...]
+) -> list[Path]:
+    """Find metadata, manifest, and data artifacts in their public order."""
+    artifacts_by_stem = {
+        path.stem: path
+        for path in artifacts_directory.iterdir()
+        if (path.is_file() or path.is_dir()) and path.stem in export_order
+    }
+    return [
+        artifacts_by_stem[stem] for stem in export_order if stem in artifacts_by_stem
+    ]
+
+
+def iter_artifact_files(
+    artifacts: list[Path],
+) -> Iterator[tuple[Path, Path]]:
+    """Yield files and paths relative to the exported dataset root."""
+    for artifact in artifacts:
+        if artifact.is_file():
+            yield artifact, Path(artifact.name)
+            continue
+        for file_path in sorted(path for path in artifact.rglob('*') if path.is_file()):
+            yield file_path, Path(artifact.name) / file_path.relative_to(artifact)
+
+
 def generate_archives(
     manifest: list[ManifestEntry], required: dict | str, user_id: str, logger=None
-) -> Iterable[dict]:
+) -> Iterator[dict]:
     """
     Yields entry archive dict using the manifest and required fields one at a time.
     """
@@ -565,7 +599,7 @@ def generate_archives(
 
 def generate_table_rows(
     manifest: list[ManifestEntry], required: dict | str, user_id: str, logger=None
-) -> Iterable[FlatEntryArchive]:
+) -> Iterator[FlatEntryArchive]:
     """
     Yields table row using the manifest and required fields one at a time.
     """
@@ -656,31 +690,6 @@ def _tabular_output_file_format(output_file_path: Path) -> str:
     return output_file_format
 
 
-def _create_tabular_writer(
-    output_file_path: Path,
-    output_file_format: str,
-    schema: pa.Schema,
-):
-    _, pcsv, pq = require_pyarrow()
-    if output_file_format == 'csv':
-        return pcsv.CSVWriter(output_file_path, schema)
-    return pq.ParquetWriter(
-        output_file_path,
-        schema,
-        compression='zstd',
-        compression_level=3,
-        use_dictionary=True,
-    )
-
-
-def _write_tabular_table(writer, table: pa.Table, output_file_format: str) -> None:
-    if output_file_format == 'parquet':
-        writer.write_table(table, row_group_size=table.num_rows)
-    else:
-        # pcsv.CSVWriter.write_table does not support row_group_size
-        writer.write_table(table)
-
-
 def write_table_rows_to_tabular_file(  # noqa: PLR0913
     table_rows_file_path: Path,
     output_file_path: Path,
@@ -692,6 +701,15 @@ def write_table_rows_to_tabular_file(  # noqa: PLR0913
 ) -> int:
     """
     Stream flattened rows from NDJSON into bounded Parquet or CSV batches.
+
+    Every Parquet batch is written to an independently closed part in the output
+    dataset directory using an independent writer. If one writer is used for all
+    batches, resulting in one big parquet file, the memory usage grows linearly
+    with the number of batches: each batch contributes to the footer metadata
+    that is written only once at the end. This can only be avoided by using an
+    independent writer for each batch.
+
+    CSV keeps one writer open for the complete output.
 
     The fixed union schema and column normalization settings are loaded from an Arrow
     IPC schema sidecar created during NDJSON generation. Parsed rows are flushed when
@@ -719,12 +737,8 @@ def write_table_rows_to_tabular_file(  # noqa: PLR0913
     buffered_input_bytes = 0
     count = 0
 
-    with (
-        open(table_rows_file_path, 'rb') as input_file,
-        _create_tabular_writer(
-            output_file_path, output_file_format, output_schema
-        ) as writer,
-    ):
+    writer = create_tabular_writer(output_file_path, output_schema)
+    with open(table_rows_file_path, 'rb') as input_file, writer:
 
         def flush_batch() -> None:
             nonlocal buffered_input_bytes, count  # update from flush
@@ -740,10 +754,11 @@ def write_table_rows_to_tabular_file(  # noqa: PLR0913
             if output_file_format == 'csv':
                 batch = _stringify_nested_columns(batch, output_schema)
             table = pa.Table.from_batches([batch], schema=output_schema)
-            _write_tabular_table(writer, table, output_file_format)
+            written_path = writer.write_table(table)
             if logger:
                 logger.info(
-                    f'Flushed {len(buffered_rows)} rows, {buffered_input_bytes} bytes'
+                    f'Flushed {len(buffered_rows)} rows, '
+                    f'{buffered_input_bytes} bytes to {written_path.name}'
                 )
             count += table.num_rows
             buffered_rows.clear()

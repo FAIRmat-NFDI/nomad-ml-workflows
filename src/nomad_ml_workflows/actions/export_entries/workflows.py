@@ -42,7 +42,7 @@ config = nomad_config.get_plugin_entry_point(
 @workflow.defn
 class ReadArchivesWorkflow:
     """
-    Child workflow that reads an archive and writes the output file.
+    Child workflow that reads archives and writes the output artifact.
     """
 
     @workflow.run
@@ -143,7 +143,8 @@ class ExtractEntriesWorkflow:
             metadata.error_info = traceback.format_exc()
 
             raise ApplicationError(
-                'Encountered an error during reading archives and writing data file.',
+                'Encountered an error during reading archives and writing the data '
+                'artifact.',
             ) from e
 
         finally:

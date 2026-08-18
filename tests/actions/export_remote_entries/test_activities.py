@@ -44,7 +44,9 @@ async def test_upload_dataset_to_remote_storage_s3_zipped(
     artifacts_dir.mkdir()
     (artifacts_dir / 'metadata.json').write_text('{}')
     (artifacts_dir / 'selected_entries.json').write_text('[]')
-    (artifacts_dir / 'data.parquet').write_text('binary data')
+    parquet_directory = artifacts_dir / 'data.parquet'
+    parquet_directory.mkdir()
+    (parquet_directory / 'part-00000.parquet').write_text('binary data')
     mock_artifacts_dir.return_value = artifacts_dir.as_posix()
 
     mock_s3 = MagicMock()
@@ -130,9 +132,7 @@ async def test_upload_dataset_to_remote_storage_s3_unzipped(
 
 @pytest.mark.asyncio
 @patch('nomad_ml_workflows.actions.export_remote_entries.activities.boto3.client')
-@patch(
-    'nomad_ml_workflows.actions.export_remote_entries.activities.get_upload_files'
-)
+@patch('nomad_ml_workflows.actions.export_remote_entries.activities.get_upload_files')
 async def test_copy_remote_dataset_to_upload_s3_zipped(
     mock_get_upload_files, mock_boto_client
 ):
@@ -167,9 +167,7 @@ async def test_copy_remote_dataset_to_upload_s3_zipped(
 
 @pytest.mark.asyncio
 @patch('nomad_ml_workflows.actions.export_remote_entries.activities.boto3.client')
-@patch(
-    'nomad_ml_workflows.actions.export_remote_entries.activities.get_upload_files'
-)
+@patch('nomad_ml_workflows.actions.export_remote_entries.activities.get_upload_files')
 async def test_copy_remote_dataset_to_upload_s3_directory(
     mock_get_upload_files, mock_boto_client
 ):

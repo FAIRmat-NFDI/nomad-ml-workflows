@@ -17,9 +17,13 @@ from nomad.utils import get_logger
 from temporalio import activity
 
 from nomad_ml_workflows.actions.export_entries.activities import (
-    DATA_FILE_NAME,
+    DATA_ARTIFACT_NAME,
     MANIFEST_FILE_NAME,
     METADATA_FILE_NAME,
+)
+from nomad_ml_workflows.actions.export_entries.utils import (
+    discover_exportable_artifacts,
+    iter_artifact_files,
 )
 from nomad_ml_workflows.actions.export_remote_entries.models import (
     CopyRemoteDatasetToUploadInput,
@@ -59,9 +63,7 @@ def _build_s3_key(prefix: str, *parts: str) -> str:
     return f'{clean_prefix}/{subpath}' if clean_prefix else subpath
 
 
-def _get_staging_upload_files(
-    user_id: str, upload_id: str
-) -> StagingUploadFiles:
+def _get_staging_upload_files(user_id: str, upload_id: str) -> StagingUploadFiles:
     """Load and validate the destination staging upload."""
     upload_files = get_upload_files(upload_id, user_id)
     if not upload_files or not isinstance(upload_files, StagingUploadFiles):
@@ -99,7 +101,7 @@ def _parse_s3_uri(remote_uri: str) -> tuple[str, str]:
 def _upload_dataset_to_s3(
     data: ExportRemoteDatasetInput,
     storage_settings: S3StorageSettings,
-    exportable_filepaths: list[Path],
+    exportable_artifacts: list[Path],
     artifacts_subdirectory: Path,
 ) -> str:
     """Upload exported dataset files to S3-compatible remote storage."""
@@ -111,16 +113,16 @@ def _upload_dataset_to_s3(
     if data.zip_output:
         zippath = artifacts_subdirectory / f'{data.exportable_dir_name}.zip'
         with zipfile.ZipFile(zippath, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
-            for filepath in exportable_filepaths:
-                zipf.write(filepath, arcname=filepath.name)
+            for filepath, relative_path in iter_artifact_files(exportable_artifacts):
+                zipf.write(filepath, arcname=relative_path.as_posix())
 
         object_key = _build_s3_key(prefix, f'{data.exportable_dir_name}.zip')
         s3_client.upload_file(zippath.as_posix(), bucket, object_key)
         return f's3://{bucket}/{object_key}'
 
     base_key_prefix = _build_s3_key(prefix, data.exportable_dir_name)
-    for filepath in exportable_filepaths:
-        object_key = f'{base_key_prefix}/{filepath.name}'
+    for filepath, relative_path in iter_artifact_files(exportable_artifacts):
+        object_key = f'{base_key_prefix}/{relative_path.as_posix()}'
         s3_client.upload_file(filepath.as_posix(), bucket, object_key)
 
     return f's3://{bucket}/{base_key_prefix}/'
@@ -176,7 +178,9 @@ def _copy_dataset_from_s3_to_upload(
                     or relative_path.is_absolute()
                     or '..' in relative_path.parts
                 ):
-                    raise ValueError(f'Invalid object key under S3 prefix: {object_key}')
+                    raise ValueError(
+                        f'Invalid object key under S3 prefix: {object_key}'
+                    )
 
                 local_path = local_directory / relative_path
                 local_path.parent.mkdir(parents=True, exist_ok=True)
@@ -187,7 +191,9 @@ def _copy_dataset_from_s3_to_upload(
                 break
             continuation_token = response.get('NextContinuationToken')
             if not continuation_token:
-                raise ValueError('S3 object listing was truncated without a continuation token.')
+                raise ValueError(
+                    'S3 object listing was truncated without a continuation token.'
+                )
 
         if downloaded_files == 0:
             raise ValueError(f'No objects found under S3 prefix: {data.remote_uri}')
@@ -240,15 +246,8 @@ async def upload_dataset_to_remote_storage(
     """
     artifacts_dir = Path(action_instance_artifacts_dir(data.export_entries_workflow_id))
 
-    export_order = (METADATA_FILE_NAME, MANIFEST_FILE_NAME, DATA_FILE_NAME)
-    files_by_stem = {
-        path.stem: path
-        for path in artifacts_dir.iterdir()
-        if path.is_file() and path.stem in export_order
-    }
-    exportable_filepaths = [
-        files_by_stem[stem] for stem in export_order if stem in files_by_stem
-    ]
+    export_order = (METADATA_FILE_NAME, MANIFEST_FILE_NAME, DATA_ARTIFACT_NAME)
+    exportable_artifacts = discover_exportable_artifacts(artifacts_dir, export_order)
 
     storage_settings = data.storage_settings
     if (
@@ -256,7 +255,7 @@ async def upload_dataset_to_remote_storage(
         or getattr(storage_settings, 'storage_type', None) == 's3'
     ):
         return _upload_dataset_to_s3(
-            data, storage_settings, exportable_filepaths, artifacts_dir
+            data, storage_settings, exportable_artifacts, artifacts_dir
         )
 
     storage_type = getattr(

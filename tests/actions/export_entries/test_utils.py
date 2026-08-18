@@ -409,11 +409,18 @@ def test_write_table_rows_to_tabular_file_builds_wide_multi_row_batches(
     )
 
     table = pq.read_table(output_path)
-    parquet_file = pq.ParquetFile(output_path)
     expected_batch_sizes = [3, 2]
+    part_paths = sorted(output_path.glob('part-*.parquet'))
     assert count == len(rows)
     assert batch_sizes == expected_batch_sizes
-    assert parquet_file.metadata.num_row_groups == len(expected_batch_sizes)
+    assert [path.name for path in part_paths] == [
+        'part-00000.parquet',
+        'part-00001.parquet',
+    ]
+    assert [pq.ParquetFile(path).metadata.num_row_groups for path in part_paths] == [
+        1,
+        1,
+    ]
     assert table['entry_id'].to_pylist() == [row['entry_id'] for row in rows]
 
 
@@ -448,11 +455,11 @@ def test_write_table_rows_to_tabular_file_flushes_on_input_bytes(
     )
 
     expected_batch_sizes = [2, 1]
+    part_paths = sorted(output_path.glob('part-*.parquet'))
     assert count == len(rows)
     assert batch_sizes == expected_batch_sizes
-    assert pq.ParquetFile(output_path).metadata.num_row_groups == len(
-        expected_batch_sizes
-    )
+    assert len(part_paths) == len(expected_batch_sizes)
+    assert pq.read_table(output_path).num_rows == len(rows)
 
 
 def test_write_table_rows_to_tabular_file_writes_oversized_row_immediately(
@@ -499,6 +506,27 @@ def test_write_table_rows_to_tabular_file_writes_oversized_row_immediately(
     assert len(warnings) == 1
     assert warnings[0][1]['entry_id'] == 'large'
     assert warnings[0][1]['row_input_bytes'] == len(encoded_lines[0])
+    assert [path.name for path in sorted(output_path.glob('part-*.parquet'))] == [
+        'part-00000.parquet',
+        'part-00001.parquet',
+    ]
+
+
+def test_write_table_rows_to_tabular_file_writes_readable_empty_dataset(tmp_path):
+    rows_path = tmp_path / 'rows.ndjson'
+    output_path = tmp_path / 'rows.parquet'
+    rows_path.write_bytes(b'')
+
+    count = utils.write_table_rows_to_tabular_file(
+        rows_path,
+        output_path,
+        _write_test_schema(tmp_path, {'value': Quantity(type=str)}),
+    )
+
+    part_paths = list(output_path.glob('part-*.parquet'))
+    assert count == 0
+    assert [path.name for path in part_paths] == ['part-00000.parquet']
+    assert pq.read_table(output_path).num_rows == 0
 
 
 def test_write_table_rows_to_tabular_file_stringifies_nested_csv_values(tmp_path):
