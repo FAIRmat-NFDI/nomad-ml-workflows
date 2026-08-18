@@ -551,7 +551,7 @@ def iter_artifact_files(
 
 def generate_archives(
     manifest: list[ManifestEntry], required: dict | str, user_id: str, logger=None
-) -> Iterable[dict]:
+) -> Iterator[dict]:
     """
     Yields entry archive dict using the manifest and required fields one at a time.
     """
@@ -600,7 +600,7 @@ def generate_archives(
 
 def generate_table_rows(
     manifest: list[ManifestEntry], required: dict | str, user_id: str, logger=None
-) -> Iterable[FlatEntryArchive]:
+) -> Iterator[FlatEntryArchive]:
     """
     Yields table row using the manifest and required fields one at a time.
     """
