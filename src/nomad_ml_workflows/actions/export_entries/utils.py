@@ -6,6 +6,7 @@ from collections import defaultdict
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from functools import lru_cache
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from nomad.app.v1.models.models import User
@@ -21,8 +22,6 @@ from nomad_ml_workflows.actions.export_entries.tabular_writers import (
 )
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     import pyarrow as pa
 
 IGNORED_KEYS = ['m_def', 'm_def_id', 'm_ref_archives']
