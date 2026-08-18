@@ -50,6 +50,9 @@ async def test_upload_dataset_to_remote_storage_s3_zipped(
     mock_artifacts_dir.return_value = artifacts_dir.as_posix()
 
     mock_s3 = MagicMock()
+    mock_s3.generate_presigned_url.return_value = (
+        'https://my-bucket.s3.amazonaws.com/my-folder/export_entries_2026.zip?signed'
+    )
     mock_boto_client.return_value = mock_s3
 
     storage_settings = S3StorageSettings(
@@ -86,7 +89,15 @@ async def test_upload_dataset_to_remote_storage_s3_zipped(
     call_args = mock_s3.upload_file.call_args[0]
     assert call_args[1] == 'my-bucket'
     assert call_args[2] == 'my-folder/export_entries_2026.zip'
-    assert remote_uri == 's3://my-bucket/my-folder/export_entries_2026.zip'
+    mock_s3.generate_presigned_url.assert_called_once_with(
+        'get_object',
+        Params={'Bucket': 'my-bucket', 'Key': 'my-folder/export_entries_2026.zip'},
+        ExpiresIn=172800,
+    )
+    assert (
+        remote_uri
+        == 'https://my-bucket.s3.amazonaws.com/my-folder/export_entries_2026.zip?signed'
+    )
 
 
 @pytest.mark.asyncio
@@ -105,6 +116,9 @@ async def test_upload_dataset_to_remote_storage_s3_unzipped(
     mock_artifacts_dir.return_value = artifacts_dir.as_posix()
 
     mock_s3 = MagicMock()
+    mock_s3.generate_presigned_url.return_value = (
+        'https://my-bucket.s3.amazonaws.com/export_entries_2026/data.csv?signed'
+    )
     mock_boto_client.return_value = mock_s3
 
     storage_settings = S3StorageSettings(
@@ -127,7 +141,15 @@ async def test_upload_dataset_to_remote_storage_s3_unzipped(
     assert 'export_entries_2026/metadata.json' in uploaded_keys
     assert 'export_entries_2026/selected_entries.json' in uploaded_keys
     assert 'export_entries_2026/data.csv' in uploaded_keys
-    assert remote_uri == 's3://my-bucket/export_entries_2026/'
+    mock_s3.generate_presigned_url.assert_called_once_with(
+        'get_object',
+        Params={'Bucket': 'my-bucket', 'Key': 'export_entries_2026/data.csv'},
+        ExpiresIn=172800,
+    )
+    assert (
+        remote_uri
+        == 'https://my-bucket.s3.amazonaws.com/export_entries_2026/data.csv?signed'
+    )
 
 
 @pytest.mark.asyncio
@@ -146,7 +168,7 @@ async def test_copy_remote_dataset_to_upload_s3_zipped(
     data = CopyRemoteDatasetToUploadInput(
         user_id='user-123',
         upload_id='upload-123',
-        remote_uri='s3://my-bucket/exports/dataset.zip',
+        remote_uri='https://s3.example.com/my-bucket/exports/dataset.zip?X-Amz-Signature=123',
         storage_settings=S3StorageSettings(
             bucket='my-bucket',
             endpoint_url='https://s3.example.com',
