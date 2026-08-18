@@ -366,14 +366,24 @@ def _ordered_columns(columns: Iterable[str]) -> list[str]:
     return [*identifier_columns, *remaining_columns]
 
 
-def _add_ids_and_order_column_configs(
-    configs: dict[str, _ArrowColumnConfig],
+def _ensure_column_configs_consistency(
+    column_configs: dict[str, _ArrowColumnConfig],
 ) -> dict[str, _ArrowColumnConfig]:
     """Add identifier columns and return configs in deterministic column order."""
     pa, _, _ = require_pyarrow()
-    configs['entry_id'] = _ArrowColumnConfig(pa.string())
-    configs['upload_id'] = _ArrowColumnConfig(pa.string())
-    return {column: configs[column] for column in _ordered_columns(configs)}
+
+    # add identifier columns to the schema
+    if 'entry_id' not in column_configs:
+        column_configs['entry_id'] = _ArrowColumnConfig(pa.string())
+    if 'upload_id' not in column_configs:
+        column_configs['upload_id'] = _ArrowColumnConfig(pa.string())
+
+    # column configs in deterministic order
+    column_configs = {
+        column: column_configs[column] for column in _ordered_columns(column_configs)
+    }
+
+    return column_configs
 
 
 def _arrow_schema_from_column_configs(
@@ -395,6 +405,8 @@ def _write_table_schema(
 ) -> None:
     """Serialize ordered column configs as an Arrow IPC schema sidecar."""
     pa, _, _ = require_pyarrow()
+
+    column_configs = _ensure_column_configs_consistency(column_configs)
     stored_schema = pa.schema(
         [
             pa.field(
@@ -634,10 +646,7 @@ def write_table_rows_to_ndjson(  # noqa: PLR0913, PLR0917
             json.dump(table_row.data_dict, file, separators=(',', ':'))
             file.write('\n')
 
-    _write_table_schema(
-        schema_file_path,
-        _add_ids_and_order_column_configs(column_configs),
-    )
+    _write_table_schema(schema_file_path, column_configs)
 
 
 def _tabular_output_file_format(output_file_path: Path) -> str:

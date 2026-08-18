@@ -56,6 +56,18 @@ def _column(name: str, section=TypedEntryData) -> str:
     return f'data.{name}#{section.m_def.qualified_name()}'
 
 
+def _write_test_schema(tmp_path, quantity_defs: dict[str, Quantity]):
+    schema_path = tmp_path / 'table_schema.arrow'
+    column_configs = {}
+    for path, quantity in quantity_defs.items():
+        column_configs[path] = utils._quantity_to_arrow_column_config(quantity)
+    utils._write_table_schema(
+        schema_path,
+        column_configs,
+    )
+    return schema_path
+
+
 def _archives_to_arrow_table(archives: list[dict]) -> pa.Table:
     table_rows = [
         utils._flatten_entry_archive(
@@ -70,7 +82,10 @@ def _archives_to_arrow_table(archives: list[dict]) -> pa.Table:
         for table_row in table_rows
         for column, quantity_def in table_row.columns_quantity_def.items()
     }
-    column_configs = utils._table_column_configs(columns_quantity_def)
+    column_configs = {}
+    for path, quantity in columns_quantity_def.items():
+        column_configs[path] = utils._quantity_to_arrow_column_config(quantity)
+    column_configs = utils._ensure_column_configs_consistency(column_configs)
     schema = pa.schema(
         [
             pa.field(column_name, config.arrow_type)
@@ -106,6 +121,35 @@ def test_ordered_columns_places_identifiers_before_sorted_columns():
         'a_column',
         'z_column',
     ]
+
+
+def test_table_schema_round_trip_preserves_order_types_and_normalization(tmp_path):
+    schema_path = tmp_path / 'table_schema.arrow'
+    expected_configs = {}
+
+    for path, quantity in {
+        'values': Quantity(type=str, shape=['*']),
+        'payload': Quantity(type=JSON),
+        'created': Quantity(type=datetime),
+    }.items():
+        expected_configs[path] = utils._quantity_to_arrow_column_config(quantity)
+
+    utils._write_table_schema(schema_path, expected_configs)
+    actual_configs, arrow_schema = utils._read_table_schema(schema_path)
+
+    assert list(actual_configs) == [
+        'entry_id',
+        'upload_id',
+        'created',
+        'payload',
+        'values',
+    ]
+    assert actual_configs == expected_configs
+    assert arrow_schema.field('created').type == pa.timestamp('us', tz='UTC')
+    assert arrow_schema.field('values').type == pa.list_(pa.string())
+    assert actual_configs['payload'].stringify_json is True
+    assert arrow_schema.metadata is None
+    assert all(field.metadata is None for field in arrow_schema)
 
 
 @pytest.fixture
@@ -246,6 +290,7 @@ def test_write_table_rows_to_tabular_file_uses_normalized_schema(
     monkeypatch,
 ):
     rows_path = tmp_path / 'entries.ndjson'
+    schema_path = tmp_path / 'entries_schema.arrow'
     output_path = tmp_path / 'entries.parquet'
     table_rows = [
         utils._flatten_entry_archive(
@@ -258,14 +303,12 @@ def test_write_table_rows_to_tabular_file_uses_normalized_schema(
         ]
     ]
     monkeypatch.setattr(utils, 'generate_table_rows', lambda *_: iter(table_rows))
-    columns_quantity_def = utils.write_table_rows_to_ndjson(
-        [], {}, 'user_id', rows_path
-    )
+    utils.write_table_rows_to_ndjson([], {}, 'user_id', rows_path, schema_path)
 
     count = utils.write_table_rows_to_tabular_file(
         rows_path,
         output_path,
-        columns_quantity_def,
+        schema_path,
     )
 
     table = pq.read_table(output_path)
@@ -278,6 +321,7 @@ def test_write_table_rows_to_ndjson_accepts_repeated_quantity_definition(
     tmp_path, monkeypatch
 ):
     output_path = tmp_path / 'rows.ndjson'
+    schema_path = tmp_path / 'table_schema.arrow'
     quantity_def = Quantity(type=str)
     table_rows = [
         utils.FlatEntryArchive(
@@ -293,12 +337,17 @@ def test_write_table_rows_to_ndjson_accepts_repeated_quantity_definition(
     ]
     monkeypatch.setattr(utils, 'generate_table_rows', lambda *_: iter(table_rows))
 
-    result = utils.write_table_rows_to_ndjson([], {}, 'user_id', output_path)
+    result = utils.write_table_rows_to_ndjson(
+        [], {}, 'user_id', output_path, schema_path
+    )
 
-    assert result == {'value': quantity_def}
+    assert result is None
     assert output_path.read_text(encoding='utf-8') == (
         '{"entry_id":"one"}\n{"entry_id":"two"}\n'
     )
+    column_configs, arrow_schema = utils._read_table_schema(schema_path)
+    assert list(column_configs) == ['entry_id', 'upload_id', 'value']
+    assert arrow_schema.field('value').type == pa.string()
 
 
 def test_write_table_rows_to_tabular_file_reads_ndjson(tmp_path):
@@ -314,7 +363,7 @@ def test_write_table_rows_to_tabular_file_reads_ndjson(tmp_path):
     count = utils.write_table_rows_to_tabular_file(
         rows_path,
         output_path,
-        {'value': quantity_def},
+        _write_test_schema(tmp_path, {'value': quantity_def}),
     )
 
     table = pq.read_table(output_path)
@@ -354,7 +403,7 @@ def test_write_table_rows_to_tabular_file_builds_wide_multi_row_batches(
     count = utils.write_table_rows_to_tabular_file(
         rows_path,
         output_path,
-        quantity_defs,
+        _write_test_schema(tmp_path, quantity_defs),
         max_buffer_bytes=1024 * 1024,
         max_buffer_rows=3,
     )
@@ -394,7 +443,7 @@ def test_write_table_rows_to_tabular_file_flushes_on_input_bytes(
     count = utils.write_table_rows_to_tabular_file(
         rows_path,
         output_path,
-        {'value': Quantity(type=str)},
+        _write_test_schema(tmp_path, {'value': Quantity(type=str)}),
         max_buffer_bytes=len(encoded_lines[0]) + len(encoded_lines[1]),
     )
 
@@ -440,7 +489,7 @@ def test_write_table_rows_to_tabular_file_writes_oversized_row_immediately(
     count = utils.write_table_rows_to_tabular_file(
         rows_path,
         output_path,
-        {'value': Quantity(type=str)},
+        _write_test_schema(tmp_path, {'value': Quantity(type=str)}),
         max_buffer_bytes=len(encoded_lines[1]) + 1,
         logger=CapturingLogger(),
     )
@@ -471,7 +520,10 @@ def test_write_table_rows_to_tabular_file_stringifies_nested_csv_values(tmp_path
     count = utils.write_table_rows_to_tabular_file(
         rows_path,
         output_path,
-        {'values': Quantity(type=str, shape=['*'])},
+        _write_test_schema(
+            tmp_path,
+            {'values': Quantity(type=str, shape=['*'])},
+        ),
         max_buffer_rows=2,
     )
 
