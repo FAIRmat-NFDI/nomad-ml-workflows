@@ -9,7 +9,6 @@ from tempfile import TemporaryDirectory
 from typing import Any
 from urllib.parse import urlparse
 
-import boto3
 from nomad.actions.manager import action_instance_artifacts_dir
 from nomad.files import StagingUploadFiles
 from nomad.uploads import get_upload_files
@@ -126,6 +125,8 @@ def _upload_dataset_to_s3(
     artifacts_subdirectory: Path,
 ) -> str:
     """Upload exported dataset files to S3-compatible remote storage."""
+    import boto3
+
     client_kwargs = _build_boto3_client_kwargs(storage_settings)
     s3_client = boto3.client('s3', **client_kwargs)
     bucket = storage_settings.bucket
@@ -154,6 +155,8 @@ def _copy_dataset_from_s3_to_upload(
     storage_settings: S3StorageSettings,
 ) -> str:
     """Download an S3 dataset and add it to a NOMAD staging upload."""
+    import boto3
+
     bucket, key = _parse_s3_uri(data.remote_uri)
     client_kwargs = _build_boto3_client_kwargs(storage_settings)
     s3_client = boto3.client('s3', **client_kwargs)

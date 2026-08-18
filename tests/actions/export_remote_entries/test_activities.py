@@ -32,7 +32,7 @@ def test_read_num_entries_exported(mock_artifacts_dir, tmp_path):
 
 
 @pytest.mark.asyncio
-@patch('nomad_ml_workflows.actions.export_remote_entries.activities.boto3.client')
+@patch('boto3.client')
 @patch(
     'nomad_ml_workflows.actions.export_remote_entries.activities.action_instance_artifacts_dir'
 )
@@ -90,7 +90,7 @@ async def test_upload_dataset_to_remote_storage_s3_zipped(
 
 
 @pytest.mark.asyncio
-@patch('nomad_ml_workflows.actions.export_remote_entries.activities.boto3.client')
+@patch('boto3.client')
 @patch(
     'nomad_ml_workflows.actions.export_remote_entries.activities.action_instance_artifacts_dir'
 )
@@ -131,7 +131,7 @@ async def test_upload_dataset_to_remote_storage_s3_unzipped(
 
 
 @pytest.mark.asyncio
-@patch('nomad_ml_workflows.actions.export_remote_entries.activities.boto3.client')
+@patch('boto3.client')
 @patch('nomad_ml_workflows.actions.export_remote_entries.activities.get_upload_files')
 async def test_copy_remote_dataset_to_upload_s3_zipped(
     mock_get_upload_files, mock_boto_client
@@ -166,7 +166,7 @@ async def test_copy_remote_dataset_to_upload_s3_zipped(
 
 
 @pytest.mark.asyncio
-@patch('nomad_ml_workflows.actions.export_remote_entries.activities.boto3.client')
+@patch('boto3.client')
 @patch('nomad_ml_workflows.actions.export_remote_entries.activities.get_upload_files')
 async def test_copy_remote_dataset_to_upload_s3_directory(
     mock_get_upload_files, mock_boto_client
