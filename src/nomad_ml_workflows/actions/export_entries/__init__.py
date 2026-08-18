@@ -29,13 +29,16 @@ class ExportEntriesActionEntryPoint(ActionEntryPoint):
         default=1024 * 1024 * 64,  # 64 MB
         gt=0,
         description='Maximum number of encoded NDJSON input bytes represented by '
-        'parsed rows buffered before writing to the output tabular file.',
+        'parsed rows buffered before writing to the output tabular file. Protects '
+        'against rows with large encoded representations. One oversized row may '
+        'exceed this target.',
     )
     max_write_buffer_size_rows: int = Field(
-        default=512,
+        default=1024,
         gt=0,
         description='Maximum number of parsed rows buffered before writing to the '
-        'output tabular file.',
+        'output tabular file. Protects against many small or sparse rows whose '
+        'Python and Arrow representations are much larger than their NDJSON bytes.',
     )
 
     def load(self):
