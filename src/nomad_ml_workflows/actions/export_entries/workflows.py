@@ -71,7 +71,7 @@ class ReadArchivesWorkflow:
                     table_rows_file_path=table_rows_file.table_rows_file_path,
                     schema_file_path=table_rows_file.schema_file_path,
                 ),
-                start_to_close_timeout=timedelta(seconds=config.read_archives_timeout),  # type: ignore
+                start_to_close_timeout=timedelta(seconds=config.write_tabular_timeout),  # type: ignore
                 retry_policy=retry_policy,
             )
 

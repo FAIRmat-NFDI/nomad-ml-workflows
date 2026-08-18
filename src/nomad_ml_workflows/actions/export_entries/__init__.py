@@ -19,6 +19,12 @@ class ExportEntriesActionEntryPoint(ActionEntryPoint):
         description='Timeout (in seconds) for the activity that reads '
         'and writes the output file.',
     )
+    write_tabular_timeout: int = Field(
+        default=7200,  # 2 hours
+        gt=0,
+        description='Timeout (in seconds) for the activity that writes '
+        'the output tabular file.',
+    )
     max_write_buffer_size_bytes: int = Field(
         default=1024 * 1024 * 64,  # 64 MB
         gt=0,
