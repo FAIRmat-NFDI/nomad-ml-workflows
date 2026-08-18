@@ -224,7 +224,7 @@ class ExtractEntriesWorkflowOutput(BaseModel):
     metadata_file_path: str = Field(
         '', description='Path to the generated metadata file.'
     )
-    data_file_path: str = Field('', description='Path to the generated data file.')
+    data_file_path: str = Field('', description='Path to the generated data artifact.')
     manifest_file_path: str = Field(
         '', description='Path to the generated manifest file.'
     )
@@ -404,15 +404,20 @@ class WriteTabularFileInput(BaseModel):
 
 
 class OutputFile(BaseModel):
-    file_path: str = Field(..., description='Path to the output file.')
-    file_size: int = Field(..., description='Size of the output file in bytes.')
+    file_path: str = Field(
+        ..., description='Path to the output file or Parquet dataset directory.'
+    )
+    file_size: int = Field(
+        ...,
+        description='Aggregate size of the output artifact files in bytes.',
+    )
     num_entries_exported: int = Field(..., description='Number of entries exported.')
 
 
 class ExportDatasetMetadata(BaseModel):
     num_entries_exported: int = Field(
         0,
-        description='Number of entries that were successfully exported in the data file. ',
+        description='Number of entries that were successfully exported in the data artifact.',
     )
     num_entries_available: int = Field(
         0,
