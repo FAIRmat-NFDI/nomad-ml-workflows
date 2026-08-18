@@ -26,7 +26,8 @@ The Export Entries action lets users:
 - save the generated dataset to a staging project/upload as a ZIP archive or directory.
 
 JSON preserves the selected archive structure. Parquet provides typed tabular data
-and preserves nested quantity values, while CSV represents nested values as JSON text.
+and preserves nested quantity values as a sharded dataset, while CSV represents nested
+values as JSON text.
 
 ### Action input
 
@@ -78,7 +79,8 @@ The generated ZIP archive or directory contains:
 
 | File | Contents |
 | --- | --- |
-| `data.json`, `data.parquet`, or `data.csv` | The exported archive data in the selected format. This file is omitted when no entries match. |
+| `data.json` or `data.csv` | The exported archive data in the selected single-file format. This file is omitted when no entries match. |
+| `data.parquet/part-NNNNN.parquet` | The exported Parquet dataset. Each deterministic part uses the same schema and the directory is omitted when no entries match. |
 | `selected_entries.json` | The ordered `entry_id` and `upload_id` pairs selected for export. |
 | `metadata.json` | The export metadata under `data`, together with its JSON schema and an explanatory note. |
 
@@ -87,6 +89,14 @@ The metadata records the original input, search timing, export-limit state, and 
 also records `nomad_deployment_api_host`, `nomad_version`, and
 `nomad_ml_workflows_version`. A zero-match export still contains `metadata.json` and
 an empty `selected_entries.json`.
+
+PyArrow reads the complete Parquet dataset directly from its directory:
+
+```python
+import pyarrow.parquet as pq
+
+table = pq.read_table('data.parquet')
+```
 
 ## ⚙️ Configuration
 
@@ -106,15 +116,18 @@ plugins:
 
         write_tabular_timeout: 7200
         # Start-to-close timeout, in seconds, for writing the output 
-        # tabular file.
+        # tabular artifact.
 
         max_write_buffer_size_bytes: 67108864  # 64 MB
-        # Target maximum number of encoded NDJSON input bytes before
-        # converting the buffer into a Arrow RecordBatch. One oversized
-        # row may exceed this target.
+        # Maximum number of encoded NDJSON input bytes represented by parsed
+        # rows buffered before writing to the output tabular file. Protects
+        # against rows with large encoded representations. One oversized row
+        # may exceed this target.
 
-        max_write_buffer_size_rows: 512
-        # Maximum number of parsed rows converted in one Arrow RecordBatch.
+        max_write_buffer_size_rows: 1024
+        # Maximum number of parsed rows buffered before writing to the output
+        # tabular file. Protects against many small or sparse rows whose Python
+        # and Arrow representations are much larger than their NDJSON bytes.
 ```
 
 ## 🚀 Adding this plugin to NOMAD
