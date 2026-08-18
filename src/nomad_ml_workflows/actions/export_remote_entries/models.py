@@ -107,7 +107,11 @@ class ExportRemoteEntriesUserInput(BaseModel):
     )
     search_settings: SearchSettings = Field(..., title='Search options')
     export_settings: ExportSettings = Field(..., title='Export options')
-    storage_settings: RemoteStorageSettings = Field(..., title='Remote storage options')
+    storage_settings: RemoteStorageSettings | None = Field(
+        default=None,
+        title='Remote storage options',
+        description='S3 storage options used when s3_mode is workflow_input.',
+    )
 
     @model_validator(mode='after')
     def validate_upload_destination(self) -> 'ExportRemoteEntriesUserInput':
@@ -115,6 +119,32 @@ class ExportRemoteEntriesUserInput(BaseModel):
         if self.save_to_upload and not self.upload_id:
             raise ValueError('upload_id is required when save_to_upload is enabled.')
         return self
+
+    @classmethod
+    def model_json_schema(cls, *args, **kwargs):
+        schema = super().model_json_schema(*args, **kwargs)
+        try:
+            from nomad_ml_workflows.actions.export_remote_entries import (
+                current_export_remote_entries_action_entry_point,
+            )
+
+            s3_mode = current_export_remote_entries_action_entry_point().s3_mode
+        except Exception:
+            s3_mode = 'env'
+
+        if s3_mode == 'workflow_input':
+            required = schema.setdefault('required', [])
+            if 'storage_settings' not in required:
+                required.append('storage_settings')
+            return schema
+
+        schema.get('properties', {}).pop('storage_settings', None)
+        required = schema.get('required', [])
+        if 'storage_settings' in required:
+            required.remove('storage_settings')
+        if not required:
+            schema.pop('required', None)
+        return schema
 
     @classmethod
     def get_schema_for_entry_point(
@@ -148,6 +178,13 @@ class ExportRemoteEntriesUserInput(BaseModel):
             )
 
         return DynamicExportRemoteEntriesUserInput
+
+
+class ResolveExportRemoteEntriesRuntimeOutput(BaseModel):
+    """Runtime configuration resolved for Export Remote Entries execution."""
+
+    s3_mode: Literal['env', 'workflow_input'] = 'env'
+    resolved_storage_settings: S3StorageSettings | None = None
 
 
 class ExportRemoteDatasetInput(BaseModel):

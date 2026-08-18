@@ -141,3 +141,126 @@ def test_get_schema_for_entry_point():
         'Oasis B (DESY)',
         'Oasis C (HZB)',
     ]
+
+
+def test_export_remote_entries_schema_omits_storage_settings_in_env_mode(monkeypatch):
+    from nomad_ml_workflows.actions.export_remote_entries import (
+        ExportRemoteEntriesActionEntryPoint,
+    )
+
+    monkeypatch.setattr(
+        'nomad.config.models.config.Config.get_plugin_entry_point',
+        lambda self, key: ExportRemoteEntriesActionEntryPoint(s3_mode='env'),
+    )
+    schema = ExportRemoteEntriesUserInput.model_json_schema()
+    assert 'storage_settings' not in schema.get('properties', {})
+    assert 'storage_settings' not in schema.get('required', [])
+
+
+def test_export_remote_entries_schema_exposes_storage_settings_in_workflow_input_mode(
+    monkeypatch,
+):
+    from nomad_ml_workflows.actions.export_remote_entries import (
+        ExportRemoteEntriesActionEntryPoint,
+    )
+
+    monkeypatch.setattr(
+        'nomad.config.models.config.Config.get_plugin_entry_point',
+        lambda self, key: ExportRemoteEntriesActionEntryPoint(s3_mode='workflow_input'),
+    )
+    schema = ExportRemoteEntriesUserInput.model_json_schema()
+    assert 'storage_settings' in schema['properties']
+    assert 'storage_settings' in schema['required']
+
+
+def test_resolve_s3_storage_settings_from_entrypoint_and_env(monkeypatch):
+    from nomad_ml_workflows.actions.export_remote_entries import (
+        ExportRemoteEntriesActionEntryPoint,
+    )
+
+    # 1. Test resolution from entrypoint config
+    ep = ExportRemoteEntriesActionEntryPoint(
+        s3_bucket='entrypoint-bucket',
+        s3_prefix='custom/prefix',
+        s3_endpoint_url='https://minio.custom.org',
+        s3_region='eu-west-1',
+        s3_access_key_id=SecretStr('ep-key'),
+        s3_secret_access_key=SecretStr('ep-secret'),
+        s3_session_token=SecretStr('ep-token'),
+    )
+    settings = ep.resolve_s3_storage_settings()
+    assert settings.bucket == 'entrypoint-bucket'
+    assert settings.prefix == 'custom/prefix'
+    assert settings.endpoint_url == 'https://minio.custom.org'
+    assert settings.region == 'eu-west-1'
+    assert settings.access_key_id.get_secret_value() == 'ep-key'
+    assert settings.secret_access_key.get_secret_value() == 'ep-secret'
+    assert settings.session_token.get_secret_value() == 'ep-token'
+
+    # 2. Test fallback to environment variables
+    ep_empty = ExportRemoteEntriesActionEntryPoint()
+    monkeypatch.setenv('S3_BUCKET', 'env-bucket')
+    monkeypatch.setenv('S3_PREFIX', 'env/prefix')
+    monkeypatch.setenv('AWS_ENDPOINT_URL_S3', 'https://s3.env.org')
+    monkeypatch.setenv('AWS_DEFAULT_REGION', 'us-east-2')
+    monkeypatch.setenv('AWS_ACCESS_KEY_ID', 'env-key')
+    monkeypatch.setenv('AWS_SECRET_ACCESS_KEY', 'env-secret')
+    monkeypatch.setenv('AWS_SESSION_TOKEN', 'env-token')
+
+    settings_env = ep_empty.resolve_s3_storage_settings()
+    assert settings_env.bucket == 'env-bucket'
+    assert settings_env.prefix == 'env/prefix'
+    assert settings_env.endpoint_url == 'https://s3.env.org'
+    assert settings_env.region == 'us-east-2'
+    assert settings_env.access_key_id.get_secret_value() == 'env-key'
+    assert settings_env.secret_access_key.get_secret_value() == 'env-secret'
+    assert settings_env.session_token.get_secret_value() == 'env-token'
+
+    # 3. Test error when bucket is missing
+    monkeypatch.delenv('S3_BUCKET')
+    with pytest.raises(ValueError, match='S3 bucket name is required'):
+        ep_empty.resolve_s3_storage_settings()
+
+
+def test_normalize_s3_storage_input():
+    from temporalio.exceptions import ApplicationError
+
+    from nomad_ml_workflows.actions.export_remote_entries.models import (
+        ResolveExportRemoteEntriesRuntimeOutput,
+    )
+    from nomad_ml_workflows.actions.export_remote_entries.workflows import (
+        ExportRemoteEntriesWorkflow,
+    )
+
+    user_input = ExportRemoteEntriesUserInput(
+        user_id='user1',
+        target_oases=['local'],
+        search_settings={
+            'owner': 'visible',
+            'max_entries': 10,
+            'query': '{}',
+            'required': [],
+        },
+        export_settings={'file_format': 'parquet', 'create_zip_archive': True},
+    )
+
+    # In workflow_input mode without storage_settings -> error
+    runtime_workflow_input = ResolveExportRemoteEntriesRuntimeOutput(
+        s3_mode='workflow_input'
+    )
+    with pytest.raises(ApplicationError, match='S3 storage settings are required'):
+        ExportRemoteEntriesWorkflow._normalize_s3_storage_input(
+            user_input, runtime_workflow_input
+        )
+
+    # In env mode with resolved settings -> successfully populates storage_settings
+    resolved = S3StorageSettings(bucket='auto-bucket')
+    runtime_env = ResolveExportRemoteEntriesRuntimeOutput(
+        s3_mode='env',
+        resolved_storage_settings=resolved,
+    )
+    normalized = ExportRemoteEntriesWorkflow._normalize_s3_storage_input(
+        user_input, runtime_env
+    )
+    assert normalized.storage_settings is not None
+    assert normalized.storage_settings.bucket == 'auto-bucket'

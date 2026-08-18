@@ -28,10 +28,31 @@ from nomad_ml_workflows.actions.export_entries.utils import (
 from nomad_ml_workflows.actions.export_remote_entries.models import (
     CopyRemoteDatasetToUploadInput,
     ExportRemoteDatasetInput,
+    ResolveExportRemoteEntriesRuntimeOutput,
     S3StorageSettings,
 )
 
 logger = get_logger(__name__)
+
+
+@activity.defn
+def resolve_export_remote_entries_runtime_activity() -> (
+    ResolveExportRemoteEntriesRuntimeOutput
+):
+    """Resolve runtime settings and S3 storage settings from entry point config and environment."""
+    from nomad_ml_workflows.actions.export_remote_entries import (
+        current_export_remote_entries_action_entry_point,
+    )
+
+    entry_point = current_export_remote_entries_action_entry_point()
+    resolved_storage_settings = None
+    if entry_point.s3_mode == 'env':
+        resolved_storage_settings = entry_point.resolve_s3_storage_settings()
+
+    return ResolveExportRemoteEntriesRuntimeOutput(
+        s3_mode=entry_point.s3_mode,
+        resolved_storage_settings=resolved_storage_settings,
+    )
 
 
 def _build_boto3_client_kwargs(storage_settings: S3StorageSettings) -> dict[str, Any]:

@@ -24,6 +24,7 @@ with workflow.unsafe.imports_passed_through():
     from nomad_ml_workflows.actions.export_remote_entries.activities import (
         copy_remote_dataset_to_upload,
         read_num_entries_exported,
+        resolve_export_remote_entries_runtime_activity,
         upload_dataset_to_remote_storage,
     )
     from nomad_ml_workflows.actions.export_remote_entries.models import (
@@ -32,6 +33,7 @@ with workflow.unsafe.imports_passed_through():
         ExportRemoteEntriesOutput,
         ExportRemoteEntriesUserInput,
         OasisExecutionResult,
+        ResolveExportRemoteEntriesRuntimeOutput,
     )
     from nomad_ml_workflows.actions.export_remote_entries.nexus_contract import (
         ExportRemoteEntriesService,
@@ -201,6 +203,27 @@ async def _execute_remote_nexus(
 class ExportRemoteEntriesWorkflow:
     """Workflow entry point for the action's aggregate result."""
 
+    @staticmethod
+    def _normalize_s3_storage_input(
+        data: ExportRemoteEntriesUserInput,
+        runtime: ResolveExportRemoteEntriesRuntimeOutput,
+    ) -> ExportRemoteEntriesUserInput:
+        """Validate and normalize S3 storage settings based on runtime s3_mode."""
+        if runtime.s3_mode == 'workflow_input':
+            if data.storage_settings is None:
+                raise ApplicationError(
+                    'S3 storage settings are required when export_remote_entries s3_mode is `workflow_input`.'
+                )
+            return data
+
+        if runtime.resolved_storage_settings is None:
+            raise ApplicationError(
+                'S3 storage settings could not be resolved from entrypoint or environment.'
+            )
+        return data.model_copy(
+            update={'storage_settings': runtime.resolved_storage_settings}
+        )
+
     @workflow.run
     async def run(
         self, data: ExportRemoteEntriesUserInput
@@ -208,6 +231,15 @@ class ExportRemoteEntriesWorkflow:
         """Extract matching entries across the requested Oases."""
         start_time = workflow.time()
         retry_policy = RetryPolicy(maximum_attempts=1)
+
+        runtime: ResolveExportRemoteEntriesRuntimeOutput = (
+            await workflow.execute_activity(
+                resolve_export_remote_entries_runtime_activity,
+                start_to_close_timeout=timedelta(minutes=1),
+                retry_policy=retry_policy,
+            )
+        )
+        data = self._normalize_s3_storage_input(data, runtime)
 
         tasks = []
         for target in data.target_oases:
