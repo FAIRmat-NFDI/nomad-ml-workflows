@@ -16,12 +16,14 @@ from nomad.metainfo import data_type as nomad_data_type
 from nomad.metainfo.metainfo import Quantity, Reference, Section
 
 from nomad_ml_workflows.actions.export_entries.models import ManifestEntry
+from nomad_ml_workflows.actions.export_entries.tabular_writers import (
+    create_tabular_writer,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     import pyarrow as pa
-
 
 IGNORED_KEYS = ['m_def', 'm_def_id', 'm_ref_archives']
 _STRINGIFY_JSON_KEY = b'nomad:stringify-json'
@@ -656,31 +658,6 @@ def _tabular_output_file_format(output_file_path: Path) -> str:
     return output_file_format
 
 
-def _create_tabular_writer(
-    output_file_path: Path,
-    output_file_format: str,
-    schema: pa.Schema,
-):
-    _, pcsv, pq = require_pyarrow()
-    if output_file_format == 'csv':
-        return pcsv.CSVWriter(output_file_path, schema)
-    return pq.ParquetWriter(
-        output_file_path,
-        schema,
-        compression='zstd',
-        compression_level=3,
-        use_dictionary=True,
-    )
-
-
-def _write_tabular_table(writer, table: pa.Table, output_file_format: str) -> None:
-    if output_file_format == 'parquet':
-        writer.write_table(table, row_group_size=table.num_rows)
-    else:
-        # pcsv.CSVWriter.write_table does not support row_group_size
-        writer.write_table(table)
-
-
 def write_table_rows_to_tabular_file(  # noqa: PLR0913
     table_rows_file_path: Path,
     output_file_path: Path,
@@ -719,12 +696,8 @@ def write_table_rows_to_tabular_file(  # noqa: PLR0913
     buffered_input_bytes = 0
     count = 0
 
-    with (
-        open(table_rows_file_path, 'rb') as input_file,
-        _create_tabular_writer(
-            output_file_path, output_file_format, output_schema
-        ) as writer,
-    ):
+    writer = create_tabular_writer(output_file_path, output_schema)
+    with open(table_rows_file_path, 'rb') as input_file, writer:
 
         def flush_batch() -> None:
             nonlocal buffered_input_bytes, count  # update from flush
@@ -740,10 +713,11 @@ def write_table_rows_to_tabular_file(  # noqa: PLR0913
             if output_file_format == 'csv':
                 batch = _stringify_nested_columns(batch, output_schema)
             table = pa.Table.from_batches([batch], schema=output_schema)
-            _write_tabular_table(writer, table, output_file_format)
+            written_path = writer.write_table(table)
             if logger:
                 logger.info(
-                    f'Flushed {len(buffered_rows)} rows, {buffered_input_bytes} bytes'
+                    f'Flushed {len(buffered_rows)} rows, '
+                    f'{buffered_input_bytes} bytes to {written_path.name}'
                 )
             count += table.num_rows
             buffered_rows.clear()

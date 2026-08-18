@@ -2,6 +2,7 @@ import json
 import multiprocessing
 import shutil
 import zipfile
+from collections.abc import Iterator
 from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
@@ -42,11 +43,43 @@ config = nomad_config.get_plugin_entry_point(
 )
 logger = get_logger(__name__)
 
-DATA_FILE_NAME = 'data'
+DATA_ARTIFACT_NAME = 'data'
 MANIFEST_FILE_NAME = 'selected_entries'
 METADATA_FILE_NAME = 'metadata'
 TABLE_ROWS_FILE_NAME = 'table_rows.tmp.ndjson'
 TABLE_SCHEMA_FILE_NAME = 'table_schema.tmp.arrow'
+
+
+def _artifact_size(path: Path) -> int:
+    """Return the aggregate byte size of a file or dataset directory."""
+    if path.is_file():
+        return path.stat().st_size
+    return sum(child.stat().st_size for child in path.rglob('*') if child.is_file())
+
+
+def _discover_exportable_artifacts(artifacts_directory: Path) -> list[Path]:
+    """Find metadata, manifest, and data artifacts in their public order."""
+    export_order = (METADATA_FILE_NAME, MANIFEST_FILE_NAME, DATA_ARTIFACT_NAME)
+    artifacts_by_stem = {
+        path.stem: path
+        for path in artifacts_directory.iterdir()
+        if (path.is_file() or path.is_dir()) and path.stem in export_order
+    }
+    return [
+        artifacts_by_stem[stem] for stem in export_order if stem in artifacts_by_stem
+    ]
+
+
+def _iter_artifact_files(
+    artifacts: list[Path],
+) -> Iterator[tuple[Path, Path]]:
+    """Yield files and paths relative to the exported dataset root."""
+    for artifact in artifacts:
+        if artifact.is_file():
+            yield artifact, Path(artifact.name)
+            continue
+        for file_path in sorted(path for path in artifact.rglob('*') if path.is_file()):
+            yield file_path, Path(artifact.name) / file_path.relative_to(artifact)
 
 
 @activity.defn
@@ -126,7 +159,7 @@ def read_archives_and_write_output_json(
         action_instance_artifacts_dir(data.export_entries_workflow_id)
     )
     manifest_file_path = artifacts_subdirectory / f'{MANIFEST_FILE_NAME}.json'
-    output_file_path = artifacts_subdirectory / f'{DATA_FILE_NAME}.json'
+    output_file_path = artifacts_subdirectory / f'{DATA_ARTIFACT_NAME}.json'
     temporary_output_file_path = output_file_path.with_stem(
         f'{output_file_path.stem}.tmp'
     )
@@ -202,13 +235,13 @@ def _write_output_tabular(
         action_instance_artifacts_dir(data.export_entries_workflow_id)
     )
     output_file_path = (
-        artifacts_subdirectory / f'{DATA_FILE_NAME}.{data.output_file_format}'
+        artifacts_subdirectory / f'{DATA_ARTIFACT_NAME}.{data.output_file_format}'
     )
     temporary_output_file_path = output_file_path.with_stem(
         f'{output_file_path.stem}.tmp'
     )
 
-    activity_logger.info('Writing table rows to tabular file...')
+    activity_logger.info('Writing table rows to tabular artifact...')
     num_entries_exported = write_table_rows_to_tabular_file(
         Path(data.table_rows_file_path),
         temporary_output_file_path,
@@ -220,12 +253,12 @@ def _write_output_tabular(
     temporary_output_file_path.replace(output_file_path)
     activity_logger.info(
         f'{num_entries_exported} table rows written to '
-        f'"data.{data.output_file_format}" file.'
+        f'"data.{data.output_file_format}" artifact.'
     )
 
     return OutputFile(
         file_path=output_file_path.as_posix(),
-        file_size=output_file_path.stat().st_size,
+        file_size=_artifact_size(output_file_path),
         num_entries_exported=num_entries_exported,
     )
 
@@ -313,23 +346,14 @@ async def export_dataset_to_upload(data: ExportDatasetInput) -> str:
         action_instance_artifacts_dir(data.export_entries_workflow_id)
     )
 
-    # Discover metadata, manifest, and data files in the artifacts subdirectory
-    export_order = (METADATA_FILE_NAME, MANIFEST_FILE_NAME, DATA_FILE_NAME)
-    files_by_stem = {
-        path.stem: path
-        for path in artifacts_subdirectory.iterdir()
-        if path.is_file() and path.stem in export_order
-    }
-    exportable_filepaths = [
-        files_by_stem[stem] for stem in export_order if stem in files_by_stem
-    ]
+    exportable_artifacts = _discover_exportable_artifacts(artifacts_subdirectory)
 
     # Create a zip file containing all the source paths and the metadata file
     if data.zip_output:
         zippath = artifacts_subdirectory / f'{exportable_dir_name}.zip'
         with zipfile.ZipFile(zippath, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
-            for filepath in exportable_filepaths:
-                zipf.write(filepath, arcname=filepath.name)
+            for filepath, relative_path in _iter_artifact_files(exportable_artifacts):
+                zipf.write(filepath, arcname=relative_path.as_posix())
         # Add zip file to the NOMAD Upload
         upload_files.add_rawfiles(target_path=zippath.as_posix(), auto_decompress=False)
         return zippath.name
@@ -337,13 +361,15 @@ async def export_dataset_to_upload(data: ExportDatasetInput) -> str:
     # If not zipping, copy files to directory named exportable_dir_name
     exportable_dir_path = artifacts_subdirectory / exportable_dir_name
     exportable_dir_path.mkdir(exist_ok=True)
-    for filepath in exportable_filepaths:
-        temp_path = exportable_dir_path / filepath.name
-        shutil.copy2(filepath, temp_path)
-        # Add directory to the NOMAD Upload
-        upload_files.add_rawfiles(
-            target_path=exportable_dir_path.as_posix(), target_dir=exportable_dir_name
-        )
+    for artifact in exportable_artifacts:
+        destination_path = exportable_dir_path / artifact.name
+        if artifact.is_dir():
+            shutil.copytree(artifact, destination_path, dirs_exist_ok=True)
+        else:
+            shutil.copy2(artifact, destination_path)
+    upload_files.add_rawfiles(
+        target_path=exportable_dir_path.as_posix(), target_dir=exportable_dir_name
+    )
     return exportable_dir_name
 
 
