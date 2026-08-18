@@ -670,6 +670,15 @@ def write_table_rows_to_tabular_file(  # noqa: PLR0913
     """
     Stream flattened rows from NDJSON into bounded Parquet or CSV batches.
 
+    Every Parquet batch is written to an independently closed part in the output
+    dataset directory using an independent writer. If one writer is used for all
+    batches, resulting in one big parquet file, the memory usage grows linearly
+    with the number of batches: each batch contributes to the footer metadata
+    that is written only once at the end. This can only be avoided by using an
+    independent writer for each batch.
+
+    CSV keeps one writer open for the complete output.
+
     The fixed union schema and column normalization settings are loaded from an Arrow
     IPC schema sidecar created during NDJSON generation. Parsed rows are flushed when
     either their count reaches ``max_buffer_rows`` or their encoded NDJSON input reaches
