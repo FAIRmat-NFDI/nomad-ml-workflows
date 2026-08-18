@@ -32,7 +32,6 @@ from nomad_ml_workflows.actions.export_entries.models import (
 )
 from nomad_ml_workflows.actions.export_entries.utils import (
     generate_archives,
-    require_pyarrow,
     write_dicts_to_json,
     write_table_rows_to_ndjson,
     write_table_rows_to_tabular_file,
@@ -189,8 +188,6 @@ def read_archives_and_write_table_rows(
     """
     Read archives and write flattened NDJSON rows plus their Arrow schema sidecar.
     """
-    require_pyarrow()
-
     activity_type = activity.info().activity_type
 
     activity_logger = logger.bind(activity_type=activity_type)
@@ -269,8 +266,6 @@ def write_output_tabular(data: WriteTabularFileInput) -> OutputFile:
     Stream temporary NDJSON rows and their schema to Parquet or CSV.
     Runs in an isolated process to ensure that memory is released after execution.
     """
-    require_pyarrow()
-
     activity_type = activity.info().activity_type
 
     # TODO: add the temporal context to the subprocess for logging
