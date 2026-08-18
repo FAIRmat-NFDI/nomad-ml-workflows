@@ -3,7 +3,7 @@ from __future__ import annotations
 import importlib
 import json
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any
@@ -514,6 +514,39 @@ def _stringify_nested_columns(
             new_columns.append(column)
 
     return pa.RecordBatch.from_arrays(new_columns, schema=csv_schema)
+
+
+def artifact_size(path: Path) -> int:
+    """Return the aggregate byte size of a file or dataset directory."""
+    if path.is_file():
+        return path.stat().st_size
+    return sum(child.stat().st_size for child in path.rglob('*') if child.is_file())
+
+
+def discover_exportable_artifacts(
+    artifacts_directory: Path, export_order: tuple[str, ...]
+) -> list[Path]:
+    """Find metadata, manifest, and data artifacts in their public order."""
+    artifacts_by_stem = {
+        path.stem: path
+        for path in artifacts_directory.iterdir()
+        if (path.is_file() or path.is_dir()) and path.stem in export_order
+    }
+    return [
+        artifacts_by_stem[stem] for stem in export_order if stem in artifacts_by_stem
+    ]
+
+
+def iter_artifact_files(
+    artifacts: list[Path],
+) -> Iterator[tuple[Path, Path]]:
+    """Yield files and paths relative to the exported dataset root."""
+    for artifact in artifacts:
+        if artifact.is_file():
+            yield artifact, Path(artifact.name)
+            continue
+        for file_path in sorted(path for path in artifact.rglob('*') if path.is_file()):
+            yield file_path, Path(artifact.name) / file_path.relative_to(artifact)
 
 
 def generate_archives(
