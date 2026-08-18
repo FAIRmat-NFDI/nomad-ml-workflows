@@ -136,6 +136,8 @@ def test_get_schema_for_entry_point():
     target_oases_props = schema['properties']['target_oases']
 
     assert target_oases_props['enum'] == ['local', 'oasis_b', 'oasis_c']
+    assert target_oases_props['items']['enum'] == ['local', 'oasis_b', 'oasis_c']
+    assert target_oases_props['uniqueItems'] is True
     assert target_oases_props['uiSchema']['ui:enumNames'] == [
         'Local (Oasis A)',
         'Oasis B (DESY)',

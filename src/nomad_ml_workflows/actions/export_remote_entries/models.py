@@ -170,6 +170,8 @@ class ExportRemoteEntriesUserInput(BaseModel):
                 description='Select target Oases for entry extraction.',
                 json_schema_extra={
                     'enum': options,
+                    'items': {'type': 'string', 'enum': options},
+                    'uniqueItems': True,
                     'uiSchema': {
                         'ui:widget': 'checkboxes',
                         'ui:enumNames': labels,
