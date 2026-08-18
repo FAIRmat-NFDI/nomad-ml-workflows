@@ -104,6 +104,10 @@ plugins:
         # Start-to-close timeout, in seconds, for reading archives and
         # writing the selected output format.
 
+        write_tabular_timeout: 7200
+        # Start-to-close timeout, in seconds, for writing the output 
+        # tabular file.
+
         max_write_buffer_size_bytes: 67108864  # 64 MB
         # Target maximum number of encoded NDJSON input bytes before
         # converting the buffer into a Arrow RecordBatch. One oversized

@@ -13,8 +13,9 @@ with workflow.unsafe.imports_passed_through():
         export_dataset_to_upload,
         prepare_manifest,
         read_archives_and_write_output_json,
-        read_archives_and_write_output_tabular,
+        read_archives_and_write_table_rows,
         write_metadata_file,
+        write_output_tabular,
     )
     from nomad_ml_workflows.actions.export_entries.models import (
         CleanupArtifactsInput,
@@ -28,7 +29,9 @@ with workflow.unsafe.imports_passed_through():
         OutputFile,
         PrepareManifestInput,
         ReadArchivesWorkflowInput,
+        TableRowsFileOutput,
         WriteMetadataFileInput,
+        WriteTabularFileInput,
     )
 
 config = nomad_config.get_plugin_entry_point(
@@ -54,10 +57,21 @@ class ReadArchivesWorkflow:
                 retry_policy=retry_policy,
             )
         else:
-            return await workflow.execute_activity(
-                read_archives_and_write_output_tabular,
+            table_rows_file: TableRowsFileOutput = await workflow.execute_activity(
+                read_archives_and_write_table_rows,
                 data,
                 start_to_close_timeout=timedelta(seconds=config.read_archives_timeout),  # type: ignore
+                retry_policy=retry_policy,
+            )
+            return await workflow.execute_activity(
+                write_output_tabular,
+                WriteTabularFileInput(
+                    export_entries_workflow_id=data.export_entries_workflow_id,
+                    output_file_format=data.output_file_format,
+                    table_rows_file_path=table_rows_file.table_rows_file_path,
+                    schema_file_path=table_rows_file.schema_file_path,
+                ),
+                start_to_close_timeout=timedelta(seconds=config.write_tabular_timeout),  # type: ignore
                 retry_policy=retry_policy,
             )
 

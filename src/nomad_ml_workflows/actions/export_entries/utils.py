@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 
 
 IGNORED_KEYS = ['m_def', 'm_def_id', 'm_ref_archives']
+_STRINGIFY_JSON_KEY = b'nomad:stringify-json'
 
 
 @lru_cache(maxsize=1)
@@ -365,21 +366,90 @@ def _ordered_columns(columns: Iterable[str]) -> list[str]:
     return [*identifier_columns, *remaining_columns]
 
 
-def _table_column_configs(
-    columns_quantity_def: dict[str, Quantity],
+def _ensure_column_configs_consistency(
+    column_configs: dict[str, _ArrowColumnConfig],
 ) -> dict[str, _ArrowColumnConfig]:
-    """
-    Build ordered Arrow column configs based on the columns quantity definition.
-    Adds 'entry_id' and 'upload_id' columns to the configs.
-    """
+    """Add identifier columns and return configs in deterministic column order."""
     pa, _, _ = require_pyarrow()
-    configs = {
-        column: _quantity_to_arrow_column_config(quantity_def)
-        for column, quantity_def in columns_quantity_def.items()
+
+    # add identifier columns to the schema
+    if 'entry_id' not in column_configs:
+        column_configs['entry_id'] = _ArrowColumnConfig(pa.string())
+    if 'upload_id' not in column_configs:
+        column_configs['upload_id'] = _ArrowColumnConfig(pa.string())
+
+    # column configs in deterministic order
+    column_configs = {
+        column: column_configs[column] for column in _ordered_columns(column_configs)
     }
-    configs['entry_id'] = _ArrowColumnConfig(pa.string())
-    configs['upload_id'] = _ArrowColumnConfig(pa.string())
-    return {column: configs[column] for column in _ordered_columns(configs)}
+
+    return column_configs
+
+
+def _arrow_schema_from_column_configs(
+    column_configs: dict[str, _ArrowColumnConfig],
+) -> pa.Schema:
+    """Build an output Arrow schema with column configs."""
+    pa, _, _ = require_pyarrow()
+    return pa.schema(
+        [
+            pa.field(column_name, config.arrow_type)
+            for column_name, config in column_configs.items()
+        ]
+    )
+
+
+def _write_table_schema(
+    schema_file_path: Path,
+    column_configs: dict[str, _ArrowColumnConfig],
+) -> None:
+    """Serialize ordered column configs as an Arrow IPC schema sidecar."""
+    pa, _, _ = require_pyarrow()
+
+    column_configs = _ensure_column_configs_consistency(column_configs)
+    stored_schema = pa.schema(
+        [
+            pa.field(
+                column_name,
+                config.arrow_type,
+                metadata={
+                    _STRINGIFY_JSON_KEY: (
+                        b'true' if config.stringify_json else b'false'
+                    )
+                },
+            )
+            for column_name, config in column_configs.items()
+        ]
+    )
+    with open(schema_file_path, 'wb') as schema_file:
+        schema_file.write(stored_schema.serialize())
+
+
+def _read_table_schema(
+    schema_file_path: Path,
+) -> tuple[dict[str, _ArrowColumnConfig], pa.Schema]:
+    """Load column configs and a metadata-free output schema from a sidecar."""
+    pa, _, _ = require_pyarrow()
+    with pa.memory_map(str(schema_file_path), 'r') as source:
+        stored_schema = pa.ipc.read_schema(source)
+
+    column_configs: dict[str, _ArrowColumnConfig] = {}
+    for field in stored_schema:
+        stringify_json = (field.metadata or {}).get(_STRINGIFY_JSON_KEY)
+        if stringify_json not in {b'true', b'false'}:
+            raise ValueError(
+                f'Missing or invalid stringify-json setting for column {field.name!r}.'
+            )
+        column_configs[field.name] = _ArrowColumnConfig(
+            arrow_type=field.type,
+            stringify_json=stringify_json == b'true',
+        )
+
+    # reconstruct the schema from the column configs
+    # without the custom metadata (stringify_json flags are preserved)
+    schema = _arrow_schema_from_column_configs(column_configs)
+
+    return column_configs, schema
 
 
 def _table_rows_to_arrow_batch(
@@ -547,16 +617,17 @@ def write_dicts_to_json(items: Iterable[dict], output_file_path: Path) -> int:
     return count
 
 
-def write_table_rows_to_ndjson(
+def write_table_rows_to_ndjson(  # noqa: PLR0913, PLR0917
     manifest: list[ManifestEntry],
     required: str | dict[str, Any],
     user_id: str,
     output_file_path: Path,
+    schema_file_path: Path,
     logger=None,
-) -> dict[str, Quantity]:
+) -> None:
     if not output_file_path.suffix == '.ndjson':
         raise ValueError('ouput_file_path should have .ndjson extension.')
-    columns_quantity_def: dict[str, Quantity] = {}
+    column_configs: dict[str, _ArrowColumnConfig] = {}
 
     table_rows_with_columns_quantity_def = generate_table_rows(
         manifest, required, user_id, logger
@@ -566,13 +637,16 @@ def write_table_rows_to_ndjson(
         for table_row in table_rows_with_columns_quantity_def:
             # accumulate only the schema information
             for column, quantity_def in table_row.columns_quantity_def.items():
-                columns_quantity_def.setdefault(column, quantity_def)
+                if column not in column_configs:
+                    column_configs[column] = _quantity_to_arrow_column_config(
+                        quantity_def
+                    )
 
             # write the current row immediately
             json.dump(table_row.data_dict, file, separators=(',', ':'))
             file.write('\n')
 
-    return columns_quantity_def
+    _write_table_schema(schema_file_path, column_configs)
 
 
 def _tabular_output_file_format(output_file_path: Path) -> str:
@@ -610,7 +684,7 @@ def _write_tabular_table(writer, table: pa.Table, output_file_format: str) -> No
 def write_table_rows_to_tabular_file(  # noqa: PLR0913
     table_rows_file_path: Path,
     output_file_path: Path,
-    columns_quantity_def: dict[str, Quantity],
+    schema_file_path: Path,
     *,
     max_buffer_bytes: int = 64 * 1024 * 1024,
     max_buffer_rows: int = 512,
@@ -619,10 +693,10 @@ def write_table_rows_to_tabular_file(  # noqa: PLR0913
     """
     Stream flattened rows from NDJSON into bounded Parquet or CSV batches.
 
-    The complete set of quantity definitions is collected before this function is
-    called, allowing buffered rows to be normalized into one RecordBatch with a fixed
-    schema. Parsed rows are flushed when either their count reaches
-    ``max_buffer_rows`` or their encoded NDJSON input reaches ``max_buffer_bytes``.
+    The fixed union schema and column normalization settings are loaded from an Arrow
+    IPC schema sidecar created during NDJSON generation. Parsed rows are flushed when
+    either their count reaches ``max_buffer_rows`` or their encoded NDJSON input reaches
+    ``max_buffer_bytes``.
 
     A single row is always accepted. If its NDJSON input is larger than
     ``max_buffer_bytes``, it is logged and written immediately.
@@ -634,13 +708,7 @@ def write_table_rows_to_tabular_file(  # noqa: PLR0913
     if max_buffer_rows < 1:
         raise ValueError('max_buffer_rows must be at least 1.')
 
-    column_configs = _table_column_configs(columns_quantity_def)
-    arrow_schema = pa.schema(
-        [
-            pa.field(column_name, config.arrow_type)
-            for column_name, config in column_configs.items()
-        ]
-    )
+    column_configs, arrow_schema = _read_table_schema(schema_file_path)
     output_schema = (
         _get_csv_compatible_schema(arrow_schema)
         if output_file_format == 'csv'
@@ -716,9 +784,3 @@ def write_table_rows_to_tabular_file(  # noqa: PLR0913
         flush_batch()
 
     return count
-
-
-def worker_process_initializer() -> None:
-    from nomad.infrastructure import setup_mongo
-
-    setup_mongo()

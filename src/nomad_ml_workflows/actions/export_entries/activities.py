@@ -25,12 +25,13 @@ from nomad_ml_workflows.actions.export_entries.models import (
     PrepareManifestInput,
     PrepareManifestOutput,
     ReadArchivesWorkflowInput,
+    TableRowsFileOutput,
     WriteMetadataFileInput,
+    WriteTabularFileInput,
 )
 from nomad_ml_workflows.actions.export_entries.utils import (
     generate_archives,
     require_pyarrow,
-    worker_process_initializer,
     write_dicts_to_json,
     write_table_rows_to_ndjson,
     write_table_rows_to_tabular_file,
@@ -44,6 +45,8 @@ logger = get_logger(__name__)
 DATA_FILE_NAME = 'data'
 MANIFEST_FILE_NAME = 'selected_entries'
 METADATA_FILE_NAME = 'metadata'
+TABLE_ROWS_FILE_NAME = 'table_rows.tmp.ndjson'
+TABLE_SCHEMA_FILE_NAME = 'table_schema.tmp.arrow'
 
 
 @activity.defn
@@ -146,15 +149,58 @@ def read_archives_and_write_output_json(
     )
 
 
-def _read_archives_and_write_output_tabular(
-    data: ReadArchivesWorkflowInput, activity_type: str
-) -> OutputFile:
+@activity.defn
+def read_archives_and_write_table_rows(
+    data: ReadArchivesWorkflowInput,
+) -> TableRowsFileOutput:
+    """
+    Read archives and write flattened NDJSON rows plus their Arrow schema sidecar.
+    """
+    require_pyarrow()
+
+    activity_type = activity.info().activity_type
+
     activity_logger = logger.bind(activity_type=activity_type)
     artifacts_subdirectory = Path(
         action_instance_artifacts_dir(data.export_entries_workflow_id)
     )
     manifest_file_path = artifacts_subdirectory / f'{MANIFEST_FILE_NAME}.json'
-    table_rows_file_path = artifacts_subdirectory / 'table_rows.tmp.ndjson'
+    table_rows_file_path = artifacts_subdirectory / TABLE_ROWS_FILE_NAME
+    schema_file_path = artifacts_subdirectory / TABLE_SCHEMA_FILE_NAME
+    temporary_table_rows_file_path = (
+        artifacts_subdirectory / 'table_rows.partial.ndjson'
+    )
+    temporary_schema_file_path = artifacts_subdirectory / 'table_schema.partial.arrow'
+
+    # load manifest
+    with open(manifest_file_path, encoding='utf-8') as f:
+        manifest = [ManifestEntry(**entry) for entry in json.load(f)]
+
+    activity_logger.info('Reading archives and building the schema...')
+    write_table_rows_to_ndjson(
+        manifest,
+        data.required,
+        data.user_id,
+        temporary_table_rows_file_path,
+        temporary_schema_file_path,
+        activity_logger,
+    )
+    temporary_schema_file_path.replace(schema_file_path)
+    temporary_table_rows_file_path.replace(table_rows_file_path)
+
+    return TableRowsFileOutput(
+        table_rows_file_path=table_rows_file_path.as_posix(),
+        schema_file_path=schema_file_path.as_posix(),
+    )
+
+
+def _write_output_tabular(
+    data: WriteTabularFileInput, activity_type: str
+) -> OutputFile:
+    activity_logger = logger.bind(activity_type=activity_type)
+    artifacts_subdirectory = Path(
+        action_instance_artifacts_dir(data.export_entries_workflow_id)
+    )
     output_file_path = (
         artifacts_subdirectory / f'{DATA_FILE_NAME}.{data.output_file_format}'
     )
@@ -162,19 +208,11 @@ def _read_archives_and_write_output_tabular(
         f'{output_file_path.stem}.tmp'
     )
 
-    # load manifest
-    with open(manifest_file_path, encoding='utf-8') as f:
-        manifest = [ManifestEntry(**entry) for entry in json.load(f)]
-
-    activity_logger.info('Reading archives and building the schema...')
-    columns_quantity_def = write_table_rows_to_ndjson(
-        manifest, data.required, data.user_id, table_rows_file_path, activity_logger
-    )
     activity_logger.info('Writing table rows to tabular file...')
     num_entries_exported = write_table_rows_to_tabular_file(
-        table_rows_file_path,
+        Path(data.table_rows_file_path),
         temporary_output_file_path,
-        columns_quantity_def,
+        Path(data.schema_file_path),
         max_buffer_bytes=config.max_write_buffer_size_bytes,  # type: ignore
         max_buffer_rows=config.max_write_buffer_size_rows,  # type: ignore
         logger=activity_logger,
@@ -193,12 +231,9 @@ def _read_archives_and_write_output_tabular(
 
 
 @activity.defn
-def read_archives_and_write_output_tabular(
-    data: ReadArchivesWorkflowInput,
-) -> OutputFile:
+def write_output_tabular(data: WriteTabularFileInput) -> OutputFile:
     """
-    Reads archives and streams flattened table rows to Parquet or CSV.
-    Uses `pyarrow` for tabular output.
+    Stream temporary NDJSON rows and their schema to Parquet or CSV.
     Runs in an isolated process to ensure that memory is released after execution.
     """
     require_pyarrow()
@@ -209,11 +244,10 @@ def read_archives_and_write_output_tabular(
     # and propagating failure and cancellation policy
     with ProcessPoolExecutor(
         max_workers=1,
-        initializer=worker_process_initializer,
         mp_context=multiprocessing.get_context('spawn'),
     ) as executor:
         future = executor.submit(
-            _read_archives_and_write_output_tabular,
+            _write_output_tabular,
             data,
             activity_type,
         )
