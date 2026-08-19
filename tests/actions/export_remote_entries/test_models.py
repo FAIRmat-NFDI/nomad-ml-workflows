@@ -218,7 +218,12 @@ def test_resolve_s3_storage_settings_from_entrypoint_and_env(monkeypatch):
     assert settings_env.secret_access_key.get_secret_value() == 'env-secret'
     assert settings_env.session_token.get_secret_value() == 'env-token'
 
-    # 3. Test error when bucket is missing
+    # 3. Test explicit empty prefix overrides env variable
+    ep_root = ExportRemoteEntriesActionEntryPoint(s3_prefix='')
+    settings_root = ep_root.resolve_s3_storage_settings()
+    assert settings_root.prefix == ''
+
+    # 4. Test error when bucket is missing
     monkeypatch.delenv('S3_BUCKET')
     with pytest.raises(ValueError, match='S3 bucket name is required'):
         ep_empty.resolve_s3_storage_settings()

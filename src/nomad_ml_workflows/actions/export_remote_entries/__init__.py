@@ -65,8 +65,8 @@ class ExportRemoteEntriesActionEntryPoint(ActionEntryPoint):
         default=None,
         description='Default S3 bucket name when s3_mode is `env`.',
     )
-    s3_prefix: str = Field(
-        default='',
+    s3_prefix: str | None = Field(
+        default=None,
         description='Default S3 prefix when s3_mode is `env`.',
     )
     s3_endpoint_url: str | None = Field(
@@ -110,7 +110,7 @@ class ExportRemoteEntriesActionEntryPoint(ActionEntryPoint):
 
         prefix = (
             self.s3_prefix
-            if self.s3_prefix
+            if self.s3_prefix is not None
             else (os.environ.get('S3_PREFIX') or os.environ.get('AWS_S3_PREFIX') or '')
         )
 
