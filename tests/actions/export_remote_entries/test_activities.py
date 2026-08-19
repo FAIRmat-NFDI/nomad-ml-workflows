@@ -32,7 +32,7 @@ def test_read_num_entries_exported(mock_artifacts_dir, tmp_path):
 
 
 @pytest.mark.asyncio
-@patch('nomad_ml_workflows.actions.export_remote_entries.activities.boto3.client')
+@patch('boto3.client')
 @patch(
     'nomad_ml_workflows.actions.export_remote_entries.activities.action_instance_artifacts_dir'
 )
@@ -50,6 +50,9 @@ async def test_upload_dataset_to_remote_storage_s3_zipped(
     mock_artifacts_dir.return_value = artifacts_dir.as_posix()
 
     mock_s3 = MagicMock()
+    mock_s3.generate_presigned_url.return_value = (
+        'https://my-bucket.s3.amazonaws.com/my-folder/export_entries_2026.zip?signed'
+    )
     mock_boto_client.return_value = mock_s3
 
     storage_settings = S3StorageSettings(
@@ -86,11 +89,19 @@ async def test_upload_dataset_to_remote_storage_s3_zipped(
     call_args = mock_s3.upload_file.call_args[0]
     assert call_args[1] == 'my-bucket'
     assert call_args[2] == 'my-folder/export_entries_2026.zip'
-    assert remote_uri == 's3://my-bucket/my-folder/export_entries_2026.zip'
+    mock_s3.generate_presigned_url.assert_called_once_with(
+        'get_object',
+        Params={'Bucket': 'my-bucket', 'Key': 'my-folder/export_entries_2026.zip'},
+        ExpiresIn=172800,
+    )
+    assert (
+        remote_uri
+        == 'https://my-bucket.s3.amazonaws.com/my-folder/export_entries_2026.zip?signed'
+    )
 
 
 @pytest.mark.asyncio
-@patch('nomad_ml_workflows.actions.export_remote_entries.activities.boto3.client')
+@patch('boto3.client')
 @patch(
     'nomad_ml_workflows.actions.export_remote_entries.activities.action_instance_artifacts_dir'
 )
@@ -105,6 +116,9 @@ async def test_upload_dataset_to_remote_storage_s3_unzipped(
     mock_artifacts_dir.return_value = artifacts_dir.as_posix()
 
     mock_s3 = MagicMock()
+    mock_s3.generate_presigned_url.return_value = (
+        'https://my-bucket.s3.amazonaws.com/export_entries_2026/data.csv?signed'
+    )
     mock_boto_client.return_value = mock_s3
 
     storage_settings = S3StorageSettings(
@@ -127,11 +141,58 @@ async def test_upload_dataset_to_remote_storage_s3_unzipped(
     assert 'export_entries_2026/metadata.json' in uploaded_keys
     assert 'export_entries_2026/selected_entries.json' in uploaded_keys
     assert 'export_entries_2026/data.csv' in uploaded_keys
+    mock_s3.generate_presigned_url.assert_not_called()
     assert remote_uri == 's3://my-bucket/export_entries_2026/'
 
 
 @pytest.mark.asyncio
-@patch('nomad_ml_workflows.actions.export_remote_entries.activities.boto3.client')
+@patch('boto3.client')
+@patch(
+    'nomad_ml_workflows.actions.export_remote_entries.activities.action_instance_artifacts_dir'
+)
+async def test_upload_dataset_to_remote_storage_s3_unzipped_parquet_directory(
+    mock_artifacts_dir, mock_boto_client, tmp_path
+):
+    artifacts_dir = tmp_path / 'artifacts'
+    artifacts_dir.mkdir()
+    (artifacts_dir / 'metadata.json').write_text('{}')
+    (artifacts_dir / 'selected_entries.json').write_text('[]')
+    parquet_dir = artifacts_dir / 'data.parquet'
+    parquet_dir.mkdir()
+    (parquet_dir / 'part-00000.parquet').write_bytes(b'parquet-data-0')
+    (parquet_dir / 'part-00001.parquet').write_bytes(b'parquet-data-1')
+    mock_artifacts_dir.return_value = artifacts_dir.as_posix()
+
+    mock_s3 = MagicMock()
+    mock_boto_client.return_value = mock_s3
+
+    storage_settings = S3StorageSettings(
+        bucket='my-bucket',
+        prefix='',
+    )
+
+    dataset_input = ExportRemoteDatasetInput(
+        export_entries_workflow_id='wf-003',
+        storage_settings=storage_settings,
+        zip_output=False,
+        exportable_dir_name='export_entries_2026',
+    )
+
+    remote_uri = await upload_dataset_to_remote_storage(dataset_input)
+
+    expected_upload_count = 4
+    assert mock_s3.upload_file.call_count == expected_upload_count
+    uploaded_keys = [call[0][2] for call in mock_s3.upload_file.call_args_list]
+    assert 'export_entries_2026/metadata.json' in uploaded_keys
+    assert 'export_entries_2026/selected_entries.json' in uploaded_keys
+    assert 'export_entries_2026/data.parquet/part-00000.parquet' in uploaded_keys
+    assert 'export_entries_2026/data.parquet/part-00001.parquet' in uploaded_keys
+    mock_s3.generate_presigned_url.assert_not_called()
+    assert remote_uri == 's3://my-bucket/export_entries_2026/'
+
+
+@pytest.mark.asyncio
+@patch('boto3.client')
 @patch('nomad_ml_workflows.actions.export_remote_entries.activities.get_upload_files')
 async def test_copy_remote_dataset_to_upload_s3_zipped(
     mock_get_upload_files, mock_boto_client
@@ -146,7 +207,7 @@ async def test_copy_remote_dataset_to_upload_s3_zipped(
     data = CopyRemoteDatasetToUploadInput(
         user_id='user-123',
         upload_id='upload-123',
-        remote_uri='s3://my-bucket/exports/dataset.zip',
+        remote_uri='https://s3.example.com/my-bucket/exports/dataset.zip?X-Amz-Signature=123',
         storage_settings=S3StorageSettings(
             bucket='my-bucket',
             endpoint_url='https://s3.example.com',
@@ -166,7 +227,7 @@ async def test_copy_remote_dataset_to_upload_s3_zipped(
 
 
 @pytest.mark.asyncio
-@patch('nomad_ml_workflows.actions.export_remote_entries.activities.boto3.client')
+@patch('boto3.client')
 @patch('nomad_ml_workflows.actions.export_remote_entries.activities.get_upload_files')
 async def test_copy_remote_dataset_to_upload_s3_directory(
     mock_get_upload_files, mock_boto_client

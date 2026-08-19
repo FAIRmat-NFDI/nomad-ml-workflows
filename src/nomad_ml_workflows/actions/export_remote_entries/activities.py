@@ -7,9 +7,8 @@ import zipfile
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
-import boto3
 from nomad.actions.manager import action_instance_artifacts_dir
 from nomad.files import StagingUploadFiles
 from nomad.uploads import get_upload_files
@@ -28,10 +27,31 @@ from nomad_ml_workflows.actions.export_entries.utils import (
 from nomad_ml_workflows.actions.export_remote_entries.models import (
     CopyRemoteDatasetToUploadInput,
     ExportRemoteDatasetInput,
+    ResolveExportRemoteEntriesRuntimeOutput,
     S3StorageSettings,
 )
 
 logger = get_logger(__name__)
+
+
+@activity.defn
+def resolve_export_remote_entries_runtime_activity() -> (
+    ResolveExportRemoteEntriesRuntimeOutput
+):
+    """Resolve runtime settings and S3 storage settings from entry point config and environment."""
+    from nomad_ml_workflows.actions.export_remote_entries import (
+        current_export_remote_entries_action_entry_point,
+    )
+
+    entry_point = current_export_remote_entries_action_entry_point()
+    resolved_storage_settings = None
+    if entry_point.s3_mode == 'env':
+        resolved_storage_settings = entry_point.resolve_s3_storage_settings()
+
+    return ResolveExportRemoteEntriesRuntimeOutput(
+        s3_mode=entry_point.s3_mode,
+        resolved_storage_settings=resolved_storage_settings,
+    )
 
 
 def _build_boto3_client_kwargs(storage_settings: S3StorageSettings) -> dict[str, Any]:
@@ -89,13 +109,33 @@ def _unique_upload_filename(filename: str, upload_files: StagingUploadFiles) -> 
         count += 1
 
 
-def _parse_s3_uri(remote_uri: str) -> tuple[str, str]:
-    """Parse an S3 URI into its bucket and object key/prefix."""
+DEFAULT_PRESIGNED_URL_EXPIRATION_SECONDS = 2 * 24 * 3600  # 2 days (172800s)
+
+
+def _parse_s3_uri(
+    remote_uri: str, default_bucket: str | None = None
+) -> tuple[str, str]:
+    """Parse an S3 URI or presigned URL into its bucket and object key/prefix."""
     parsed_uri = urlparse(remote_uri)
-    key = parsed_uri.path.lstrip('/')
-    if parsed_uri.scheme != 's3' or not parsed_uri.netloc or not key:
-        raise ValueError(f'Invalid S3 URI: {remote_uri}')
-    return parsed_uri.netloc, key
+    if parsed_uri.scheme == 's3':
+        key = parsed_uri.path.lstrip('/')
+        if not parsed_uri.netloc or not key:
+            raise ValueError(f'Invalid S3 URI: {remote_uri}')
+        return parsed_uri.netloc, key
+    elif parsed_uri.scheme in ('http', 'https'):
+        path = unquote(parsed_uri.path.lstrip('/'))
+        if default_bucket and path.startswith(f'{default_bucket}/'):
+            key = path[len(default_bucket) + 1 :]
+            return default_bucket, key
+        elif default_bucket:
+            return default_bucket, path
+        parts = path.split('/', 1)
+        if len(parts) > 1:
+            return parts[0], parts[1]
+        elif parts and parts[0]:
+            return parsed_uri.netloc, parts[0]
+        raise ValueError(f'Could not determine S3 bucket/key from URL: {remote_uri}')
+    raise ValueError(f'Invalid S3 URI: {remote_uri}')
 
 
 def _upload_dataset_to_s3(
@@ -104,7 +144,9 @@ def _upload_dataset_to_s3(
     exportable_artifacts: list[Path],
     artifacts_subdirectory: Path,
 ) -> str:
-    """Upload exported dataset files to S3-compatible remote storage."""
+    """Upload exported dataset files to S3-compatible remote storage and return a presigned download URL."""
+    import boto3
+
     client_kwargs = _build_boto3_client_kwargs(storage_settings)
     s3_client = boto3.client('s3', **client_kwargs)
     bucket = storage_settings.bucket
@@ -118,7 +160,14 @@ def _upload_dataset_to_s3(
 
         object_key = _build_s3_key(prefix, f'{data.exportable_dir_name}.zip')
         s3_client.upload_file(zippath.as_posix(), bucket, object_key)
-        return f's3://{bucket}/{object_key}'
+        try:
+            return s3_client.generate_presigned_url(
+                'get_object',
+                Params={'Bucket': bucket, 'Key': object_key},
+                ExpiresIn=DEFAULT_PRESIGNED_URL_EXPIRATION_SECONDS,
+            )
+        except Exception:
+            return f's3://{bucket}/{object_key}'
 
     base_key_prefix = _build_s3_key(prefix, data.exportable_dir_name)
     for filepath, relative_path in iter_artifact_files(exportable_artifacts):
@@ -133,7 +182,9 @@ def _copy_dataset_from_s3_to_upload(
     storage_settings: S3StorageSettings,
 ) -> str:
     """Download an S3 dataset and add it to a NOMAD staging upload."""
-    bucket, key = _parse_s3_uri(data.remote_uri)
+    import boto3
+
+    bucket, key = _parse_s3_uri(data.remote_uri, default_bucket=storage_settings.bucket)
     client_kwargs = _build_boto3_client_kwargs(storage_settings)
     s3_client = boto3.client('s3', **client_kwargs)
     upload_files = _get_staging_upload_files(data.user_id, data.upload_id)
