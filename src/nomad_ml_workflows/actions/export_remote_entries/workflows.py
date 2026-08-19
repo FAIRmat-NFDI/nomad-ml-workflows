@@ -235,7 +235,7 @@ class ExportRemoteEntriesWorkflow:
         runtime: ResolveExportRemoteEntriesRuntimeOutput = (
             await workflow.execute_activity(
                 resolve_export_remote_entries_runtime_activity,
-                start_to_close_timeout=timedelta(minutes=1),
+                start_to_close_timeout=timedelta(minutes=10),
                 retry_policy=retry_policy,
             )
         )

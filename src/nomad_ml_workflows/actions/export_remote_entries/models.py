@@ -122,6 +122,7 @@ class ExportRemoteEntriesUserInput(BaseModel):
 
     @classmethod
     def model_json_schema(cls, *args, **kwargs):
+        """Sets the required property of `storage_settings` based on `s3_mode`."""
         schema = super().model_json_schema(*args, **kwargs)
         try:
             from nomad_ml_workflows.actions.export_remote_entries import (

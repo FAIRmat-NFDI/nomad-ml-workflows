@@ -123,7 +123,7 @@ def _parse_s3_uri(
             raise ValueError(f'Invalid S3 URI: {remote_uri}')
         return parsed_uri.netloc, key
     elif parsed_uri.scheme in ('http', 'https'):
-        path = parsed_uri.path.lstrip('/')
+        path = unquote(parsed_uri.path.lstrip('/'))
         if default_bucket and path.startswith(f'{default_bucket}/'):
             key = path[len(default_bucket) + 1 :]
             return default_bucket, key
