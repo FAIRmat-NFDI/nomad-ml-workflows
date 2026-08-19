@@ -106,7 +106,9 @@ class ExportRemoteEntriesUserInput(BaseModel):
         # },
     )
     search_settings: SearchSettings = Field(..., title='Search options')
-    export_settings: ExportSettings = Field(..., title='Export options')
+    export_settings: ExportSettings = Field(
+        default_factory=ExportSettings, title='Export options'
+    )
     storage_settings: RemoteStorageSettings | None = Field(
         default=None,
         title='Remote storage options',
@@ -200,7 +202,7 @@ class ExportRemoteDatasetInput(BaseModel):
         ..., description='Remote storage configuration.'
     )
     zip_output: bool = Field(
-        ..., description='Whether to create a zip file for the exported dataset.'
+        True, description='Whether to create a zip file for the exported dataset.'
     )
     exportable_dir_name: str = Field(
         ...,
@@ -218,7 +220,7 @@ class CopyRemoteDatasetToUploadInput(BaseModel):
         ..., description='S3 storage configuration.'
     )
     zip_output: bool = Field(
-        ..., description='Whether the remote dataset is a ZIP archive.'
+        True, description='Whether the remote dataset is a ZIP archive.'
     )
 
 
