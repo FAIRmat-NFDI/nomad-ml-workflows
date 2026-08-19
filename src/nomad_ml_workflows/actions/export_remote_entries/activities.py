@@ -7,7 +7,7 @@ import zipfile
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 from nomad.actions.manager import action_instance_artifacts_dir
 from nomad.files import StagingUploadFiles
@@ -170,22 +170,9 @@ def _upload_dataset_to_s3(
             return f's3://{bucket}/{object_key}'
 
     base_key_prefix = _build_s3_key(prefix, data.exportable_dir_name)
-    primary_object_key = None
     for filepath, relative_path in iter_artifact_files(exportable_artifacts):
         object_key = f'{base_key_prefix}/{relative_path.as_posix()}'
         s3_client.upload_file(filepath.as_posix(), bucket, object_key)
-        if filepath.stem == DATA_ARTIFACT_NAME or primary_object_key is None:
-            primary_object_key = object_key
-
-    if primary_object_key:
-        try:
-            return s3_client.generate_presigned_url(
-                'get_object',
-                Params={'Bucket': bucket, 'Key': primary_object_key},
-                ExpiresIn=DEFAULT_PRESIGNED_URL_EXPIRATION_SECONDS,
-            )
-        except Exception:
-            pass
 
     return f's3://{bucket}/{base_key_prefix}/'
 

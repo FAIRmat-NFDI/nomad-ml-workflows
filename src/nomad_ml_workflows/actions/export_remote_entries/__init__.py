@@ -243,12 +243,6 @@ def current_export_remote_entries_action_entry_point() -> (
         )
         if isinstance(loaded_entry_point, ExportRemoteEntriesActionEntryPoint):
             return loaded_entry_point
-        # Also check fallback ID
-        loaded_entry_point = nomad_config.get_plugin_entry_point(
-            'nomad_ml_workflows.actions:export_remote_entries'
-        )
-        if isinstance(loaded_entry_point, ExportRemoteEntriesActionEntryPoint):
-            return loaded_entry_point
     except Exception:
         pass
     return export_remote_entries_action_entry_point
