@@ -166,18 +166,21 @@ class ExportRemoteEntriesUserInput(BaseModel):
                 options.append(key)
                 labels.append(getattr(ep, 'display_name', key))
 
+        one_of = [{'const': opt, 'title': lbl} for opt, lbl in zip(options, labels)]
+
         class DynamicExportRemoteEntriesUserInput(cls):  # type: ignore
             target_oases: list[str] = Field(
                 default=['local'],
                 title='Target Oases',
                 description='Select target Oases for entry extraction.',
                 json_schema_extra={
-                    'enum': options,
-                    'items': {'type': 'string', 'enum': options},
+                    'items': {
+                        'type': 'string',
+                        'oneOf': one_of,
+                    },
                     'uniqueItems': True,
                     'uiSchema': {
-                        'ui:widget': 'checkboxes',
-                        'ui:enumNames': labels,
+                        'ui:widget': 'select',
                     },
                 },
             )
