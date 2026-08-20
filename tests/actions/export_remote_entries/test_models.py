@@ -135,14 +135,13 @@ def test_get_schema_for_entry_point():
     schema = DynamicModel.model_json_schema()
     target_oases_props = schema['properties']['target_oases']
 
-    assert target_oases_props['enum'] == ['local', 'oasis_b', 'oasis_c']
-    assert target_oases_props['items']['enum'] == ['local', 'oasis_b', 'oasis_c']
-    assert target_oases_props['uniqueItems'] is True
-    assert target_oases_props['uiSchema']['ui:enumNames'] == [
-        'Local (Oasis A)',
-        'Oasis B (DESY)',
-        'Oasis C (HZB)',
+    assert target_oases_props['items']['oneOf'] == [
+        {'const': 'local', 'title': 'Local (Oasis A)'},
+        {'const': 'oasis_b', 'title': 'Oasis B (DESY)'},
+        {'const': 'oasis_c', 'title': 'Oasis C (HZB)'},
     ]
+    assert target_oases_props['uniqueItems'] is True
+    assert target_oases_props['uiSchema'] == {'ui:widget': 'select'}
 
 
 def test_export_remote_entries_schema_omits_storage_settings_in_env_mode(monkeypatch):
