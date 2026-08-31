@@ -24,7 +24,12 @@ maintainers = [
     { name = "Sarthak Kapoor", email = "sarthak.kapoor@physik.hu-berlin.de" },
 ]
 license = { file = "LICENSE" }
-dependencies = ["nomad-lab>=1.4.3", "pydantic", "temporalio"]
+dependencies = [
+    "nomad-lab>=1.4.3",
+    "huggingface-hub",
+    "pydantic",
+    "temporalio",
+]
 
 [project.urls]
 Repository = "https://github.com/FAIRmat-NFDI/nomad-ml-workflows"
@@ -140,3 +145,4 @@ skip = [".github/*"]
 [project.entry-points.'nomad.plugin']
 export_entries_action_entry_point = "nomad_ml_workflows.actions:export_entries"
 export_remote_entries_action_entry_point = "nomad_ml_workflows.actions:export_remote_entries"
+model_schema = "nomad_ml_workflows.schema_packages:model_schema"
