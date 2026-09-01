@@ -1,11 +1,17 @@
+from __future__ import annotations
+
 import os
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from huggingface_hub import ModelCard
+from nomad.datamodel.context import Context
 from nomad.datamodel.data import ArchiveSection, Schema
 from nomad.datamodel.metainfo.annotations import ELNAnnotation, ELNComponentEnum
 from nomad.datamodel.metainfo.basesections.v1 import Entity, SectionReference
 from nomad.metainfo import Package, Quantity, Section, SubSection
+
+if TYPE_CHECKING:
+    from structlog import BoundLogger
 
 m_package = Package(name='ML model schema')
 
@@ -58,28 +64,29 @@ def _string_list_value(value: Any, key: str, notes: list[str]) -> list[str]:
     return []
 
 
-def _read_model_card(archive, model_card_file: str) -> str:
+def _read_model_card(model_card_file: str, context: Context) -> ModelCard:
+    """Reads and parses the model card from the raw file path in the given upload context."""
     if os.path.basename(model_card_file).lower() != 'readme.md':
         raise ValueError('The model card file must be named README.md.')
 
-    context = getattr(archive, 'm_context', None)
-    if context is None:
-        raise ValueError('The model card cannot be read without an archive context.')
-
     try:
-        with context.raw_file(model_card_file, 'rb') as model_card_stream:
-            content = model_card_stream.read()
+        with context.raw_file(model_card_file, 'rb') as fp:
+            content = fp.read()
     except (OSError, KeyError) as error:
         raise ValueError(f'Could not read the model card: {error}') from error
 
     if isinstance(content, bytes):
         try:
-            return content.decode('utf-8')
+            content = content.decode('utf-8')
         except UnicodeDecodeError as error:
             raise ValueError(f'The model card is not valid UTF-8: {error}') from error
-    if isinstance(content, str):
-        return content
-    raise ValueError('The model card is not a text file.')
+    if not isinstance(content, str):
+        raise ValueError('The model card is not a text file.')
+
+    try:
+        return ModelCard(content, ignore_metadata_errors=False)
+    except Exception as error:
+        raise ValueError(f'Could not parse the model card: {error}') from error
 
 
 class ModelArtifact(ArchiveSection):
@@ -239,11 +246,13 @@ class HuggingFaceModelCardEvaluation(Evaluation):
 class HuggingFaceModelCard(ArchiveSection):
     """Supported metadata imported from a Hugging Face model card README.
 
-    Find the full list of supported fields at https://huggingface.co/docs/hub/model-cards.
+    Find the full list of supported fields at https://huggingface.co/docs/hub/model-cards
+    and https://github.com/huggingface/hub-docs/blob/main/modelcard.md?plain=1
     """
 
     m_def = Section(label='Hugging Face model card')
 
+    model_name = Quantity(type=str)
     language = Quantity(
         type=str,
         shape=['*'],
@@ -253,8 +262,7 @@ class HuggingFaceModelCard(ArchiveSection):
     license_link = Quantity(type=str)
     library_name = Quantity(type=str)
     tags = Quantity(type=str, shape=['*'])
-    # pipeline_tag = Quantity(type=str)
-    # model_name = Quantity(type=str)
+    pipeline_tag = Quantity(type=str)
     datasets = Quantity(
         type=str,
         shape=['*'],
@@ -267,21 +275,11 @@ class HuggingFaceModelCard(ArchiveSection):
         shape=['*'],
         description='External Hugging Face identifiers for models this model derives from.',
     )
-    # base_model_relation = Quantity(type=str)
-    # new_version = Quantity(type=str)
+    base_model_relation = Quantity(type=str)
+    new_version = Quantity(type=str)
     markdown_content = Quantity(
         type=str,
         description='The Markdown body without its YAML front matter.',
-    )
-    normalization_status = Quantity(
-        type=str,
-        description='The result of the most recent model card normalization.',
-    )
-    normalization_notes = Quantity(type=str, shape=['*'])
-    derived_fields = Quantity(
-        type=str,
-        shape=['*'],
-        description='Inherited MLModel fields populated from the model card.',
     )
 
 
@@ -365,34 +363,62 @@ class HuggingFaceMLModel(MLModel):
         description='Metadata and Markdown imported from a Hugging Face model card.',
     )
 
-    def _clear_derived_fields(self, archive):
-        if self.model_card is None:
+    def _populate_evaluation_results(self, model_card: ModelCard, logger: BoundLogger):
+        """
+        Populate evaluation results from Hugging Face ``model-index`` metadata.
+        """
+        if not model_card.data or not model_card.data.eval_results:
             return
 
-        derived_fields = list(self.model_card.derived_fields or [])
-        previous_name = self.name
-        for field_name in derived_fields:
-            if field_name in self.m_def.all_quantities:
-                setattr(self, field_name, None)
-        self.model_card.derived_fields = []
-
-        metadata = getattr(archive, 'metadata', None)
-        if (
-            'name' in derived_fields
-            and metadata is not None
-            and metadata.entry_name == previous_name
-            and metadata.mainfile
-        ):
-            metadata.entry_name = os.path.basename(metadata.mainfile)
-
-    def _set_derived_field(self, field_name: str, value: Any):
-        if self.model_card is None:
+    def _populate_model_card_data(self, model_card: ModelCard, logger: BoundLogger):
+        if not model_card.data:
             return
-        setattr(self, field_name, value)
-        derived_fields = list(self.model_card.derived_fields or [])
-        if field_name not in derived_fields:
-            derived_fields.append(field_name)
-        self.model_card.derived_fields = derived_fields
+
+        data = model_card.data.to_dict()
+        if not data:
+            logger.warning('No Hugging Face model card metadata was found.')
+            return
+
+        notes = []
+        for field_name in _MODEL_CARD_SCALAR_FIELDS:
+            setattr(
+                self.model_card,
+                field_name,
+                _string_value(data.get(field_name, None), field_name, notes),
+            )
+        for field_name in _MODEL_CARD_LIST_FIELDS:
+            setattr(
+                self.model_card,
+                field_name,
+                _string_list_value(data.get(field_name, None), field_name, notes),
+            )
+        if notes:
+            logger.warning('\n'.join(notes))
+
+        unsupported_keys = sorted(
+            str(key) for key in data if key not in _SUPPORTED_MODEL_CARD_KEYS
+        )
+        if unsupported_keys:
+            logger.warning(
+                f'Ignored unsupported model card metadata fields: {", ".join(unsupported_keys)}.',
+            )
+
+        self._populate_evaluation_results(model_card, logger)
+
+    def _normalize_model_card(self, archive, logger):
+        if not self.model_card_file:
+            return
+
+        try:
+            model_card = _read_model_card(self.model_card_file, archive.m_context)
+        except ValueError as error:
+            logger.warning('failed to read model card', error=str(error))
+            return
+
+        self.model_card = HuggingFaceModelCard()
+
+        self.model_card.markdown_content = model_card.text.strip()
+        self._populate_model_card_data(model_card, logger)
 
     def _populate_generic_fields(self):
         if self.model_card is None:
@@ -407,12 +433,13 @@ class HuggingFaceMLModel(MLModel):
             'tags': self.model_card.tags,
         }
         for field_name, value in mappings.items():
-            if value is not None:
-                self._set_derived_field(field_name, value)
+            if value and not getattr(self, field_name):
+                setattr(self, field_name, value)
 
     def normalize(self, archive, logger):
-        self._clear_derived_fields(archive)
+        self._normalize_model_card(archive, logger)
         self._populate_generic_fields()
+
         super().normalize(archive, logger)
 
 
