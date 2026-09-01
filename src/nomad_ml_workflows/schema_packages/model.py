@@ -241,6 +241,7 @@ class HuggingFaceModelCardEvaluation(Evaluation):
         type=str,
         description='A URL identifying the source of the evaluation result.',
     )
+    metric_value = Quantity(type=str)
 
 
 class HuggingFaceModelCard(ArchiveSection):
