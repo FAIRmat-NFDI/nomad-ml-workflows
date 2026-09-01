@@ -6,7 +6,6 @@ from nomad.datamodel.data import ArchiveSection, Schema
 from nomad.datamodel.metainfo.annotations import ELNAnnotation, ELNComponentEnum
 from nomad.datamodel.metainfo.basesections.v1 import Entity, SectionReference
 from nomad.metainfo import Package, Quantity, Section, SubSection
-from nomad.metainfo.data_type import Any as AnyType
 
 m_package = Package(name='ML model schema')
 
@@ -138,26 +137,80 @@ class TrainingMetadata(ArchiveSection):
     )
 
 
-class TrainingDataset(SectionReference):
-    """A dataset used to train the model, referenced by entry or raw file."""
+class Dataset(ArchiveSection):
+    """A dataset available as NOMAD sections or raw files."""
 
-    m_def = Section(label='Training dataset')
+    m_def = Section(label='Dataset')
 
-    dataset_file = Quantity(
+    references = SubSection(
+        sub_section=SectionReference,
+        repeats=True,
+        description='References to NOMAD sections containing the dataset.',
+    )
+    files = Quantity(
         type=str,
-        description='A training dataset file stored as a raw file.',
+        shape=['*'],
+        description='Dataset stored as raw files.',
         a_eln=ELNAnnotation(component=ELNComponentEnum.FileEditQuantity),  # type: ignore
     )
 
 
-class HuggingFaceModelCardEvaluation(ArchiveSection):
+class TrainingDataset(Dataset):
+    """A dataset and split used to train the model."""
+
+    m_def = Section(label='Training dataset')
+
+    training_split = Quantity(
+        type=str,
+        description='The dataset split used for training, for example `train`.',
+        a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity),  # type: ignore
+    )
+
+
+class Evaluation(ArchiveSection):
+    """A model evaluation result for one task, dataset, split, and metric."""
+
+    m_def = Section(label='Evaluation')
+
+    task_name = Quantity(
+        type=str,
+        description='The task on which the model was evaluated. For example '
+        '`Crystal structure classification`.',
+        a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity),  # type: ignore
+    )
+    dataset = SubSection(
+        sub_section=Dataset,
+        description='The dataset used to evaluate the model.',
+    )
+    dataset_split = Quantity(
+        type=str,
+        description='The dataset split used for evaluation, for example `test`.',
+        a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity),  # type: ignore
+    )
+    metric_name = Quantity(
+        type=str,
+        description='The human-readable name of the reported evaluation metric, for example '
+        '`Top-5 Accuracy`, `F1`.',
+        a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity),  # type: ignore
+    )
+    metric_value = Quantity(
+        type=float,
+        description='The value of the reported evaluation metric.',
+        a_eln=ELNAnnotation(component=ELNComponentEnum.NumberEditQuantity),  # type: ignore
+    )
+
+
+class HuggingFaceModelCardEvaluation(Evaluation):
     """A flattened evaluation result from Hugging Face ``model-index`` metadata."""
 
-    m_def = Section(label='Model card evaluation result')
+    m_def = Section(label='Model card evaluation')
 
     model_name = Quantity(type=str)
-    task_type = Quantity(type=str)
-    task_name = Quantity(type=str)
+    task_type = Quantity(
+        type=str,
+        description='The machine-readable type of the task on which the model was evaluated, '
+        'for example `classification`, `regression`.',
+    )
     dataset_type = Quantity(type=str)
     dataset_name = Quantity(type=str)
     dataset_config = Quantity(type=str)
@@ -168,34 +221,19 @@ class HuggingFaceModelCardEvaluation(ArchiveSection):
         shape=['*', '2'],
         description='key-value pairs for additional arguments to `load_dataset()`',
     )
-    metric_type = Quantity(type=str)
-    metric_name = Quantity(type=str)
-    metric_value = Quantity(type=AnyType())
-    source_name = Quantity(type=str)
-    source_url = Quantity(type=str)
-
-
-def _model_index(model_card: ModelCard) -> list[HuggingFaceModelCardEvaluation]:
-    evaluations = []
-    for result in model_card.data.eval_results or []:
-        evaluations.append(
-            HuggingFaceModelCardEvaluation(
-                model_name=model_card.data.model_name,
-                task_type=result.task_type,
-                task_name=result.task_name,
-                dataset_type=result.dataset_type,
-                dataset_name=result.dataset_name,
-                dataset_config=result.dataset_config,
-                dataset_split=result.dataset_split,
-                dataset_revision=result.dataset_revision,
-                metric_type=result.metric_type,
-                metric_name=result.metric_name,
-                metric_value=result.metric_value,
-                source_name=result.source_name,
-                source_url=result.source_url,
-            )
-        )
-    return evaluations
+    metric_type = Quantity(
+        type=str,
+        description='The machine-readable type of the reported evaluation metric, '
+        'for example `accuracy`, `f1`.',
+    )
+    source_name = Quantity(
+        type=str,
+        description='The name of the source reporting the evaluation result.',
+    )
+    source_url = Quantity(
+        type=str,
+        description='A URL identifying the source of the evaluation result.',
+    )
 
 
 class HuggingFaceModelCard(ArchiveSection):
@@ -206,11 +244,6 @@ class HuggingFaceModelCard(ArchiveSection):
 
     m_def = Section(label='Hugging Face model card')
 
-    model_card_file = Quantity(
-        type=str,
-        description='A Hugging Face model card README.md stored as a raw file.',
-        a_eln=ELNAnnotation(component=ELNComponentEnum.FileEditQuantity),  # type: ignore
-    )
     language = Quantity(
         type=str,
         shape=['*'],
@@ -250,84 +283,6 @@ class HuggingFaceModelCard(ArchiveSection):
         shape=['*'],
         description='Inherited MLModel fields populated from the model card.',
     )
-    model_index = SubSection(
-        sub_section=HuggingFaceModelCardEvaluation,
-        repeats=True,
-        description='Structured evaluation results imported from model-index metadata.',
-    )
-
-    def _clear_derived_metadata(self):
-        for field_name in _MODEL_CARD_METADATA_FIELDS:
-            setattr(self, field_name, None)
-        self.model_index = []
-        self.normalization_status = None
-        self.normalization_notes = []
-
-    def _normalization_error(self, logger, message: str):
-        self.normalization_status = 'error'
-        self.normalization_notes = [message]
-        logger.warning('could_not_normalize_hugging_face_model_card', error=message)
-
-    def _populate_metadata(self, model_card: ModelCard, notes: list[str]):
-        data = model_card.data
-        for field_name in _MODEL_CARD_SCALAR_FIELDS:
-            setattr(
-                self,
-                field_name,
-                _string_value(getattr(data, field_name, None), field_name, notes),
-            )
-        for field_name in _MODEL_CARD_LIST_FIELDS:
-            setattr(
-                self,
-                field_name,
-                _string_list_value(getattr(data, field_name, None), field_name, notes),
-            )
-
-        self.model_index = _model_index(model_card)
-        if self.model_name is None and self.model_index:
-            self.model_name = self.model_index[0].model_name
-
-        metadata = data.to_dict()
-        if not metadata:
-            notes.append('No Hugging Face model card metadata was found.')
-            return
-
-        unsupported_keys = sorted(
-            str(key) for key in metadata if key not in _SUPPORTED_MODEL_CARD_KEYS
-        )
-        if unsupported_keys:
-            notes.append(
-                'Ignored unsupported model card metadata fields: '
-                + ', '.join(unsupported_keys)
-                + '.'
-            )
-
-    def _normalize_file(self, archive, logger):
-        try:
-            content = _read_model_card(archive, self.model_card_file)
-        except ValueError as error:
-            self._normalization_error(logger, str(error))
-            return
-
-        try:
-            model_card = ModelCard(content, ignore_metadata_errors=False)
-        except Exception as error:
-            self._normalization_error(
-                logger, f'Hugging Face model card validation failed: {error}'
-            )
-            return
-
-        notes = []
-        self.markdown_content = model_card.text.strip()
-        self._populate_metadata(model_card, notes)
-        self.normalization_status = 'partial' if notes else 'success'
-        self.normalization_notes = notes
-
-    def normalize(self, archive, logger):
-        self._clear_derived_metadata()
-        if self.model_card_file:
-            self._normalize_file(archive, logger)
-        super().normalize(archive, logger)
 
 
 class MLModel(Entity, Schema):
@@ -389,8 +344,9 @@ class MLModel(Entity, Schema):
         ),
     )
     evaluation_results = SubSection(
-        sub_section=SectionReference.m_def,
+        sub_section=Evaluation,
         repeats=True,
+        description='Evaluation results reported for the model.',
     )
 
 
@@ -399,6 +355,11 @@ class HuggingFaceMLModel(MLModel):
 
     m_def = Section(label='Hugging Face machine learning model')
 
+    model_card_file = Quantity(
+        type=str,
+        description='A Hugging Face model card README.md stored as a raw file.',
+        a_eln=ELNAnnotation(component=ELNComponentEnum.FileEditQuantity),  # type: ignore
+    )
     model_card = SubSection(
         sub_section=HuggingFaceModelCard,
         description='Metadata and Markdown imported from a Hugging Face model card.',
