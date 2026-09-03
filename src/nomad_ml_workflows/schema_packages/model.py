@@ -9,10 +9,10 @@ from nomad.datamodel.metainfo.annotations import ELNAnnotation, ELNComponentEnum
 from nomad.datamodel.metainfo.basesections import Entity
 from nomad.metainfo.metainfo import Package, Quantity, Section, SubSection
 
+from nomad_ml_workflows.hf import libraries as hf_libraries
+from nomad_ml_workflows.hf import tasks as hf_tasks
+from nomad_ml_workflows.hf import validate_hf_model_card
 from nomad_ml_workflows.schema_packages.dataset import Dataset
-from nomad_ml_workflows.schema_packages.hf import libraries as hf_libraries
-from nomad_ml_workflows.schema_packages.hf import tasks as hf_tasks
-from nomad_ml_workflows.schema_packages.hf import validate_hf_model_card
 
 if TYPE_CHECKING:
     from huggingface_hub import ModelCard
