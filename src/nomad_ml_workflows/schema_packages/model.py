@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING, Any
 
-from huggingface_hub import ModelCard
 from nomad.datamodel.context import Context
 from nomad.datamodel.data import ArchiveSection, Schema
 from nomad.datamodel.metainfo.annotations import ELNAnnotation, ELNComponentEnum
@@ -11,8 +10,12 @@ from nomad.datamodel.metainfo.basesections import Entity
 from nomad.metainfo.metainfo import Package, Quantity, Section, SubSection
 
 from nomad_ml_workflows.schema_packages.dataset import Dataset
+from nomad_ml_workflows.schema_packages.hf import libraries as hf_libraries
+from nomad_ml_workflows.schema_packages.hf import tasks as hf_tasks
+from nomad_ml_workflows.schema_packages.hf import validate_hf_model_card
 
 if TYPE_CHECKING:
+    from huggingface_hub import ModelCard
     from structlog import BoundLogger
 
 m_package = Package(name='ML model schema')
@@ -85,10 +88,7 @@ def _read_model_card(model_card_file: str, context: Context) -> ModelCard:
     if not isinstance(content, str):
         raise ValueError('The model card is not a text file.')
 
-    try:
-        return ModelCard(content, ignore_metadata_errors=False)
-    except Exception as error:
-        raise ValueError(f'Could not parse the model card: {error}') from error
+    return validate_hf_model_card(content)
 
 
 class ModelArtifact(ArchiveSection):
@@ -141,10 +141,6 @@ class Training(ArchiveSection):
 
     m_def = Section(label='Training metadata')
 
-    optimizer = SubSection(
-        sub_section=Optimizer,
-        description='The optimizer or optimization algorithm used for training.',
-    )
     epochs = Quantity(
         type=int,
         description='The number of completed training epochs.',
@@ -164,6 +160,10 @@ class Training(ArchiveSection):
         type=str,
         description='The dataset split used for training, for example `train`.',
         a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity),  # type: ignore
+    )
+    optimizer = SubSection(
+        sub_section=Optimizer,
+        description='The optimizer or optimization algorithm used for training.',
     )
 
 
@@ -279,28 +279,34 @@ class HuggingFaceModelCard(ArchiveSection):
 
 
 class MLModel(Entity, Schema):
-    """A generic, framework- and artifact-format-independent ML model entry."""
+    """A generic, library- and artifact-format-independent ML model entry."""
 
     m_def = Section(label='Machine learning model')
 
     task = Quantity(
         type=str,
-        description='The task for which the model is intended.',
-        a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity),  # type: ignore
+        description='The task for which the model is intended. E.g., "image-segmentation".',
+        a_eln=ELNAnnotation(
+            component=ELNComponentEnum.EnumEditQuantity,
+            props={'suggestions': hf_tasks},
+        ),  # type: ignore
     )
-    framework = Quantity(
+    library = Quantity(
         type=str,
-        description='The framework or library with which the model is used.',
-        a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity),  # type: ignore
+        description='The library with which the model is implemented. E.g., "pytorch".',
+        a_eln=ELNAnnotation(
+            component=ELNComponentEnum.EnumEditQuantity,
+            props={'suggestions': hf_libraries},
+        ),  # type: ignore
     )
-    framework_version = Quantity(
+    library_version = Quantity(
         type=str,
-        description='The version of the framework associated with the model.',
+        description='The version of the library associated with the model.',
         a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity),  # type: ignore
     )
     architecture = Quantity(
         type=str,
-        description='The architecture, model family, or other structural designation.',
+        description='The architecture, model family, or other structural designation. E.g., "resnet", "U-Net".',
         a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity),  # type: ignore
     )
     model_version = Quantity(
@@ -415,7 +421,7 @@ class HuggingFaceMLModel(MLModel):
             'name': self.model_card.model_name,
             'description': self.model_card.markdown_content,
             'task': self.model_card.pipeline_tag,
-            'framework': self.model_card.library_name,
+            'library': self.model_card.library_name,
             'license': self.model_card.license,
             'tags': self.model_card.tags,
         }

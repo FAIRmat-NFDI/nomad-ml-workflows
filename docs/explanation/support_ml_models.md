@@ -46,7 +46,7 @@ Required metadata:
 Optional metadata:
 
 - description
-- framework
+- library
 - model family or architecture name
 - version string
 - architecture details
@@ -90,7 +90,7 @@ This section captures structural metadata about the model when such metadata can
 
 Optional metadata:
 
-- framework
+- library
 - model family
 - architecture name
 - input signature summary
@@ -195,7 +195,7 @@ It must:
 
 It may:
 
-- populate framework, model family, or architecture fields if trusted metadata is present in the file
+- populate library, model family, or architecture fields if trusted metadata is present in the file
 - populate tensor inventory summaries such as tensor names, shapes, counts, and dtypes when these can be read safely
 
 It must never:
@@ -222,7 +222,7 @@ For `safetensors`, the parser must populate:
 
 When trusted metadata is available, the parser may also populate:
 
-- framework
+- library
 - model family or architecture name
 - tensor inventory summary
 - parser notes about extracted metadata

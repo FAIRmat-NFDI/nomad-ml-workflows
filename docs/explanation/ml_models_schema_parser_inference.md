@@ -84,8 +84,8 @@ Recommended content of the schema:
     - title or model name
     - description
     - task
-    - framework
-    - framework version
+    - library
+    - library version
     - architecture or model family
     - model version
 - Artifact metadata
@@ -121,7 +121,7 @@ Search behavior should support the main usage patterns:
 Recommended filters:
 
 - task
-- framework
+- library
 - architecture or model family
 - artifact format
 - inference availability
@@ -131,7 +131,7 @@ Recommended columns:
 
 - model name
 - task
-- framework
+- library
 - artifact format
 - inference available
 - creation time or upload time
