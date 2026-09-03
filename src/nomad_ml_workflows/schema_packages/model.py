@@ -168,16 +168,10 @@ class Training(ArchiveSection):
 
 
 class Evaluation(ArchiveSection):
-    """A model evaluation result for one task, dataset, split, and metric."""
+    """A model evaluation result for one dataset, split, and metric."""
 
     m_def = Section(label='Evaluation')
 
-    task_name = Quantity(
-        type=str,
-        description='The task on which the model was evaluated. For example '
-        '`Crystal structure classification`.',
-        a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity),  # type: ignore
-    )
     metric_name = Quantity(
         type=str,
         description='The human-readable name of the reported evaluation metric, for example '
@@ -235,7 +229,6 @@ class HuggingFaceModelCardEvaluation(Evaluation):
         type=str,
         description='A URL identifying the source of the evaluation result.',
     )
-    metric_value = Quantity(type=str)
 
 
 class HuggingFaceModelCard(ArchiveSection):
