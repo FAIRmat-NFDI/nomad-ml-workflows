@@ -119,20 +119,31 @@ class ModelArtifact(ArchiveSection):
     )
 
 
-class TrainingMetadata(ArchiveSection):
-    """Minimal framework-independent metadata describing model training."""
+class Optimizer(ArchiveSection):
+    """The optimizer or optimization algorithm used for training."""
 
-    m_def = Section(label='Training metadata')
+    m_def = Section(label='Optimizer')
 
-    optimizer = Quantity(
+    name = Quantity(
         type=str,
-        description='The optimizer or optimization algorithm used for training.',
+        description='The name of the optimizer or optimization algorithm.',
         a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity),  # type: ignore
     )
     learning_rate = Quantity(
         type=float,
         description='The learning rate used for training, when represented by one value.',
         a_eln=ELNAnnotation(component=ELNComponentEnum.NumberEditQuantity),  # type: ignore
+    )
+
+
+class Training(ArchiveSection):
+    """Minimal framework-independent metadata describing model training."""
+
+    m_def = Section(label='Training metadata')
+
+    optimizer = SubSection(
+        sub_section=Optimizer,
+        description='The optimizer or optimization algorithm used for training.',
     )
     epochs = Quantity(
         type=int,
