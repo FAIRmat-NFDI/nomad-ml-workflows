@@ -1,7 +1,9 @@
-from nomad.datamodel.data import ArchiveSection, Schema
+from nomad.datamodel.data import ArchiveSection, Package, Schema
 from nomad.datamodel.metainfo.annotations import ELNAnnotation, ELNComponentEnum
 from nomad.datamodel.metainfo.basesections import Entity
 from nomad.metainfo.metainfo import Quantity, Section
+
+m_package = Package(name='Dataset schema')
 
 
 class Dataset(Entity, Schema):
@@ -29,3 +31,6 @@ class Dataset(Entity, Schema):
         description='URLs to resources comprising the dataset.',
         a_eln=ELNAnnotation(component=ELNComponentEnum.URLEditQuantity),  # type: ignore
     )
+
+
+m_package.__init_metainfo__()
