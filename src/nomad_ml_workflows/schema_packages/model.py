@@ -7,8 +7,10 @@ from huggingface_hub import ModelCard
 from nomad.datamodel.context import Context
 from nomad.datamodel.data import ArchiveSection, Schema
 from nomad.datamodel.metainfo.annotations import ELNAnnotation, ELNComponentEnum
-from nomad.datamodel.metainfo.basesections.v1 import Entity, SectionReference
-from nomad.metainfo import Package, Quantity, Section, SubSection
+from nomad.datamodel.metainfo.basesections import Entity
+from nomad.metainfo.metainfo import Package, Quantity, Section, SubSection
+
+from nomad_ml_workflows.schema_packages.dataset import Dataset
 
 if TYPE_CHECKING:
     from structlog import BoundLogger
@@ -142,32 +144,11 @@ class TrainingMetadata(ArchiveSection):
         description='The number of samples in one training batch.',
         a_eln=ELNAnnotation(component=ELNComponentEnum.NumberEditQuantity),  # type: ignore
     )
-
-
-class Dataset(ArchiveSection):
-    """A dataset available as NOMAD sections or raw files."""
-
-    m_def = Section(label='Dataset')
-
-    references = SubSection(
-        sub_section=SectionReference,
-        repeats=True,
-        description='References to NOMAD sections containing the dataset.',
+    dataset = SubSection(
+        sub_section=Dataset,
+        description='The dataset used for training.',
     )
-    files = Quantity(
-        type=str,
-        shape=['*'],
-        description='Dataset stored as raw files.',
-        a_eln=ELNAnnotation(component=ELNComponentEnum.FileEditQuantity),  # type: ignore
-    )
-
-
-class TrainingDataset(Dataset):
-    """A dataset and split used to train the model."""
-
-    m_def = Section(label='Training dataset')
-
-    training_split = Quantity(
+    dataset_split = Quantity(
         type=str,
         description='The dataset split used for training, for example `train`.',
         a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity),  # type: ignore
@@ -331,18 +312,10 @@ class MLModel(Entity, Schema):
         description='Files containing all or part of the machine learning model.',
     )
     training = SubSection(
-        sub_section=TrainingMetadata,
+        sub_section=Training,
         description='Framework-independent metadata describing model training.',
     )
-    training_datasets = SubSection(
-        sub_section=TrainingDataset,
-        repeats=True,
-        description=(
-            'Datasets used to train the model, referenced as NOMAD archive sections '
-            'or raw files.'
-        ),
-    )
-    evaluation_results = SubSection(
+    evaluations = SubSection(
         sub_section=Evaluation,
         repeats=True,
         description='Evaluation results reported for the model.',
