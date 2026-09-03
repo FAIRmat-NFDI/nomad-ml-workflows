@@ -852,7 +852,7 @@ need the same level of structured representation.</p>
 <p>Optional metadata:</p>
 <ul>
 <li>description</li>
-<li>framework</li>
+<li>library</li>
 <li>model family or architecture name</li>
 <li>version string</li>
 <li>architecture details</li>
@@ -892,7 +892,7 @@ need the same level of structured representation.</p>
 <p>This section captures structural metadata about the model when such metadata can be obtained safely.</p>
 <p>Optional metadata:</p>
 <ul>
-<li>framework</li>
+<li>library</li>
 <li>model family</li>
 <li>architecture name</li>
 <li>input signature summary</li>
@@ -996,7 +996,7 @@ need the same level of structured representation.</p>
 </ul>
 <p>It may:</p>
 <ul>
-<li>populate framework, model family, or architecture fields if trusted metadata is present in the file</li>
+<li>populate library, model family, or architecture fields if trusted metadata is present in the file</li>
 <li>populate tensor inventory summaries such as tensor names, shapes, counts, and dtypes when these can be read safely</li>
 </ul>
 <p>It must never:</p>
@@ -1020,7 +1020,7 @@ need the same level of structured representation.</p>
 <h3 id="fields-the-parser-may-populate">Fields the Parser May Populate<a class="headerlink" href="#fields-the-parser-may-populate" title="Permanent link">&para;</a></h3>
 <p>When trusted metadata is available, the parser may also populate:</p>
 <ul>
-<li>framework</li>
+<li>library</li>
 <li>model family or architecture name</li>
 <li>tensor inventory summary</li>
 <li>parser notes about extracted metadata</li>
