@@ -4,17 +4,9 @@ import logging
 from collections.abc import Mapping
 from functools import lru_cache
 
-from huggingface_hub import HfApi, ModelCard
+from huggingface_hub import HfApi
 
 logger = logging.getLogger(__name__)
-
-
-def validate_hf_model_card(content: str) -> ModelCard:
-    """Parse a model card and require valid Hugging Face metadata."""
-    try:
-        return ModelCard(content, ignore_metadata_errors=False)
-    except Exception as error:
-        raise ValueError(f'Could not parse the model card: {error}') from error
 
 
 def _get_tag_ids(model_tags: Mapping[str, object], category: str) -> list[str]:
