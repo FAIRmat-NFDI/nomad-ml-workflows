@@ -4,7 +4,6 @@ A NOMAD plugin for supporting machine-learning workflows. It currently provides 
 Export Entries action, which turns a permission-scoped NOMAD search into a reusable
 JSON, Parquet, or CSV dataset.
 
-
 ## 📦 Installation
 
 Install the package with pip:
