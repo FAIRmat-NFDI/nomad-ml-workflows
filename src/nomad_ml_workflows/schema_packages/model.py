@@ -137,7 +137,7 @@ class Optimizer(ArchiveSection):
 
 
 class Training(ArchiveSection):
-    """Minimal framework-independent metadata describing model training."""
+    """Framework-independent metadata describing model training."""
 
     m_def = Section(label='Training metadata')
 
