@@ -155,9 +155,10 @@ class Training(ArchiveSection):
         description='The number of samples in one training batch.',
         a_eln=ELNAnnotation(component=ELNComponentEnum.NumberEditQuantity),  # type: ignore
     )
-    dataset = SubSection(
-        sub_section=Dataset,
+    dataset = Quantity(
+        type=Dataset,
         description='The dataset used for training.',
+        a_eln=ELNAnnotation(component=ELNComponentEnum.ReferenceEditQuantity),  # type: ignore
     )
     dataset_split = Quantity(
         type=str,
@@ -177,15 +178,6 @@ class Evaluation(ArchiveSection):
         '`Crystal structure classification`.',
         a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity),  # type: ignore
     )
-    dataset = SubSection(
-        sub_section=Dataset,
-        description='The dataset used to evaluate the model.',
-    )
-    dataset_split = Quantity(
-        type=str,
-        description='The dataset split used for evaluation, for example `test`.',
-        a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity),  # type: ignore
-    )
     metric_name = Quantity(
         type=str,
         description='The human-readable name of the reported evaluation metric, for example '
@@ -196,6 +188,16 @@ class Evaluation(ArchiveSection):
         type=float,
         description='The value of the reported evaluation metric.',
         a_eln=ELNAnnotation(component=ELNComponentEnum.NumberEditQuantity),  # type: ignore
+    )
+    dataset = Quantity(
+        type=Dataset,
+        description='The dataset used to evaluate the model.',
+        a_eln=ELNAnnotation(component=ELNComponentEnum.ReferenceEditQuantity),  # type: ignore
+    )
+    dataset_split = Quantity(
+        type=str,
+        description='The dataset split used for evaluation, for example `test`.',
+        a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity),  # type: ignore
     )
 
 
