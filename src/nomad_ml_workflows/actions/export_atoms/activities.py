@@ -29,8 +29,11 @@ logger = get_logger(__name__)
 DATA_ARTIFACT_NAME = 'data'
 MANIFEST_FILE_NAME = 'selected_entries'
 METADATA_FILE_NAME = 'metadata'
-TABLE_ROWS_FILE_NAME = 'table_rows.tmp.ndjson'
-TABLE_SCHEMA_FILE_NAME = 'table_schema.tmp.arrow'
+
+DATA_FILE_EXTENSIONS = {
+    'extxyz': 'xyz',
+    'ase_db': 'db',
+}
 
 REQUIRED_ARCHIVE_DATA = {
     'results': {
@@ -62,13 +65,11 @@ def read_archives_and_generate_atoms(
         action_instance_artifacts_dir(data.export_entries_workflow_id)
     )
     manifest_file_path = artifacts_subdirectory / f'{MANIFEST_FILE_NAME}.json'
-    output_file_path = (
-        artifacts_subdirectory / f'{DATA_ARTIFACT_NAME}.{data.output_file_format}'
-    )
+    file_extension = DATA_FILE_EXTENSIONS[data.output_file_format]
+    output_file_path = artifacts_subdirectory / f'{DATA_ARTIFACT_NAME}.{file_extension}'
     temporary_output_file_path = output_file_path.with_stem(
         f'{output_file_path.stem}.tmp'
     )
-
     # load manifest
     with open(manifest_file_path, encoding='utf-8') as f:
         manifest = [ManifestEntry(**entry) for entry in json.load(f)]
@@ -80,13 +81,15 @@ def read_archives_and_generate_atoms(
         manifest, REQUIRED_ARCHIVE_DATA, data.user_id, activity_logger
     )
 
-    atoms = generate_atoms_from_archives(archives)
-    num_frames_exported = write_atoms_to_file(atoms, temporary_output_file_path)
+    atoms = generate_atoms_from_archives(archives, properties=data.properties)
+    write_atoms_to_file(
+        atoms, temporary_output_file_path, output_format=data.output_file_format
+    )
     temporary_output_file_path.replace(output_file_path)
     return OutputFile(
         file_path=output_file_path.as_posix(),
         file_size=output_file_path.stat().st_size,
-        num_entries_exported=num_frames_exported,
+        num_entries_exported=len(atoms),
     )
 
 

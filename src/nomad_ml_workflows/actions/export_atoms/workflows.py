@@ -77,7 +77,6 @@ class AtomsExtractEntriesWorkflow:
 
         try:
             search_settings = AtomsNormalizedSearchSettings.from_user_input(user_input)
-            print(f'Search settings: {search_settings}')
             manifest_output = await workflow.execute_activity(
                 prepare_manifest,
                 PrepareManifestInput(
@@ -90,7 +89,6 @@ class AtomsExtractEntriesWorkflow:
                 start_to_close_timeout=timedelta(hours=2),
                 retry_policy=retry_policy,
             )
-            print(f'Manifest output: {manifest_output}')
             workflow_output.manifest_file_path = manifest_output.manifest_file.file_path
 
             metadata.num_entries_available = manifest_output.num_entries_available

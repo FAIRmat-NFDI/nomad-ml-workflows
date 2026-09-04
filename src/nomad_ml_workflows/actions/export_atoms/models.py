@@ -16,7 +16,7 @@ OwnerLiteral = Literal[
     'shared',
     'staging',
 ]
-DataFileFormatLiteral = Literal['extxyz', 'asedb']
+DataFileFormatLiteral = Literal['extxyz', 'ase_db']
 
 
 config = nomad_config.get_plugin_entry_point(
@@ -161,6 +161,7 @@ class AtomsExtractEntriesWorkflowInput(BaseModel):
         ..., description='Original user input for the export entries workflow.'
     )
 
+
 class AtomsNormalizedSearchSettings(BaseModel):
     user_id: str = Field(..., description='User ID performing the search.')
     owner: OwnerLiteral = Field(..., description='Owner of the entries to be searched.')
@@ -190,6 +191,7 @@ class AtomsNormalizedSearchSettings(BaseModel):
             query=query,
             num_entries_user_limit=user_input.search_settings.max_entries,
         )
+
 
 class AtomsReadArchivesWorkflowInput(BaseModel):
     export_entries_workflow_id: str = Field(

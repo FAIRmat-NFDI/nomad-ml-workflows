@@ -1,13 +1,16 @@
-import json
 from collections.abc import Iterable
 from pathlib import Path
 
-
-def generate_atoms_from_archives(archives: Iterable[dict]) -> list:
-    return [archive for archive in archives]
+from nomad_mlip_data import atoms_generator, write_atoms
 
 
-def write_atoms_to_file(atoms: list, output_file_path: str | Path):
-    with open(output_file_path, 'w') as f:
-        json.dump(atoms, f, indent=2)
-    return len(atoms)
+def generate_atoms_from_archives(
+    archives: Iterable[dict], properties: list[str]
+) -> list:
+    return [atom for atom in atoms_generator(archives, properties=set(properties))]
+
+
+def write_atoms_to_file(
+    atoms: list, output_file_path: str | Path, output_format: str = 'extxyz'
+) -> None:
+    write_atoms(atoms, output_path=output_file_path, output_format=output_format)

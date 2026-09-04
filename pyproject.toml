@@ -140,3 +140,4 @@ skip = [".github/*"]
 [project.entry-points.'nomad.plugin']
 export_entries_action_entry_point = "nomad_ml_workflows.actions:export_entries"
 export_remote_entries_action_entry_point = "nomad_ml_workflows.actions:export_remote_entries"
+atoms_export_entries_action_entry_point = "nomad_ml_workflows.actions:atoms_export_entries"
