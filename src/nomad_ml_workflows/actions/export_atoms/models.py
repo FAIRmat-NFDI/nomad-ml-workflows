@@ -3,6 +3,7 @@ from typing import Literal
 
 from nomad.app.v1.models.models import Query
 from nomad.config import config as nomad_config
+from nomad_mlip_data.config import BASE_QUERY
 from pydantic import BaseModel, ConfigDict, Field
 
 from nomad_ml_workflows.actions.export_entries.models import (
@@ -32,20 +33,6 @@ def _clean_field(field: str) -> str:
 
 
 _DIRECTIVE_PRIORITY = {'include': 1, 'include-resolved': 2, 'exclude': 3}
-
-
-WORKFLOWS = [
-    'SinglePoint',
-    'single_point',
-    'GeometryOptimization',
-    'geometry_optimization',
-]
-
-BASE_QUERY = {
-    'results.method.method_name:any': ['DFT'],
-    'results.method.workflow_name:any': WORKFLOWS,
-    'quantities:all': ['run.calculation', 'run.system'],
-}
 
 
 class IncludeProperties(BaseModel):
