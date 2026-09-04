@@ -1,0 +1,138 @@
+name: Check and preview documentation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "*.md"
+      - "docs/**"
+      - "mkdocs.yml"
+      - "pyproject.toml"
+      - ".github/workflows/mkdocs-preview.yml"
+      - ".github/workflows/mkdocs-deploy.yml"
+      - ".github/workflows/configs/**"
+  pull_request:
+    branches: [main]
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+      - closed
+    paths:
+      - "*.md"
+      - "docs/**"
+      - "mkdocs.yml"
+      - "pyproject.toml"
+      - ".github/workflows/mkdocs-preview.yml"
+      - ".github/workflows/mkdocs-deploy.yml"
+      - ".github/workflows/configs/**"
+  workflow_dispatch:
+
+env:
+  UV_VERSION: 0.9
+  PYTHON_VERSION: 3.12
+  UV_SYSTEM_PYTHON: true
+  DISABLE_MKDOCS_2_WARNING: "true"
+
+# Cancel stale checks for the same PR or branch. A closed event replaces an
+# in-progress preview deployment so that the preview is removed promptly.
+concurrency:
+  group: docs-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-markdown:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: DavidAnson/markdownlint-cli2-action@v24
+        with:
+          config: .github/workflows/configs/nomad.markdownlint.jsonc
+          globs: |
+            *.md
+            docs/**/*.md
+
+  check-links:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check links in Markdown files
+        uses: UmbrellaDocs/action-linkspector@v1.5.5
+        with:
+          config_file: .github/workflows/configs/.linkspector.yml
+          filter_mode: nofilter
+          fail_level: none
+
+  build-docs:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: ${{ env.UV_VERSION }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install documentation dependencies
+        run: uv sync --extra dev
+
+      - name: Check MkDocs build
+        run: uv run mkdocs build --strict
+
+      - name: Upload documentation site
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/upload-artifact@v6
+        with:
+          name: documentation-site
+          path: site
+          if-no-files-found: error
+          retention-days: 1
+
+  deploy-preview:
+    if: >-
+      always() &&
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (github.event.action == 'closed' || needs.build-docs.result == 'success')
+    needs: build-docs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download documentation site
+        if: github.event.action != 'closed'
+        uses: actions/download-artifact@v7
+        with:
+          name: documentation-site
+          path: site
+
+      - name: Deploy PR preview
+        uses: rossjrw/pr-preview-action@v1
+        with:
+          source-dir: site
+          qr-code: false

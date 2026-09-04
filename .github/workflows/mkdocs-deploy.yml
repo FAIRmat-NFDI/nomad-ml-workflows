@@ -6,29 +6,47 @@ on:
       - main  # Triggers deployment on push to the main branch
 
 env:
-  REGISTRY: ghcr.io
   UV_VERSION: 0.9
   PYTHON_VERSION: 3.12
   UV_SYSTEM_PYTHON: true
+  DISABLE_MKDOCS_2_WARNING: "true"
+
+# Main deployments share the gh-pages branch with PR previews. Rebase instead
+# of force-pushing and preserve the preview directory during site cleanup.
+concurrency:
+  group: deploy-docs
+  cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v7
         with:
           version: ${{ env.UV_VERSION }}
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Build and Deploy
-        run: |
-          uv run --extra dev mkdocs gh-deploy --force --remote-branch gh-pages
+      - name: Install documentation dependencies
+        run: uv sync --extra dev
+
+      - name: Build documentation
+        run: uv run mkdocs build --strict
+
+      - name: Deploy documentation
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages
+          folder: site
+          clean: true
+          clean-exclude: pr-preview/
+          force: false
