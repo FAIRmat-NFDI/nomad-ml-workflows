@@ -134,7 +134,7 @@ plugins:
 ### NOMAD Oasis
 
 Follow the
-[NOMAD plugin installation documentation](https://nomad-lab.eu/prod/v1/staging/docs/howto/oasis/plugins_install.html)
+[NOMAD Oasis configuration documentation](https://docs.nomad-lab.eu/howto/oasis/configure.html#plugins)
 to add and enable the plugin in an Oasis.
 
 ### Local NOMAD development installation
