@@ -57,6 +57,7 @@ def prepare_manifest(data: PrepareManifestInput) -> PrepareManifestOutput:
         config.max_entries_export_limit,  # type: ignore
         data.num_entries_user_limit,
     )
+    print(data.query)
     manifest: list = []
     page_size = min(10000, max_num_entries_limit)
     starttime = datetime.now(timezone.utc).isoformat()
