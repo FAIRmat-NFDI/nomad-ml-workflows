@@ -1,0 +1,17 @@
+{
+    "upload_id": "ScUJhuPQR0Ssa_i6rm7r5A",
+    "user_id": "be691000-501a-462a-99b2-873aa11fbe1e",
+    "search_settings": {
+        "owner": "public",
+        "max_entries": 100,
+        "query": "{'entry_type:any': ['PerovskiteSolarCell', 'LLMExtractedPerovskiteSolarCell']}",
+        "required": [
+          {"type": "include", "path": "results"},
+          {"type": "include", "path": "data"}
+        ]
+    },
+    "export_settings": {
+        "file_format": "parquet",
+        "create_zip_archive": false
+    }
+}
