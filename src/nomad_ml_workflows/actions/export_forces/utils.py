@@ -20,14 +20,14 @@ def require_nomad_forces_export() -> tuple[Any, Any]:
 
 
 def generate_atoms_from_archives(
-    archives: Iterable[dict], properties: list[str]
+    archives: Iterable[dict], properties: list[str], max_frames: int | None = None
 ) -> Iterable:
     atoms_generator, _ = require_nomad_forces_export()
-    return atoms_generator(archives, properties=set(properties))
+    return atoms_generator(archives, properties=set(properties), max_frames=max_frames)
 
 
 def write_atoms_to_file(
-    atoms: Iterable, output_file_path: str | Path, output_format: str = 'extxyz'
+    atoms: Iterable, output_file_path: str | Path, output_format: list[str] = ['extxyz']
 ) -> None:
     _, write_atoms = require_nomad_forces_export()
     write_atoms(atoms, output_path=output_file_path, output_format=output_format)
