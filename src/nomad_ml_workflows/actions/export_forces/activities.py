@@ -47,36 +47,62 @@ def read_archives_and_create_export(
     """
     Reads selected entry archives and writes the exported atoms dataset file (extxyz/ASE DB).
     """
+    info = activity.info()
+    activity_logger = logger.bind(activity_type=info.activity_type)
+
     artifacts_subdirectory = Path(
         action_instance_artifacts_dir(data.export_entries_workflow_id)
     )
     manifest_file_path = artifacts_subdirectory / f'{MANIFEST_FILE_NAME}.json'
-    file_extension = DATA_FILE_EXTENSIONS[data.output_file_format]
-    output_file_path = artifacts_subdirectory / f'{DATA_ARTIFACT_NAME}.{file_extension}'
-    temporary_output_file_path = output_file_path.with_stem(
-        f'{output_file_path.stem}.tmp'
-    )
+    file_extensions = [
+        DATA_FILE_EXTENSIONS[format] for format in data.output_file_format
+    ]
+    data_subdirectory = artifacts_subdirectory
+    if len(file_extensions) > 1:
+        data_subdirectory = artifacts_subdirectory / DATA_ARTIFACT_NAME
+        data_subdirectory.mkdir(parents=True, exist_ok=True)
+    output_file_paths = [
+        data_subdirectory / f'{DATA_ARTIFACT_NAME}.{ext}' for ext in file_extensions
+    ]
+    temporary_output_file_paths = [
+        output_file_path.with_stem(f'{output_file_path.stem}.tmp')
+        for output_file_path in output_file_paths
+    ]
     # load manifest
     with open(manifest_file_path, encoding='utf-8') as f:
         manifest = [ManifestEntry(**entry) for entry in json.load(f)]
-
-    info = activity.info()
-    activity_logger = logger.bind(activity_type=info.activity_type)
 
     archives = generate_archives(
         manifest, REQUIRED_ARCHIVE_DATA, data.user_id, activity_logger
     )
 
-    atoms_generator = generate_atoms_from_archives(archives, properties=data.properties)
+    atoms_generator = generate_atoms_from_archives(
+        archives, properties=data.properties, max_frames=data.max_frames
+    )
     write_atoms_to_file(
         atoms_generator,
-        temporary_output_file_path,
+        temporary_output_file_paths[0],
         output_format=data.output_file_format,
     )
-    temporary_output_file_path.replace(output_file_path)
+
+    for i in range(len(temporary_output_file_paths)):
+        if not temporary_output_file_paths[i].exists():
+            logger.error(
+                f'Expected output file {temporary_output_file_paths[i]} does not exist.'
+            )
+            continue
+        temporary_output_file_paths[i].replace(output_file_paths[i])
+
+    if len(output_file_paths) > 1:
+        return OutputFile(
+            file_path=data_subdirectory.as_posix(),
+            file_size=sum(path.stat().st_size for path in output_file_paths),
+            num_entries_exported=len(manifest),
+        )
+
     return OutputFile(
-        file_path=output_file_path.as_posix(),
-        file_size=output_file_path.stat().st_size,
+        file_path=output_file_paths[0].as_posix(),
+        file_size=output_file_paths[0].stat().st_size,
         num_entries_exported=len(manifest),
     )
 

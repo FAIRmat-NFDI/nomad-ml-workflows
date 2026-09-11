@@ -103,8 +103,9 @@ class ForcesExtractEntriesWorkflow:
                     ForcesCreateExportWorkflowInput(
                         export_entries_workflow_id=data.export_entries_workflow_id,
                         user_id=user_input.user_id,
-                        output_file_format=user_input.export_settings.file_format,
+                        output_file_format=user_input.export_settings.file_format.selected_formats,
                         properties=user_input.search_settings.required_properties,
+                        max_frames=user_input.export_settings.max_frames,
                     ),
                     id=f'{workflow.info().workflow_id}-read-archives-and-write-file',
                     parent_close_policy=workflow.ParentClosePolicy.TERMINATE,
