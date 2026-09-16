@@ -57,7 +57,8 @@ class ModelArtifact(ArchiveSection):
             self.format = Path(self.model_file).suffix.lstrip('.').lower()
 
     def normalize(self, archive, logger):
-        self._normalize_file_size_format(archive, logger)
+        local_logger = logger.bind(section=self.m_def.qualified_name())
+        self._normalize_file_size_format(archive, local_logger)
 
         super().normalize(archive, logger)
 
