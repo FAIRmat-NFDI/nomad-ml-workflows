@@ -42,13 +42,22 @@ class ModelArtifact(ArchiveSection):
         a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity),  # type: ignore
     )
 
+    def _normalize_file_size_format(self, archive, logger):
+        """
+        Determine the file size from os.path.getsize and always overwrite it.
+        Determine the file format from the file extension and write if not already set.
+        """
+        if not self.model_file:
+            return
+        if not archive.m_context.raw_path_exists(self.model_file):
+            logger.warning(f'File not found: {self.model_file}')
+            return
+        self.file_size = archive.m_context.upload_files.raw_file_size(self.model_file)
+        if not self.format:
+            self.format = Path(self.model_file).suffix.lstrip('.').lower()
+
     def normalize(self, archive, logger):
-        if self.model_file and archive.m_context.raw_path_exists(self.model_file):
-            self.file_size = os.path.getsize(
-                archive.m_context.raw_path(self.model_file)
-            )
-            if not self.format:
-                self.format = Path(self.model_file).suffix.lstrip('.').lower()
+        self._normalize_file_size_format(archive, logger)
 
         super().normalize(archive, logger)
 
