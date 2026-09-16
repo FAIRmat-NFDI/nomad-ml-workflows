@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from nomad.datamodel.data import ArchiveSection, Schema
 from nomad.datamodel.metainfo.annotations import ELNAnnotation, ELNComponentEnum
 from nomad.datamodel.metainfo.basesections import Entity
@@ -27,16 +29,56 @@ class ModelArtifact(ArchiveSection):
         description='The serialization or packaging format of the artifact.',
         a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity),  # type: ignore
     )
-    checksum = Quantity(
-        type=str,
-        description='A checksum identifying the exact artifact contents.',
-        a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity),  # type: ignore
-    )
     file_size = Quantity(
         type=int,
         unit='byte',
         description='The size of the artifact in bytes.',
         a_eln=ELNAnnotation(component=ELNComponentEnum.NumberEditQuantity),  # type: ignore
+    )
+    checksum = Quantity(
+        type=str,
+        description='A checksum identifying the exact artifact contents.',
+        a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity),  # type: ignore
+    )
+
+    def _normalize_file_size_format(self, archive, logger):
+        """
+        Determine the file size from os.path.getsize and always overwrite it.
+        Determine the file format from the file extension and write if not already set.
+        """
+        if not self.model_file:
+            return
+        if not archive.m_context.raw_path_exists(self.model_file):
+            logger.warning(f'File not found: {self.model_file}')
+            return
+        self.file_size = archive.m_context.upload_files.raw_file_size(self.model_file)
+        if not self.format:
+            self.format = Path(self.model_file).suffix.lstrip('.').lower()
+
+    def normalize(self, archive, logger):
+        local_logger = logger.bind(section=self.m_def.qualified_name())
+        self._normalize_file_size_format(archive, local_logger)
+
+        super().normalize(archive, logger)
+
+
+class Library(ArchiveSection):
+    """The library with which the model is implemented."""
+
+    m_def = Section(label='Library')
+
+    name = Quantity(
+        type=str,
+        description='The library with which the model is implemented. E.g., "pytorch".',
+        a_eln=ELNAnnotation(
+            component=ELNComponentEnum.EnumEditQuantity,
+            props={'suggestions': hf_libraries},
+        ),  # type: ignore
+    )
+    version = Quantity(
+        type=str,
+        description='The version of the library associated with the model.',
+        a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity),  # type: ignore
     )
 
 
@@ -121,27 +163,6 @@ class MLModel(Entity, Schema):
 
     m_def = Section(label='Machine learning model')
 
-    task = Quantity(
-        type=str,
-        description='The task for which the model is intended. E.g., "image-segmentation".',
-        a_eln=ELNAnnotation(
-            component=ELNComponentEnum.EnumEditQuantity,
-            props={'suggestions': hf_tasks},
-        ),  # type: ignore
-    )
-    library = Quantity(
-        type=str,
-        description='The library with which the model is implemented. E.g., "pytorch".',
-        a_eln=ELNAnnotation(
-            component=ELNComponentEnum.EnumEditQuantity,
-            props={'suggestions': hf_libraries},
-        ),  # type: ignore
-    )
-    library_version = Quantity(
-        type=str,
-        description='The version of the library associated with the model.',
-        a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity),  # type: ignore
-    )
     architecture = Quantity(
         type=str,
         description='The architecture, model family, or other structural designation. E.g., "resnet", "U-Net".',
@@ -157,11 +178,25 @@ class MLModel(Entity, Schema):
         description='The license under which the model is made available.',
         a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity),  # type: ignore
     )
+    tasks = Quantity(
+        type=str,
+        shape=['*'],
+        description='The tasks for which the model is intended. E.g., "image-segmentation".',
+        a_eln=ELNAnnotation(
+            component=ELNComponentEnum.EnumEditQuantity,
+            props={'suggestions': hf_tasks},
+        ),  # type: ignore
+    )
     tags = Quantity(
         type=str,
         shape=['*'],
         description='Free-form labels used to describe and discover the model.',
         a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity),  # type: ignore
+    )
+    libraries = SubSection(
+        sub_section=Library,
+        repeats=True,
+        description='The libraries with which the model is implemented.',
     )
     artifacts = SubSection(
         sub_section=ModelArtifact,
