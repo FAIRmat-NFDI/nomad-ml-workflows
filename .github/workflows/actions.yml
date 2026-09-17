@@ -13,7 +13,7 @@ jobs:
     steps:
     - uses: actions/checkout@v7
     - name: Install uv
-      uses: astral-sh/setup-uv@v10
+      uses: astral-sh/setup-uv@v10.1.0
       with:
           version: ${{ env.UV_VERSION }}
     - name: Setup Python
@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/ruff-action@v4
+      - uses: astral-sh/ruff-action@v4.1.0
       - run: ruff check .
       # Uncomment the following line to enable format check
       # - run: ruff format --check .
