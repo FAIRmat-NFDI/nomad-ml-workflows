@@ -49,7 +49,7 @@ dev = [
 cpu-action = [
     "pyarrow", # for parquet support
     "boto3",   # s3 storage
-    "nomad-forces-export @  git+https://github.com/FAIRmat-NFDI/nomad-forces-export@action",
+    "nomad-forces-export",  # extract forces from NOMAD entries
 ]
 
 [tool.uv]
