@@ -10,7 +10,6 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "License :: OSI Approved :: MIT License",
 ]
 name = "nomad-ml-workflows"
 description = "A NOMAD plugin for managing ML workflows."
@@ -23,7 +22,7 @@ authors = [
 maintainers = [
     { name = "Sarthak Kapoor", email = "sarthak.kapoor@physik.hu-berlin.de" },
 ]
-license = { file = "LICENSE" }
+license-files = ["LICENSE"]
 dependencies = [
     "nomad-lab>=1.4.3",
     "huggingface-hub",
