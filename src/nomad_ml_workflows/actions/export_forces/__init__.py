@@ -29,25 +29,32 @@ class ExportForcesActionEntryPoint(ActionEntryPoint):
             prepare_manifest,
         )
         from nomad_ml_workflows.actions.export_forces.activities import (
+            manifest_archives_and_create_export,
             read_archives_and_create_export,
             write_export_forces_metadata_file,
         )
         from nomad_ml_workflows.actions.export_forces.workflows import (
             ForcesCreateExportWorkflow,
             ForcesExportEntriesWorkflow,
+            ForcesExtractEntriesCombinedWorkflow,
             ForcesExtractEntriesWorkflow,
         )
 
         return Action(
             task_queue=self.task_queue,
             workflow=ForcesExportEntriesWorkflow,
-            child_workflows=[ForcesExtractEntriesWorkflow, ForcesCreateExportWorkflow],
+            child_workflows=[
+                ForcesExtractEntriesWorkflow,
+                ForcesCreateExportWorkflow,
+                ForcesExtractEntriesCombinedWorkflow,
+            ],
             activities=[
                 prepare_manifest,
                 export_dataset_to_upload,
                 cleanup_artifacts,
                 write_export_forces_metadata_file,
                 read_archives_and_create_export,
+                manifest_archives_and_create_export,
             ],
         )
 
