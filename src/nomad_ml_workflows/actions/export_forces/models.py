@@ -12,6 +12,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from nomad_ml_workflows.actions.export_entries.models import (
     ExportDatasetMetadata,
+    OutputFile,
+    PrepareManifestInput,
+    PrepareManifestOutput,
 )
 
 OwnerLiteral = Literal[
@@ -74,7 +77,14 @@ class ForcesSearchSettings(BaseModel):
             f'{config.max_entries_export_limit}.'  # type: ignore
         ),
     )
-
+    max_frames: int | None = Field(
+        None,
+        title='Maximum frames',
+        description=(
+            'Export at most this many frames from the matching entries. '
+            'If not specified, all frames will be exported.'
+        ),
+    )
     query: str = Field(
         json.dumps(BASE_QUERY, indent=2),
         title='Search query',
@@ -139,14 +149,6 @@ class DataFileFormat(BaseModel):
 
 
 class ForcesExportSettings(BaseModel):
-    max_frames: int | None = Field(
-        None,
-        title='Maximum frames',
-        description=(
-            'Export at most this many frames from the matching entries. '
-            'If not specified, all frames will be exported.'
-        ),
-    )
     file_format: DataFileFormat = Field(
         ...,
         title='File format',
@@ -250,6 +252,9 @@ class ForcesExportDatasetMetadata(ExportDatasetMetadata):
     user_input: ForcesExportEntriesUserInput | None = Field(
         None, description='Original user input for the export entries workflow.'
     )  # type: ignore[assignment]
+    num_frames_exported: int | None = Field(
+        None, description='Number of frames exported in the dataset.'
+    )  # type: ignore[assignment]
 
 
 class ForcesWriteMetadataFileInput(BaseModel):
@@ -259,4 +264,28 @@ class ForcesWriteMetadataFileInput(BaseModel):
     )
     metadata: ForcesExportDatasetMetadata = Field(
         ..., description='Metadata to be written to the metadata file.'
+    )
+
+
+class ForcesOutputFile(OutputFile):
+    num_frames_exported: int | None = Field(
+        None, description='Number of frames exported in the dataset.'
+    )  # type: ignore[assignment]
+
+
+class ForcesExportOutputFile(BaseModel):
+    manifest_output: PrepareManifestOutput = Field(
+        ..., description='Output of the prepare manifest activity.'
+    )
+    output_file: ForcesOutputFile = Field(
+        ..., description='Output of the create export workflow.'
+    )
+
+
+class ForcesManifestArchiveExportInput(BaseModel):
+    manifest_data: PrepareManifestInput = Field(
+        ..., description='Input data for the prepare manifest activity.'
+    )
+    export_data: ForcesCreateExportWorkflowInput = Field(
+        ..., description='Input data for the create export workflow.'
     )
