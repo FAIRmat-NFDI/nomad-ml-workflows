@@ -556,6 +556,23 @@ def generate_archives(
     Yields entry archive dict using the manifest and required fields one at a time.
     """
 
+    # # Temporary local replay. write_dicts_to_json writes one dictionary per line.
+    # fixture_path = Path(
+    #     '/home/sarthak-kapoor/repositories/fairmat/dev_distro/'
+    #     '.volumes/fs/staging/Sc/ScUJhuPQR0Ssa_i6rm7r5A/raw/'
+    #     'export_entries_2026-09-25T14:10:35.011709+00:00/data.json'
+    # )
+    # with fixture_path.open(encoding='utf-8') as fixture:
+    #     for line in fixture:
+    #         record = line.strip()
+    #         if record in ('[', ']'):
+    #             continue
+    #         yield json.loads(record.removesuffix(','))
+
+    #         del record, line
+    #         gc.collect()
+    # return
+
     # set up required reader
     required_reader = RequiredReader(
         required=required,
