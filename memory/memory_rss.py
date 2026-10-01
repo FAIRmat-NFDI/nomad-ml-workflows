@@ -165,7 +165,7 @@ def save_rss_results(
             raise ValueError('Workflow stop timestamp must not precede its start.')
         plot_intervals.append((interval, start_timestamp, stop_timestamp))
 
-    output_subdirectory = Path(__file__).parent / output_subdirectory
+    output_subdirectory = Path(__file__).parent / 'logs' / output_subdirectory
     output_subdirectory = output_subdirectory.with_name(
         f'logging_rss_monitoring_results_{rss_timestamps_utc[0]}'
     )
