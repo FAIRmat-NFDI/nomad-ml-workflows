@@ -10,6 +10,11 @@ from nomad.actions.manager import get_action_result, get_action_status, start_ac
 
 from nomad_ml_workflows.actions.export_entries.models import ExportEntriesUserInput
 
+if __package__:
+    from .plot_rss import plot_rss_results
+else:
+    from plot_rss import plot_rss_results
+
 RSS_PRINT_INTERVAL = 1.0
 RSS_LOG_INTERVAL = 0.1
 RSS_BASELINE_SECONDS = 15.0
@@ -145,8 +150,8 @@ def save_rss_results(
     log_interval: float,
     baseline_seconds: float = 0,
     output_subdirectory: Path = Path('.logs'),
-) -> tuple[Path, Path]:
-    """Save timestamped RSS samples and plot measured workflow windows."""
+) -> Path:
+    """Save timestamped RSS samples and workflow intervals as JSON."""
     if not rss_values_mb:
         raise ValueError('No RSS values were collected.')
     if len(rss_values_mb) != len(rss_timestamps_utc):
@@ -154,16 +159,13 @@ def save_rss_results(
     if log_interval <= 0:
         raise ValueError('log_interval must be greater than zero.')
 
-    sample_timestamps = [
-        datetime.fromisoformat(timestamp) for timestamp in rss_timestamps_utc
-    ]
-    plot_intervals = []
+    for timestamp in rss_timestamps_utc:
+        datetime.fromisoformat(timestamp)
     for interval in workflow_intervals:
         start_timestamp = datetime.fromisoformat(interval['start_timestamp_utc'])
         stop_timestamp = datetime.fromisoformat(interval['stop_timestamp_utc'])
         if stop_timestamp < start_timestamp:
             raise ValueError('Workflow stop timestamp must not precede its start.')
-        plot_intervals.append((interval, start_timestamp, stop_timestamp))
 
     output_subdirectory = Path(__file__).parent / 'logs' / output_subdirectory
     output_subdirectory = output_subdirectory.with_name(
@@ -172,7 +174,6 @@ def save_rss_results(
 
     output_subdirectory.mkdir(parents=True, exist_ok=True)
     json_path = output_subdirectory / 'cpuworker_rss.json'
-    plot_path = output_subdirectory / 'cpuworker_rss.png'
 
     result = {
         'rss_unit': 'MB',
@@ -190,45 +191,9 @@ def save_rss_results(
     with json_path.open('w', encoding='utf-8') as output_file:
         json.dump(result, output_file, indent=2)
 
-    from matplotlib import dates as mdates
-    from matplotlib import pyplot as plt
-
-    figure, axis = plt.subplots(figsize=(12, 6))
-    axis.plot(sample_timestamps, rss_values_mb, color='black', linewidth=1.5)
-
-    for index, (interval, start_timestamp, stop_timestamp) in enumerate(plot_intervals):
-        color = f'C{index % 10}'
-        axis.axvspan(
-            start_timestamp,
-            stop_timestamp,
-            color=color,
-            alpha=0.15,
-            label=(
-                f'Workflow {interval["workflow"]}: num_entries {interval["num_entries"]}'
-            ),
-        )
-        axis.axvline(start_timestamp, color=color, linestyle=':', alpha=0.8)
-        axis.axvline(stop_timestamp, color=color, linestyle='--', alpha=0.8)
-
-    axis.set_title('CPU worker RSS by export workflow')
-    axis.set_xlabel('Absolute timestamp (UTC)')
-    axis.set_ylabel('RSS (MB)')
-    axis.xaxis.set_major_formatter(
-        mdates.DateFormatter('%Y-%m-%d\n%H:%M:%S', tz=timezone.utc)
-    )
-    axis.grid(alpha=0.25)
-    if plot_intervals:
-        axis.legend()
-
-    figure.autofmt_xdate()
-    figure.tight_layout()
-    figure.savefig(plot_path, dpi=160)
-    plt.close(figure)
-
     print(f'Saved RSS values to: {json_path}', flush=True)
-    print(f'Saved RSS plot to: {plot_path}', flush=True)
 
-    return json_path, plot_path
+    return json_path
 
 
 def execute_workflow(data: ExportEntriesUserInput) -> tuple[float, str, str]:
@@ -294,16 +259,17 @@ def execute_workflows_serial(data: list[ExportEntriesUserInput]):
     rss_values_mb = execute_workflows_serial.rss_values
     rss_timestamps_utc = execute_workflows_serial.rss_timestamps_utc
 
-    save_rss_results(
+    print(f'Peak RSS: {max(rss_values_mb):.2f} MB')
+    print(f'time_taken: {time_taken}')
+
+    json_path = save_rss_results(
         rss_values_mb,
         rss_timestamps_utc,
         workflow_intervals,
         RSS_LOG_INTERVAL,
         baseline_seconds=RSS_BASELINE_SECONDS,
     )
-
-    print(f'Peak RSS: {max(rss_values_mb):.2f} MB')
-    print(f'time_taken: {time_taken}')
+    plot_rss_results(json_path)
 
 
 if __name__ == '__main__':
