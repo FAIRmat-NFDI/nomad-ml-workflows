@@ -151,7 +151,7 @@ def save_rss_results(
     baseline_seconds: float = 0,
     output_subdirectory: Path = Path('.logs'),
 ) -> Path:
-    """Save timestamped RSS samples and workflow intervals as JSON."""
+    """Save RSS samples as JSON beneath the selected output directory."""
     if not rss_values_mb:
         raise ValueError('No RSS values were collected.')
     if len(rss_values_mb) != len(rss_timestamps_utc):
@@ -167,13 +167,14 @@ def save_rss_results(
         if stop_timestamp < start_timestamp:
             raise ValueError('Workflow stop timestamp must not precede its start.')
 
-    output_subdirectory = Path(__file__).parent / 'logs' / output_subdirectory
-    output_subdirectory = output_subdirectory.with_name(
-        f'logging_rss_monitoring_results_{rss_timestamps_utc[0]}'
+    output_directory = (
+        Path(__file__).parent
+        / output_subdirectory
+        / (f'logging_rss_monitoring_results_{rss_timestamps_utc[0]}')
     )
 
-    output_subdirectory.mkdir(parents=True, exist_ok=True)
-    json_path = output_subdirectory / 'cpuworker_rss.json'
+    output_directory.mkdir(parents=True, exist_ok=True)
+    json_path = output_directory / 'cpuworker_rss.json'
 
     result = {
         'rss_unit': 'MB',
@@ -280,7 +281,7 @@ if __name__ == '__main__':
 
     # Run workflow with different max_entries values
     for file_format in ['parquet']:
-        for max_entries in [2000] * 2:
+        for max_entries in [20] * 1:
             model = export_entries_user_input.model_copy(deep=True)
             model.search_settings.max_entries = max_entries
             model.search_settings.required = []
