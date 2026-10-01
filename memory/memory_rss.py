@@ -143,7 +143,7 @@ def monitor_rss(
     return decorator
 
 
-def save_rss_results(
+def save_rss_results(  # noqa: PLR0917, PLR0913
     rss_values_mb: list[float],
     rss_timestamps_utc: list[str],
     workflow_intervals: list[dict],
