@@ -36,7 +36,7 @@ Repository = "https://github.com/FAIRmat-NFDI/nomad-ml-workflows"
 [project.optional-dependencies]
 dev = [
     "nomad-lab[infrastructure]>=1.4.3",
-    "nomad_ml_workflows[cpu-action]",
+    "nomad-ml-workflows[cpu-action]",
     "ruff",
     "pytest",
     "structlog",
