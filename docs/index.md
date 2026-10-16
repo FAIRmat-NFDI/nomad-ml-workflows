@@ -21,5 +21,3 @@ Administrators can follow [installation and configuration](how_to/install_this_p
 ## Describe a model
 
 The [ML model schema](explanation/ml_model.md) describes models independently of their implementation library and artifact format. Record model versions, libraries, files, training datasets, and evaluation metrics in a NOMAD entry. The related Dataset schema can describe data through NOMAD references, files, or URLs.
-
-To help maintain the plugin, see [contributing to the plugin](how_to/contribute_to_this_plugin.md) and [contributing to the documentation](how_to/contribute_to_the_documentation.md).
