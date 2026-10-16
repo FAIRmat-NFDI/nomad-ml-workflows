@@ -14,12 +14,9 @@ nav:
       - Export entries: how_to/export_entries.md
       - Export energies, forces, and stresses: how_to/export_forces.md
       - Export remote entries: how_to/export_remote_entries.md
-      - Contribute to this plugin: how_to/contribute_to_this_plugin.md
-      - Contribute to the documentation: how_to/contribute_to_the_documentation.md
   - Explanation:
       - Export functionality: explanation/explanation.md
       - ML model schema: explanation/ml_model.md
-  - Reference: reference/references.md
 plugins:
   - search
 theme:
@@ -55,7 +52,7 @@ markdown_extensions:
   - pymdownx.extra
 extra:
   generator: false
-  homepage: https://nomad-lab.eu
+  homepage: https://fairmat-nfdi.github.io/nomad-ml-workflows/
 use_directory_urls: false
 extra_css:
   - stylesheets/extra.css
