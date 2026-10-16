@@ -1,48 +1,25 @@
-# Welcome to the `nomad-ml-workflows` documentation
+# NOMAD ML Workflows
 
-A plugin containing curated NOMAD Actions.
+`nomad-ml-workflows` helps you turn NOMAD entries into reusable datasets and describe machine learning models alongside their artifacts, training metadata, and evaluations.
 
-## Introduction
+## Choose an export action
 
-!!! note "Attention"
-    TODO
+| Action | Use it for | Output |
+| --- | --- | --- |
+| [Export Entries](how_to/export_entries.md) | Complete archives or selected archive paths from this deployment | JSON, CSV, or a Parquet dataset in a staging project/upload |
+| [Export Forces](how_to/export_forces.md) | Atomic structures with selected energies, forces, and stresses; shown as **Export MLIP Data Action** in the GUI | Extended XYZ or an ASE database in a staging project/upload |
+| [Export Remote Entries](how_to/export_remote_entries.md) | Entries from configured Oases, optionally including this deployment | One export per target in S3, optionally copied into a local staging project/upload |
 
-<div markdown="block" class="home-grid">
-<div markdown="block">
+Each action runs independently. They share permission-scoped search and archive extraction, with Export Entries providing the foundation. Read the [export explanation](explanation/explanation.md) for selection, formats, manifests, and counts.
 
-### Tutorial
+## Start here
 
-TODO
+Follow the short [Export Entries tutorial](tutorial/tutorial.md) to save up to ten visible entries as JSON in a ZIP, using either the GUI or a Python REST client. Use the [action chooser](how_to/use_this_plugin.md) for task-specific guides.
 
-- [Tutorial](tutorial/tutorial.md)
+Administrators can follow [installation and configuration](how_to/install_this_plugin.md) to enable the plugin, start a CPU worker, set limits, and configure remote targets and storage.
 
-</div>
-<div markdown="block">
+## Describe a model
 
-### How-to guides
+The [ML model schema](explanation/ml_model.md) describes models independently of their implementation library and artifact format. Record model versions, libraries, files, training datasets, and evaluation metrics in a NOMAD entry. The related Dataset schema can describe data through NOMAD references, files, or URLs.
 
-How-to guides provide step-by-step instructions for a wide range of tasks, with the overarching topics:
-
-- [Install this plugin](how_to/install_this_plugin.md)
-- [Use this plugin](how_to/use_this_plugin.md)
-- [Contribute to this plugin](how_to/contribute_to_this_plugin.md)
-- [Contribute to the documentation](how_to/contribute_to_the_documentation.md)
-
-</div>
-
-<div markdown="block">
-
-### Explanation
-
-The explanation [section](explanation/explanation.md) provides background knowledge on this plugin.
-
-</div>
-<div markdown="block">
-
-### Reference
-
-The reference [section](reference/references.md) includes all CLI commands and arguments, all configuration options,
-the possible schema annotations and their arguments, and a glossary of used terms.
-
-</div>
-</div>
+To help maintain the plugin, see [contributing to the plugin](how_to/contribute_to_this_plugin.md) and [contributing to the documentation](how_to/contribute_to_the_documentation.md).

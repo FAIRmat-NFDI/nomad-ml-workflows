@@ -7,13 +7,18 @@ edit_uri: ""
 
 nav:
   - Home: index.md
-  - Tutorial: tutorial/tutorial.md
+  - Export Entries tutorial: tutorial/tutorial.md
   - How-to guides:
       - Install this Plugin: how_to/install_this_plugin.md
       - Use this Plugin: how_to/use_this_plugin.md
+      - Export entries: how_to/export_entries.md
+      - Export energies, forces, and stresses: how_to/export_forces.md
+      - Export remote entries: how_to/export_remote_entries.md
       - Contribute to this plugin: how_to/contribute_to_this_plugin.md
       - Contribute to the documentation: how_to/contribute_to_the_documentation.md
-  - Explanation: explanation/explanation.md
+  - Explanation:
+      - Export functionality: explanation/explanation.md
+      - ML model schema: explanation/ml_model.md
   - Reference: reference/references.md
 plugins:
   - search
@@ -55,5 +60,4 @@ use_directory_urls: false
 extra_css:
   - stylesheets/extra.css
 extra_javascript:
-  - javascript.js
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
