@@ -1,0 +1,51 @@
+# Export energies, forces, and stresses
+
+Use **Export MLIP Data Action** (`nomad_ml_workflows.actions:export_forces`) to export atomic structures and selected properties for machine learning interatomic potentials. Its formats are Extended XYZ (`extxyz`) and ASE database (`ase_db`).
+
+## Prerequisites
+
+You need access to the action and compatible calculation archives, a writable staging project/upload, and a running CPU action worker with the `cpu-action` dependencies installed, including `nomad-forces-export`. See [administrator setup](install_this_plugin.md).
+
+## Configure and run
+
+1. Open **Actions → Run action → Export MLIP Data Action** and set the destination staging upload ID.
+1. Choose an ownership scope and maximum entry count. Keep or adapt the prefilled calculation query for your source data.
+1. Under **Properties**, select energies, forces, and/or stresses. The underlying field names are exactly `Energies`, `Forces`, and `Stresses`, with initial capitals; each defaults to `false`.
+1. Choose `extxyz` (the default) or `ase_db`, select ZIP or directory output, and run the action.
+1. Inspect status, logs, and results, then download the output from the destination project's files using `exported_dir_path`.
+
+The action adds quantity-presence conditions for the selected properties to the query (`run.calculation.energy.total.value`, `run.calculation.forces.total.value`, and `run.calculation.stress.total.value`). Use archives supported by `nomad-forces-export`; general ELN entries need not contain compatible structures or calculation data.
+
+## Example input
+
+This input requests energy and force data from up to 100 public matching entries. `{}` adds no user filters; the action still adds the selected property requirements. For a narrower dataset, use a query copied from a search app's **View API Call** dialog.
+
+```json
+{
+  "upload_id": "YOUR_STAGING_UPLOAD_ID",
+  "search_settings": {
+    "owner": "public",
+    "max_entries": 100,
+    "query": "{}",
+    "properties": {
+      "Energies": true,
+      "Forces": true,
+      "Stresses": false
+    }
+  },
+  "export_settings": {
+    "file_format": "extxyz",
+    "create_zip_archive": true
+  }
+}
+```
+
+For REST, omit `user_id` and send the input under `data` to this action's start endpoint. `query` is JSON text. Ownership scopes and limits follow the [shared selection rules](../explanation/explanation.md#search-selection-and-archive-content). Forces uses `properties` instead of an archive `required` list; its extractor chooses the archive content needed for atomic data.
+
+## Expected output
+
+The ZIP or directory contains `data.xyz` for Extended XYZ or `data.db` for an ASE database, plus `selected_entries.json` and `metadata.json`. Set `file_format` to `ase_db` for database output, or `create_zip_archive` to `false` for a directory. The result also reports `workflow_duration`.
+
+Metadata records source selection, inputs, versions, and timing. For this action, `num_entries_exported` is set to the manifest length; it does **not** measure the number of exported atomic configurations. An entry can contain multiple configurations, and conversion may skip unsupported data. Inspect logs and the generated atomic dataset to assess its contents.
+
+A zero-match run produces an empty manifest and metadata without `data.xyz` or `data.db`. See the [shared export explanation](../explanation/explanation.md) for packaging and provenance.
