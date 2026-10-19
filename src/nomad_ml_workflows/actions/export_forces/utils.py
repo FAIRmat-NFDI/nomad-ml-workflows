@@ -13,7 +13,7 @@ from nomad_ml_workflows.actions.export_entries.utils import (
 
 try:
     from nomad_forces_export.config import REQUIRED_ARCHIVE_DATA, archive_filter
-except ImportError:
+except ImportError as e:
     raise ImportError(
         'nomad-forces-export is required. Install with: '
         'pip install nomad-ml-workflows[cpu]'
@@ -95,13 +95,12 @@ def yield_manifest_archives(
         for upload_id, entry_ids in manifest_dict.items():
             if logger:
                 logger.info(f'processing upload_id: {upload_id}')
-
-            with UploadFiles.get(upload_id) as upload_files:
-                if upload_files is None:
-                    if logger:
-                        logger.info(f'no upload files found for upload_id: {upload_id}')
-                    continue
-
+            upload_files = UploadFiles.get(upload_id)
+            if upload_files is None:
+                if logger:
+                    logger.info(f'no upload files found for upload_id: {upload_id}')
+                continue
+            with upload_files:
                 for entry_id in entry_ids:
                     entry = {'entry_id': entry_id, 'upload_id': upload_id}
                     try:

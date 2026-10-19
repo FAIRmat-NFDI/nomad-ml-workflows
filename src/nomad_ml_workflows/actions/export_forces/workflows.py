@@ -56,7 +56,6 @@ class ForcesExtractEntriesWorkflow:
         workflow_output = ExtractEntriesWorkflowOutput()  # type: ignore
 
         try:
-            print('Starting manifest_archives_and_create_export workflow...')
             search_settings = ForcesNormalizedSearchSettings.from_user_input(user_input)
             manifest_data = PrepareManifestInput(
                 export_entries_workflow_id=data.export_entries_workflow_id,
@@ -79,7 +78,9 @@ class ForcesExtractEntriesWorkflow:
             manifest_archives_output = await workflow.execute_activity(
                 manifest_archives_and_create_export,
                 manifest_archive_export_input,
-                start_to_close_timeout=timedelta(hours=2),
+                start_to_close_timeout=timedelta(
+                    seconds=config.export_archives_timeout
+                ),
                 retry_policy=retry_policy,
             )
             manifest_output = manifest_archives_output.manifest_output
