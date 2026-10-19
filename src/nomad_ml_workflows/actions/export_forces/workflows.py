@@ -11,19 +11,16 @@ with workflow.unsafe.imports_passed_through():
     from nomad_ml_workflows.actions.export_entries.activities import (
         cleanup_artifacts,
         export_dataset_to_upload,
-        prepare_manifest,
     )
     from nomad_ml_workflows.actions.export_entries.models import (
         CleanupArtifactsInput,
         ExportDatasetInput,
         ExportEntriesOutput,
         ExtractEntriesWorkflowOutput,
-        OutputFile,
         PrepareManifestInput,
     )
     from nomad_ml_workflows.actions.export_forces.activities import (
         manifest_archives_and_create_export,
-        read_archives_and_create_export,
         write_export_forces_metadata_file,
     )
     from nomad_ml_workflows.actions.export_forces.models import (
@@ -33,7 +30,6 @@ with workflow.unsafe.imports_passed_through():
         ForcesExtractEntriesWorkflowInput,
         ForcesManifestArchiveExportInput,
         ForcesNormalizedSearchSettings,
-        ForcesOutputFile,
         ForcesWriteMetadataFileInput,
     )
 
@@ -41,111 +37,7 @@ config = nomad_config.get_plugin_entry_point('nomad_ml_workflows.actions:export_
 
 
 @workflow.defn
-class ForcesCreateExportWorkflow:
-    """
-    Child workflow that reads archives and writes the output artifact.
-    """
-
-    @workflow.run
-    async def run(self, data: ForcesCreateExportWorkflowInput) -> OutputFile:
-        retry_policy = RetryPolicy(maximum_attempts=1)
-        return await workflow.execute_activity(
-            read_archives_and_create_export,
-            data,
-            start_to_close_timeout=timedelta(seconds=config.export_archives_timeout),  # type: ignore
-            retry_policy=retry_policy,
-        )
-
-
-@workflow.defn
 class ForcesExtractEntriesWorkflow:
-    @workflow.run
-    async def run(
-        self, data: ForcesExtractEntriesWorkflowInput
-    ) -> ExtractEntriesWorkflowOutput:
-        """
-        Find matching entries and write their archives to action artifact subdirectory.
-        """
-        retry_policy = RetryPolicy(maximum_attempts=1)
-        user_input = data.user_input
-        metadata = ForcesExportDatasetMetadata(
-            user_input=user_input,
-            nomad_deployment_api_host=nomad_config.services.api_host,
-            nomad_version=nomad_config.meta.version,
-            nomad_ml_workflows_version=nomad_ml_workflows_version,
-        )  # type: ignore
-        workflow_output = ExtractEntriesWorkflowOutput()  # type: ignore
-
-        try:
-            search_settings = ForcesNormalizedSearchSettings.from_user_input(user_input)
-            manifest_output = await workflow.execute_activity(
-                prepare_manifest,
-                PrepareManifestInput(
-                    export_entries_workflow_id=data.export_entries_workflow_id,
-                    user_id=search_settings.user_id,
-                    owner=search_settings.owner,
-                    query=search_settings.query,
-                    num_entries_user_limit=search_settings.num_entries_user_limit,
-                ),
-                start_to_close_timeout=timedelta(hours=2),
-                retry_policy=retry_policy,
-            )
-            workflow_output.manifest_file_path = manifest_output.manifest_file.file_path
-
-            metadata.num_entries_available = manifest_output.num_entries_available
-            metadata.num_entries_selected = manifest_output.num_entries_selected
-            metadata.reached_max_entries_limit = (
-                manifest_output.reached_max_entries_limit
-            )
-            metadata.search_start_time = manifest_output.search_start_time
-            metadata.search_end_time = manifest_output.search_end_time
-
-            if manifest_output.num_entries_selected > 0:
-                output_file: ForcesOutputFile = await workflow.execute_child_workflow(
-                    ForcesCreateExportWorkflow.run,
-                    ForcesCreateExportWorkflowInput(
-                        export_entries_workflow_id=data.export_entries_workflow_id,
-                        user_id=user_input.user_id,
-                        output_file_format=user_input.export_settings.file_format.selected_formats,
-                        properties=user_input.search_settings.required_properties,
-                        max_frames=user_input.search_settings.max_frames,
-                    ),
-                    id=f'{workflow.info().workflow_id}-read-archives-and-write-file',
-                    parent_close_policy=workflow.ParentClosePolicy.TERMINATE,
-                    retry_policy=retry_policy,
-                )
-                metadata.num_entries_exported = output_file.num_entries_exported
-                metadata.num_frames_exported = output_file.num_frames_exported
-                workflow_output.data_file_path = output_file.file_path
-
-        except Exception as e:
-            # Add error info to metadata and re-raise
-            import traceback
-
-            metadata.error_info = traceback.format_exc()
-
-            raise ApplicationError(
-                'Encountered an error during reading archives and writing the data '
-                'artifact.',
-            ) from e
-
-        finally:
-            metadata_file = await workflow.execute_activity(
-                write_export_forces_metadata_file,
-                ForcesWriteMetadataFileInput(
-                    export_entries_workflow_id=data.export_entries_workflow_id,
-                    metadata=metadata,
-                ),
-                start_to_close_timeout=timedelta(hours=2),
-                retry_policy=retry_policy,
-            )
-            workflow_output.metadata_file_path = metadata_file.file_path
-
-        return workflow_output
-
-
-@workflow.defn
-class ForcesExtractEntriesCombinedWorkflow:
     @workflow.run
     async def run(
         self, data: ForcesExtractEntriesWorkflowInput
@@ -202,10 +94,9 @@ class ForcesExtractEntriesCombinedWorkflow:
             metadata.search_end_time = manifest_output.search_end_time
             metadata.num_entries_exported = output_file.num_entries_exported
             metadata.num_frames_exported = output_file.num_frames_exported
-            
+
             workflow_output.data_file_path = output_file.file_path
             workflow_output.manifest_file_path = manifest_output.manifest_file.file_path
-
 
         except Exception as e:
             # Add error info to metadata and re-raise
@@ -245,7 +136,7 @@ class ForcesExportEntriesWorkflow:
 
         try:
             await workflow.execute_child_workflow(
-                ForcesExtractEntriesCombinedWorkflow.run,
+                ForcesExtractEntriesWorkflow.run,
                 ForcesExtractEntriesWorkflowInput(
                     export_entries_workflow_id=workflow.info().workflow_id,
                     user_input=data,

@@ -89,6 +89,7 @@ def read_archives_and_create_export(
         output_file_path.with_stem(f'{output_file_path.stem}.tmp')
         for output_file_path in output_file_paths
     ]
+
     # load manifest
     with open(manifest_file_path, encoding='utf-8') as f:
         manifest = [ManifestEntry(**entry) for entry in json.load(f)]
@@ -289,6 +290,7 @@ def manifest_archives_and_create_export(
     if len(file_extensions) > 1:
         data_subdirectory = artifacts_subdirectory / DATA_ARTIFACT_NAME
         data_subdirectory.mkdir(parents=True, exist_ok=True)
+    temp_file_stem = data_subdirectory / f'{DATA_ARTIFACT_NAME}.tmp'
     output_file_paths = [
         data_subdirectory / f'{DATA_ARTIFACT_NAME}.{ext}' for ext in file_extensions
     ]
@@ -310,12 +312,6 @@ def manifest_archives_and_create_export(
 
     # load manifest
     archives = yield_manifest_archives(manifest_data, response, activity_logger)
-    # for entry in archives:
-    #     pass
-    # with open(temporary_output_file_paths[0], 'wb') as temp_file:
-    #     print('Writing archives to temporary output file...')
-    #     pass
-    # num_of_frames = 0
     atoms_generator = generate_atoms_from_archives(
         archives,
         properties=export_data.properties,
@@ -323,7 +319,7 @@ def manifest_archives_and_create_export(
     )
     num_of_frames = write_atoms_to_file(
         atoms_generator,
-        temporary_output_file_paths[0],
+        temp_file_stem,
         output_format=export_data.output_file_format,
     )
 

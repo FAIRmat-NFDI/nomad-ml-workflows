@@ -77,12 +77,14 @@ class ForcesSearchSettings(BaseModel):
             f'{config.max_entries_export_limit}.'  # type: ignore
         ),
     )
-    max_frames: int | None = Field(
-        None,
+    max_frames: int = Field(
+        config.max_frames_export_limit,  # type: ignore
+        gt=0,
+        le=config.max_frames_export_limit,  # type: ignore
         title='Maximum frames',
         description=(
-            'Export at most this many frames from the matching entries. '
-            'If not specified, all frames will be exported.'
+            'Export at most this many frames from the matching entries. (The deployment limit is '
+            f'{config.max_frames_export_limit}.)'  # type: ignore
         ),
     )
     query: str = Field(

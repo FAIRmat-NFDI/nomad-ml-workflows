@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterator
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -88,6 +88,15 @@ def yield_manifest_archives(
     )
     manifest: list = []
     page_size = min(10000, max_num_entries_limit)
+    artifacts_subdirectory = Path(
+        action_instance_artifacts_dir(data.export_entries_workflow_id)
+    )
+    manifest_file_path = artifacts_subdirectory / f'{MANIFEST_FILE_NAME}.json'
+
+    def write_manifest_file(manifest: list, manifest_file_path: Path):
+        manifest = manifest[:max_num_entries_limit]
+        write_dicts_to_json(manifest, manifest_file_path)
+
     while True:
         required_reader = RequiredReader(
             required=REQUIRED_ARCHIVE_DATA,
@@ -122,6 +131,7 @@ def yield_manifest_archives(
                             manifest.append(
                                 {'entry_id': entry_id, 'upload_id': upload_id}
                             )
+                            write_manifest_file(manifest, manifest_file_path)
                             yield entry
                             del entry
                             if len(manifest) >= max_num_entries_limit:
@@ -150,9 +160,4 @@ def yield_manifest_archives(
                 page_after_value=response.pagination.next_page_after_value,
             ),  # type: ignore
         )
-    manifest = manifest[:max_num_entries_limit]
-    artifacts_subdirectory = Path(
-        action_instance_artifacts_dir(data.export_entries_workflow_id)
-    )
-    manifest_file_path = artifacts_subdirectory / f'{MANIFEST_FILE_NAME}.json'
-    write_dicts_to_json(manifest, manifest_file_path)
+    write_manifest_file(manifest, manifest_file_path)
