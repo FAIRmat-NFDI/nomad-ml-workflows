@@ -718,42 +718,54 @@
 
 
 <h1 id="export-energies-forces-and-stresses">Export energies, forces, and stresses<a class="headerlink" href="#export-energies-forces-and-stresses" title="Permanent link">&para;</a></h1>
-<p>Use <strong>Export MLIP Data Action</strong> (<code>nomad_ml_workflows.actions:export_forces</code>) to export atomic structures and selected properties for machine learning interatomic potentials. Its formats are Extended XYZ (<code>extxyz</code>) and ASE database (<code>ase_db</code>).</p>
+<p>Use <strong>Export MLIP Data Action</strong> (<code>nomad_ml_workflows.actions:export_forces</code>) to export atomic structures and selected properties for machine learning interatomic potentials. Its formats are Extended XYZ (<code>extxyz</code>) and ASE database (<code>ase_db</code>). </p>
+<p>Currently only <code>DFT</code> entries are supported. </p>
+<p><code>magmoms</code> are currently only added for <code>VASP DFT</code> entries.</p>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
 <p>You need access to the action and compatible calculation archives, a writable staging project/upload, and a running CPU action worker with the <code>cpu-action</code> dependencies installed, including <code>nomad-forces-export</code>. See <a href="install_this_plugin.html">administrator setup</a>.</p>
 <h2 id="configure-and-run">Configure and run<a class="headerlink" href="#configure-and-run" title="Permanent link">&para;</a></h2>
 <ol>
 <li>Open <strong>Actions → Run action → Export MLIP Data Action</strong> and set the destination staging upload ID.</li>
-<li>Choose an ownership scope and maximum entry count. Keep or adapt the prefilled calculation query for your source data.</li>
-<li>Under <strong>Properties</strong>, select energies, forces, and/or stresses. The underlying field names are exactly <code>Energies</code>, <code>Forces</code>, and <code>Stresses</code>, with initial capitals; each defaults to <code>false</code>.</li>
-<li>Choose <code>extxyz</code> (the default) or <code>ase_db</code>, select ZIP or directory output, and run the action.</li>
+<li>Choose an ownership scope and maximum entry count. Keep or adapt the prefilled calculation query for your source data.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span><span class="w"> </span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">"results.method.method_name:any"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"> </span><span class="s2">"DFT"</span><span class="w"> </span><span class="p">],</span><span class="w">   </span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">"quantities:all"</span><span class="p">:</span><span class="w"> </span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="p">[</span><span class="w"> </span><span class="s2">"run.calculation"</span><span class="p">,</span><span class="w"> </span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">      </span><span class="s2">"run.system"</span><span class="w"> </span><span class="p">]</span><span class="w"> </span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">}</span>
+</code></pre></div></li>
+<li>Under <strong>Properties</strong>, select energies, forces, and/or stresses. The underlying field names are exactly <code>energies</code>, <code>forces</code>, and <code>stresses</code>; each defaults to <code>false</code>.</li>
+<li>Choose <code>extxyz</code> and/or <code>ase_db</code>, select ZIP or directory output, and run the action.</li>
 <li>Inspect status, logs, and results, then download the output from the destination project's files using <code>exported_dir_path</code>.</li>
 </ol>
-<p>The action adds quantity-presence conditions for the selected properties to the query (<code>run.calculation.energy.total.value</code>, <code>run.calculation.forces.total.value</code>, and <code>run.calculation.stress.total.value</code>). Use archives supported by <code>nomad-forces-export</code>; general ELN entries need not contain compatible structures or calculation data.</p>
+<p>The action adds quantity-presence conditions for the selected properties to the query (<code>run.calculation.energy.total_t0.value</code>, <code>run.calculation.forces.total.value</code>, and <code>run.calculation.stress.total.value</code>). Use archives supported by <code>nomad-forces-export</code>; general ELN entries need not contain compatible structures or calculation data.</p>
 <h2 id="example-input">Example input<a class="headerlink" href="#example-input" title="Permanent link">&para;</a></h2>
 <p>This input requests energy and force data from up to 100 public matching entries. <code>{}</code> adds no user filters; the action still adds the selected property requirements. For a narrower dataset, use a query copied from a search app's <strong>View API Call</strong> dialog.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">"upload_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"YOUR_STAGING_UPLOAD_ID"</span><span class="p">,</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">"search_settings"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">"owner"</span><span class="p">:</span><span class="w"> </span><span class="s2">"public"</span><span class="p">,</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="nt">"max_entries"</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="nt">"query"</span><span class="p">:</span><span class="w"> </span><span class="s2">"{}"</span><span class="p">,</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span><span class="nt">"properties"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">      </span><span class="nt">"Energies"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">      </span><span class="nt">"Forces"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">      </span><span class="nt">"Stresses"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span>
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">  </span><span class="p">},</span>
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">  </span><span class="nt">"export_settings"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">    </span><span class="nt">"file_format"</span><span class="p">:</span><span class="w"> </span><span class="s2">"extxyz"</span><span class="p">,</span>
-<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">    </span><span class="nt">"create_zip_archive"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
-<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">  </span><span class="p">}</span>
-<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">"upload_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"YOUR_STAGING_UPLOAD_ID"</span><span class="p">,</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">"search_settings"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="nt">"owner"</span><span class="p">:</span><span class="w"> </span><span class="s2">"public"</span><span class="p">,</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="nt">"max_entries"</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="nt">"query"</span><span class="p">:</span><span class="w"> </span><span class="s2">"{}"</span><span class="p">,</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="nt">"properties"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">      </span><span class="nt">"energies"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">      </span><span class="nt">"forces"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">      </span><span class="nt">"stresses"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">  </span><span class="nt">"export_settings"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">    </span><span class="nt">"file_format"</span><span class="p">:</span><span class="w"> </span><span class="s2">"extxyz"</span><span class="p">,</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">    </span><span class="nt">"create_zip_archive"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="p">}</span>
 </code></pre></div>
 <p>For REST, omit <code>user_id</code> and send the input under <code>data</code> to this action's start endpoint. <code>query</code> is JSON text. Ownership scopes and limits follow the <a href="../explanation/explanation.html#search-selection-and-archive-content">shared selection rules</a>. Forces uses <code>properties</code> instead of an archive <code>required</code> list; its extractor chooses the archive content needed for atomic data.</p>
 <h2 id="expected-output">Expected output<a class="headerlink" href="#expected-output" title="Permanent link">&para;</a></h2>
 <p>The ZIP or directory contains <code>data.xyz</code> for Extended XYZ or <code>data.db</code> for an ASE database, plus <code>selected_entries.json</code> and <code>metadata.json</code>. Set <code>file_format</code> to <code>ase_db</code> for database output, or <code>create_zip_archive</code> to <code>false</code> for a directory. The result also reports <code>workflow_duration</code>.</p>
-<p>Metadata records source selection, inputs, versions, and timing. For this action, <code>num_entries_exported</code> is set to the manifest length; it does <strong>not</strong> measure the number of exported atomic configurations. An entry can contain multiple configurations, and conversion may skip unsupported data. Inspect logs and the generated atomic dataset to assess its contents.</p>
+<p>Metadata records source selection, inputs, versions, and timing. </p>
+<p><code>num_entries_exported</code> is set to the number of entries that were processed; it does <strong>not</strong> measure the number of exported atomic configurations. An entry can contain multiple configurations, and conversion may skip unsupported frames. The archive filtering checks for relevant properties being present before adding a entry to the count, however due to errors within the archive data there might be no usable frames in that entry.</p>
+<p><code>num_frames_exported</code> gives the actual total number of frames exported acroos all the entries.</p>
+<p>Inspect logs and the generated atomic dataset to assess its contents.</p>
 <p>A zero-match run produces an empty manifest and metadata without <code>data.xyz</code> or <code>data.db</code>. See the <a href="../explanation/explanation.html">shared export explanation</a> for packaging and provenance.</p>
 
 
