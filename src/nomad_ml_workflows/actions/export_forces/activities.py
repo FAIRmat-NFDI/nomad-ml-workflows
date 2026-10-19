@@ -1,22 +1,12 @@
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 from nomad.actions.manager import action_instance_artifacts_dir
-from nomad.config import config as nomad_config
-from nomad.utils import get_logger
-
-try:
-    from nomad_forces_export.config import REQUIRED_ARCHIVE_DATA, archive_filter
-except ImportError:
-    raise ImportError(
-        'nomad-forces-export is required. Install with: '
-        'pip install nomad-ml-workflows[cpu]'
-    ) from e
-
-from datetime import datetime, timezone
-
 from nomad.app.v1.models.models import MetadataPagination, MetadataRequired
+from nomad.config import config as nomad_config
 from nomad.search import search as nomad_search
+from nomad.utils import get_logger
 from temporalio import activity
 
 from nomad_ml_workflows.actions.export_entries.models import (

@@ -62,23 +62,6 @@ def write_atoms_to_file(
     return write_atoms(atoms, output_path=output_file_path, output_format=output_format)
 
 
-def generate_archives_with_filter(archives: Iterator[dict]):
-    """
-    Generate archives that pass the filter defined in nomad_forces_export.config.archive_filter.
-    """
-    try:
-        from nomad_forces_export.config import archive_filter
-    except ImportError as e:
-        raise ImportError(
-            'nomad-forces-export is required. Install with: '
-            'pip install nomad-ml-workflows[cpu]'
-        ) from e
-
-    for archive in archives:
-        if not archive_filter(archive):
-            yield archive
-
-
 def yield_manifest_archives(
     data: PrepareManifestInput, response, logger=None
 ) -> Iterator[dict]:
