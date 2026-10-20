@@ -54,7 +54,7 @@ This input requests energy and force data from up to 100 public matching entries
 }
 ```
 
-For REST, omit `user_id` and send the input under `data` to this action's start endpoint. `query` is JSON text. Ownership scopes and limits follow the [shared selection rules](../explanation/explanation.md#search-selection-and-archive-content). Forces uses `properties` instead of an archive `required` list; its extractor chooses the archive content needed for atomic data.
+For REST, omit `user_id` and send the input under `data` to this action's start endpoint. `query` is JSON text. Ownership scopes and limits follow the [shared selection rules](../explanation/export_entries.md#search-selection-and-archive-content). Forces uses `properties` instead of an archive `required` list; its extractor chooses the archive content needed for atomic data.
 
 ## Expected output
 
@@ -68,4 +68,4 @@ Metadata records source selection, inputs, versions, and timing.
 
 Inspect logs and the generated atomic dataset to assess its contents.
 
-A zero-match run produces an empty manifest and metadata without `data.xyz` or `data.db`. See the [shared export explanation](../explanation/explanation.md) for packaging and provenance.
+A zero-match run produces an empty manifest and metadata without `data.xyz` or `data.db`. See the [shared export explanation](../explanation/export_entries.md) for packaging and provenance.

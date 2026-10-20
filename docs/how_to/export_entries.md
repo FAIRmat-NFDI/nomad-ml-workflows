@@ -1,6 +1,6 @@
 # Export entries
 
-Use **Export Entries Action** (`nomad_ml_workflows.actions:export_entries`) to save local NOMAD archives as JSON, CSV, or Parquet. The [tutorial](../tutorial/tutorial.md) demonstrates the GUI and a Python REST submission.
+Use **Export Entries Action** (`nomad_ml_workflows.actions:export_entries`) to save archives from the deployment where you start the action as JSON, CSV, or Parquet. The [tutorial](../tutorial/tutorial.md) demonstrates the GUI and a Python REST submission.
 
 ## Prerequisites
 
@@ -8,11 +8,12 @@ You need access to the action and source entries, a writable staging project/upl
 
 ## Select entries and content
 
-1. Find your entries in a NOMAD search app and copy the query object from **View API Call**.
 1. Open **Actions → Run action → Export Entries Action** and set **Destination project ID** to your staging upload ID.
-1. Choose the ownership scope, a positive maximum entry count, and the search query. In the GUI, enter the query as JSON text; in an input JSON file, encode it as a string.
-1. Leave **Archive required paths** empty for full archives, or add include paths and enable reference resolution where needed.
+1. Choose the ownership scope, a positive maximum entry count, and the search query. Enter the query as JSON text.
+1. Leave **Archive required paths** empty for full archives, or add include/exclude directives. Enable reference resolution on included paths where needed.
 1. Select `json`, `parquet`, or `csv`, choose ZIP or directory output, and run the action.
+
+## Action form inputs
 
 | Input | Meaning |
 | --- | --- |
@@ -20,7 +21,7 @@ You need access to the action and source entries, a writable staging project/upl
 | `search_settings.owner` | `visible` (default), `public`, `user`, `shared`, or `staging` |
 | `search_settings.max_entries` | Positive limit, bounded by the deployment cap; default is at most 1,000 |
 | `search_settings.query` | Search query as JSON text; selects entries |
-| `search_settings.required` | Include directives with `type`, `path`, and `resolve_references`; selects archive content |
+| `search_settings.required` | Include or exclude directives with `type` and `path`; includes also accept `resolve_references`. Selects archive content |
 | `export_settings.file_format` | `parquet` (default), `csv`, or `json` |
 | `export_settings.create_zip_archive` | `true` (default) for ZIP; `false` for an upload subdirectory |
 
@@ -48,7 +49,20 @@ For example, this action input selects up to 100 public entries with `entry_type
 }
 ```
 
-Replace the query and paths with ones appropriate to your entries. An include path does not require the entry to contain that path; search filters and archive-content selection have [different roles](../explanation/explanation.md#search-selection-and-archive-content). To follow references beneath an included path, set its `resolve_references` to `true`. Exclusion directives are not supported by the public input model.
+Replace the query and paths with ones appropriate to your entries. An include path does not require the entry to contain that path; search filters and archive-content selection have [different roles](../explanation/export_entries.md#search-selection-and-archive-content). To follow references beneath an included path, set its `resolve_references` to `true`.
+
+To export complete archives except for selected paths, use only exclude directives. For example, replace `search_settings.required` with this list to omit the `run` section:
+
+```json
+[
+  {
+    "type": "exclude",
+    "path": "run"
+  }
+]
+```
+
+Exclude directives do not have a `resolve_references` option.
 
 For REST, wrap this input in `{"data": input_json}` as shown in the tutorial. Omit `user_id`; NOMAD supplies the authenticated user's ID.
 
@@ -72,4 +86,4 @@ import pyarrow.parquet as pq
 table = pq.read_table('data.parquet')
 ```
 
-Compare `num_entries_available`, `num_entries_selected`, and `num_entries_exported` under metadata's `data` object. The manifest describes selection; archive-read or flattening failures may reduce the exported count. Inspect logs for skipped entries. A zero-match export contains metadata and an empty manifest, with no data artifact. See [manifest and count semantics](../explanation/explanation.md#manifest-metadata-and-counts).
+Compare `num_entries_available`, `num_entries_selected`, and `num_entries_exported` under metadata's `data` object. The manifest describes selection; archive-read or flattening failures may reduce the exported count. Inspect logs for skipped entries. A zero-match export contains metadata and an empty manifest, with no data artifact. See [manifest and count semantics](../explanation/export_entries.md#manifest-metadata-and-counts).

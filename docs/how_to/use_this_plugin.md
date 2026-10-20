@@ -4,7 +4,7 @@ Sign in to a deployment with the plugin enabled and an active CPU action worker.
 
 | Your task | Guide | GUI action name |
 | --- | --- | --- |
-| Export local archives or selected paths as JSON, CSV, or Parquet | [Export entries](export_entries.md) | Export Entries Action |
+| Export archives or selected paths from this deployment as JSON, CSV, or Parquet | [Export entries](export_entries.md) | Export Entries Action |
 | Export atomic structures with energies, forces, or stresses | [Export forces](export_forces.md) | Export MLIP Data Action |
 | Search configured Oases and save results in S3 | [Export remote entries](export_remote_entries.md) | Export Remote Entries Action |
 
@@ -12,4 +12,4 @@ For a first export, follow the [GUI and REST tutorial](../tutorial/tutorial.md).
 
 Open **Actions**, select **Run action**, choose an action, complete its form, and submit it. Use the action instance page to monitor status, inspect results, and read logs. Actions available to you depend on the deployment's configured user/group access.
 
-If an action is missing or remains waiting to execute, consult the administrator's [installation guide](install_this_plugin.md). For format and count semantics, read the [export explanation](../explanation/explanation.md).
+If an action is missing or remains waiting to execute, consult the administrator's [installation guide](install_this_plugin.md). For format and count semantics, read the [export explanation](../explanation/export_entries.md).

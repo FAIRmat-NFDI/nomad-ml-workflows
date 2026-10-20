@@ -14,9 +14,10 @@ nav:
       - Export entries: how_to/export_entries.md
       - Export energies, forces, and stresses: how_to/export_forces.md
       - Export remote entries: how_to/export_remote_entries.md
+      - Contribute to this plugin: how_to/contribute_to_this_plugin.md
   - Explanation:
-      - Export functionality: explanation/explanation.md
-      - ML model schema: explanation/ml_model.md
+      - Export functionality: explanation/export_entries.md
+      - Schema: explanation/schema.md
 plugins:
   - search
 theme:
