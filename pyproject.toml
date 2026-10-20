@@ -24,7 +24,7 @@ maintainers = [
 ]
 license-files = ["LICENSE"]
 dependencies = [
-    "nomad-lab>=1.4.3",
+    "nomad-lab>=2.0.0",
     "huggingface-hub",
     "pydantic",
     "temporalio",
@@ -35,7 +35,7 @@ Repository = "https://github.com/FAIRmat-NFDI/nomad-ml-workflows"
 
 [project.optional-dependencies]
 dev = [
-    "nomad-lab[infrastructure]>=1.4.3",
+    "nomad-lab[infrastructure]>=2.0.0",
     "nomad-ml-workflows[cpu-action]",
     "ruff",
     "pytest",
