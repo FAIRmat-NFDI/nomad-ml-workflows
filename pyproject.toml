@@ -41,7 +41,7 @@ dev = [
     "pytest",
     "structlog",
     "mkdocs",
-    "mkdocs-material>=8.1.1",
+    "mkdocs-material>=9.5.0",
     "pymdown-extensions",
     "mkdocs-click",
     "pytest-asyncio",

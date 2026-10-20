@@ -23,15 +23,33 @@ plugins:
 theme:
   name: material
   palette:
-    primary: "#2A4CDF"
-    accent: "#008A67"
+    # 1. Light
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # 2. Dark
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+    # 3. Auto
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
   font:
     text: "Titillium Web"
   logo: assets/nomad-plugin-logo.png
   favicon: assets/favicon.png
   features:
     - navigation.instant
-  custom_dir: docs/theme
   icon:
     repo: fontawesome/brands/github
 markdown_extensions:
