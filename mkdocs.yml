@@ -58,4 +58,5 @@ use_directory_urls: false
 extra_css:
   - stylesheets/extra.css
 extra_javascript:
+  - javascripts/theme-video.js
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
