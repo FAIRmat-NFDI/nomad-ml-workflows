@@ -66,10 +66,12 @@
   
     
     
+      
     
     
     
-    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="#2A4CDF" data-md-color-accent="#008A67">
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
   
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
@@ -90,14 +92,17 @@
     
       
 
-<header class="md-header" data-md-component="header">
-  <nav class="md-header__inner md-grid" aria-label="header.title">
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="https://fairmat-nfdi.github.io/nomad-ml-workflows/" title="nomad-ml-workflows" class="md-header__button md-logo" aria-label="nomad-ml-workflows" data-md-component="logo">
       
   <img src="../assets/nomad-plugin-logo.png" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
+      
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
     </label>
     <div class="md-header__title" data-md-component="header-title">
@@ -117,7 +122,86 @@
       </div>
     </div>
     
+      
+        <form class="md-header__option" data-md-component="palette">
+  
     
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
     
     
       <div class="md-header__source">
@@ -427,6 +511,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#action-form-inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Action form inputs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#retrieve-and-inspect-the-export" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -502,6 +597,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="contribute_to_this_plugin.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contribute to this plugin
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -563,7 +686,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../explanation/explanation.html" class="md-nav__link">
+      <a href="../explanation/export_entries.html" class="md-nav__link">
         
   
   
@@ -591,14 +714,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../explanation/ml_model.html" class="md-nav__link">
+      <a href="../explanation/schema.html" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    ML model schema
+    Schema
   
 
     
@@ -668,6 +791,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#action-form-inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Action form inputs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#retrieve-and-inspect-the-export" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -696,17 +830,17 @@
 
 
 <h1 id="export-entries">Export entries<a class="headerlink" href="#export-entries" title="Permanent link">&para;</a></h1>
-<p>Use <strong>Export Entries Action</strong> (<code>nomad_ml_workflows.actions:export_entries</code>) to save local NOMAD archives as JSON, CSV, or Parquet. The <a href="../tutorial/tutorial.html">tutorial</a> demonstrates the GUI and a Python REST submission.</p>
+<p>Use <strong>Export Entries Action</strong> (<code>nomad_ml_workflows.actions:export_entries</code>) to save archives from the deployment where you start the action as JSON, CSV, or Parquet. The <a href="../tutorial/tutorial.html">tutorial</a> demonstrates the GUI and a Python REST submission.</p>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
 <p>You need access to the action and source entries, a writable staging project/upload for the output, and a running CPU action worker. Administrators can follow <a href="install_this_plugin.html">installation and configuration</a>.</p>
 <h2 id="select-entries-and-content">Select entries and content<a class="headerlink" href="#select-entries-and-content" title="Permanent link">&para;</a></h2>
 <ol>
-<li>Find your entries in a NOMAD search app and copy the query object from <strong>View API Call</strong>.</li>
 <li>Open <strong>Actions → Run action → Export Entries Action</strong> and set <strong>Destination project ID</strong> to your staging upload ID.</li>
-<li>Choose the ownership scope, a positive maximum entry count, and the search query. In the GUI, enter the query as JSON text; in an input JSON file, encode it as a string.</li>
-<li>Leave <strong>Archive required paths</strong> empty for full archives, or add include paths and enable reference resolution where needed.</li>
+<li>Choose the ownership scope, a positive maximum entry count, and the search query. Enter the query as JSON text.</li>
+<li>Leave <strong>Archive required paths</strong> empty for full archives, or add include/exclude directives. Enable reference resolution on included paths where needed.</li>
 <li>Select <code>json</code>, <code>parquet</code>, or <code>csv</code>, choose ZIP or directory output, and run the action.</li>
 </ol>
+<h2 id="action-form-inputs">Action form inputs<a class="headerlink" href="#action-form-inputs" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -733,7 +867,7 @@
 </tr>
 <tr>
 <td><code>search_settings.required</code></td>
-<td>Include directives with <code>type</code>, <code>path</code>, and <code>resolve_references</code>; selects archive content</td>
+<td>Include or exclude directives with <code>type</code> and <code>path</code>; includes also accept <code>resolve_references</code>. Selects archive content</td>
 </tr>
 <tr>
 <td><code>export_settings.file_format</code></td>
@@ -766,7 +900,16 @@
 <a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">  </span><span class="p">}</span>
 <a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="p">}</span>
 </code></pre></div>
-<p>Replace the query and paths with ones appropriate to your entries. An include path does not require the entry to contain that path; search filters and archive-content selection have <a href="../explanation/explanation.html#search-selection-and-archive-content">different roles</a>. To follow references beneath an included path, set its <code>resolve_references</code> to <code>true</code>. Exclusion directives are not supported by the public input model.</p>
+<p>Replace the query and paths with ones appropriate to your entries. An include path does not require the entry to contain that path; search filters and archive-content selection have <a href="../explanation/export_entries.html#search-selection-and-archive-content">different roles</a>. To follow references beneath an included path, set its <code>resolve_references</code> to <code>true</code>.</p>
+<p>To export complete archives except for selected paths, use only exclude directives. For example, replace <code>search_settings.required</code> with this list to omit the <code>run</code> section:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">[</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="p">{</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"exclude"</span><span class="p">,</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"run"</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="p">]</span>
+</code></pre></div>
+<p>Exclude directives do not have a <code>resolve_references</code> option.</p>
 <p>For REST, wrap this input in <code>{"data": input_json}</code> as shown in the tutorial. Omit <code>user_id</code>; NOMAD supplies the authenticated user's ID.</p>
 <h2 id="retrieve-and-inspect-the-export">Retrieve and inspect the export<a class="headerlink" href="#retrieve-and-inspect-the-export" title="Permanent link">&para;</a></h2>
 <p>Monitor the action instance's status and logs. After success, its <code>exported_dir_path</code> gives the ZIP filename or directory path relative to the destination upload's raw files; <code>workflow_duration</code> reports elapsed seconds. Open the project's files to download it.</p>
@@ -801,11 +944,11 @@
 </tbody>
 </table>
 <p>Only the selected data format is produced. Read the whole extracted Parquet directory with PyArrow:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pyarrow.parquet</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pq</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">table</span> <span class="o">=</span> <span class="n">pq</span><span class="o">.</span><span class="n">read_table</span><span class="p">(</span><span class="s1">'data.parquet'</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pyarrow.parquet</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pq</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">table</span> <span class="o">=</span> <span class="n">pq</span><span class="o">.</span><span class="n">read_table</span><span class="p">(</span><span class="s1">'data.parquet'</span><span class="p">)</span>
 </code></pre></div>
-<p>Compare <code>num_entries_available</code>, <code>num_entries_selected</code>, and <code>num_entries_exported</code> under metadata's <code>data</code> object. The manifest describes selection; archive-read or flattening failures may reduce the exported count. Inspect logs for skipped entries. A zero-match export contains metadata and an empty manifest, with no data artifact. See <a href="../explanation/explanation.html#manifest-metadata-and-counts">manifest and count semantics</a>.</p>
+<p>Compare <code>num_entries_available</code>, <code>num_entries_selected</code>, and <code>num_entries_exported</code> under metadata's <code>data</code> object. The manifest describes selection; archive-read or flattening failures may reduce the exported count. Inspect logs for skipped entries. A zero-match export contains metadata and an empty manifest, with no data artifact. See <a href="../explanation/export_entries.html#manifest-metadata-and-counts">manifest and count semantics</a>.</p>
 
 
 
@@ -854,6 +997,8 @@
     
     
       <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../javascripts/theme-video.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
       

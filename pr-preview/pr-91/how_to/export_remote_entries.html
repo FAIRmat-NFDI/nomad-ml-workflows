@@ -16,7 +16,7 @@
         <link rel="prev" href="export_forces.html">
       
       
-        <link rel="next" href="../explanation/explanation.html">
+        <link rel="next" href="contribute_to_this_plugin.html">
       
       
         
@@ -66,10 +66,12 @@
   
     
     
+      
     
     
     
-    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="#2A4CDF" data-md-color-accent="#008A67">
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
   
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
@@ -90,14 +92,17 @@
     
       
 
-<header class="md-header" data-md-component="header">
-  <nav class="md-header__inner md-grid" aria-label="header.title">
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="https://fairmat-nfdi.github.io/nomad-ml-workflows/" title="nomad-ml-workflows" class="md-header__button md-logo" aria-label="nomad-ml-workflows" data-md-component="logo">
       
   <img src="../assets/nomad-plugin-logo.png" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
+      
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
     </label>
     <div class="md-header__title" data-md-component="header-title">
@@ -117,7 +122,86 @@
       </div>
     </div>
     
+      
+        <form class="md-header__option" data-md-component="palette">
+  
     
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
     
     
       <div class="md-header__source">
@@ -524,6 +608,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="contribute_to_this_plugin.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contribute to this plugin
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -585,7 +697,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../explanation/explanation.html" class="md-nav__link">
+      <a href="../explanation/export_entries.html" class="md-nav__link">
         
   
   
@@ -613,14 +725,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../explanation/ml_model.html" class="md-nav__link">
+      <a href="../explanation/schema.html" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    ML model schema
+    Schema
   
 
     
@@ -740,21 +852,23 @@
 
 
 <h1 id="export-remote-entries">Export remote entries<a class="headerlink" href="#export-remote-entries" title="Permanent link">&para;</a></h1>
-<p>Use <strong>Export Remote Entries Action</strong> (<code>nomad_ml_workflows.actions:export_remote_entries</code>) to run the same archive extraction on configured Oases over Temporal Nexus. Each target writes its own export to S3. You can also include the local deployment and copy successful exports into a local staging upload.</p>
+<p>Use <strong>Export Remote Entries Action</strong> (<code>nomad_ml_workflows.actions:export_remote_entries</code>) to run the same archive extraction on configured Oases over Temporal Nexus.</p>
+<p>In this guide, <strong>local</strong> means the current NOMAD deployment from which you start the action, also called the <strong>initiating deployment</strong>. The <code>local</code> target extracts entries from that deployment; other targets extract entries from remote deployments. Each target writes its own export to S3. You can also copy successful exports into a staging upload on the initiating deployment.</p>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
-<p>An administrator must configure Nexus endpoints, action access, storage, and CPU workers on participating deployments; see <a href="install_this_plugin.html#configure-remote-export">remote export setup</a>. The initiating user's ID is forwarded to remote extraction, which applies that user's permissions there. Participating deployments must recognize that identity and trust the Nexus connection.</p>
-<p>S3 storage must be accessible to the workers that write exports and, when copying to a local upload, to the initiating deployment's worker. A local writable staging upload is needed only when <code>save_to_upload</code> is <code>true</code>. The default action access is restricted to <code>users: [admin]</code>; administrators must configure the intended user IDs or groups.</p>
+<p>An administrator must configure Nexus endpoints, action access, storage, and CPU workers on participating deployments; see <a href="install_this_plugin.html#configure-remote-export">remote export setup</a>. The initiating user's ID is forwarded to remote extraction, which applies that user's permissions there. Participating deployments must recognize that identity, trust the Nexus callers, and configure matching <a href="install_this_plugin.html#configure-nexus-trust-and-payload-encryption">payload encryption keys</a>.</p>
+<p>S3 storage must be accessible to the workers that write exports. Copying datasets back also requires storage access for the initiating deployment's worker and a writable staging upload there. For ZIP copy-back, configure the same bucket name on the initiating and receiving deployments; the current copy implementation uses the initiating bucket when parsing presigned URLs. The staging upload is needed only when <code>save_to_upload</code> is <code>true</code>.</p>
+<p>Action submission through the GUI and HTTP API defaults to <code>users: [admin]</code>; administrators must configure the intended user IDs or groups. Incoming Nexus calls do not recheck the receiver's action <code>users</code> or <code>groups</code> lists, so access to the receiving endpoint must be restricted to trusted callers.</p>
 <h2 id="choose-targets-and-run">Choose targets and run<a class="headerlink" href="#choose-targets-and-run" title="Permanent link">&para;</a></h2>
 <ol>
 <li>Open <strong>Actions → Run action → Export Remote Entries Action</strong>.</li>
-<li>Choose one or more <strong>Target Oases</strong>. <code>local</code> runs extraction on this deployment; other values are administrator-configured Nexus target keys.</li>
-<li>Set search options, including ownership scope, maximum entries, query JSON text, and optional archive include paths. The selection limit applies separately to each target.</li>
+<li>Choose one or more <strong>Target Oases</strong>. <code>local</code> runs extraction on the initiating deployment; other values are administrator-configured Nexus target keys.</li>
+<li>Set search options, including ownership scope, maximum entries, query JSON text, and optional archive include/exclude directives. The selection limit applies separately to each target.</li>
 <li>Select <code>json</code>, <code>csv</code>, or <code>parquet</code> and ZIP or directory output.</li>
 <li>Leave <strong>Save dataset to upload</strong> disabled for S3-only output, or enable it and provide the destination staging upload ID.</li>
 <li>Run the action, then inspect every target's result.</li>
 </ol>
 <h2 id="example-input">Example input<a class="headerlink" href="#example-input" title="Permanent link">&para;</a></h2>
-<p>With the administrator's <code>oasis-b</code> target configured and deployment-managed storage (<code>s3_mode: env</code>), this input exports up to ten visible entries from both local and remote deployments:</p>
+<p>With the administrator's <code>oasis-b</code> target configured and deployment-managed storage (<code>s3_mode: env</code>), this input exports up to ten visible entries from each of the initiating deployment (<code>local</code>) and the remote <code>oasis-b</code> deployment:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">"target_oases"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"local"</span><span class="p">,</span><span class="w"> </span><span class="s2">"oasis-b"</span><span class="p">],</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">"save_to_upload"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
@@ -770,8 +884,8 @@
 <a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">  </span><span class="p">}</span>
 <a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="p">}</span>
 </code></pre></div>
-<p>Use the keys supplied by your administrator. To search only remote data, omit <code>local</code> from <code>target_oases</code>. To copy each successful dataset to a local upload, set <code>save_to_upload</code> to <code>true</code> and add <code>upload_id</code>. Each target remains a separate export; the action does not merge datasets.</p>
-<p>For REST, omit <code>user_id</code> and submit this input under <code>data</code>. Search query text and archive include directives follow <a href="export_entries.html">Export Entries</a>. Remote export does not produce forces formats.</p>
+<p>Use the keys supplied by your administrator. To search only remote data, omit <code>local</code> from <code>target_oases</code>. To copy each successful dataset to an upload on the initiating deployment, set <code>save_to_upload</code> to <code>true</code> and add <code>upload_id</code>. Each target remains a separate export; the action does not merge datasets.</p>
+<p>For REST, omit <code>user_id</code> and submit this input under <code>data</code>. Search query text and archive include/exclude directives follow <a href="export_entries.html">Export Entries</a>. Remote export does not produce forces formats.</p>
 <h2 id="storage-options">Storage options<a class="headerlink" href="#storage-options" title="Permanent link">&para;</a></h2>
 <p>In the default <code>env</code> mode, the worker resolves storage from deployment configuration and environment variables, and the form hides <code>storage_settings</code>. Supplied storage settings are replaced by deployment-managed values on a deployment running in this mode.</p>
 <p>If the administrator enables <code>s3_mode: workflow_input</code>, add this <code>storage_settings</code> object to the action input:</p>
@@ -784,7 +898,9 @@
 <a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">  </span><span class="p">}</span>
 <a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="p">}</span>
 </code></pre></div>
-<p>This fragment supplements the complete input above. <code>endpoint_url</code> can select an S3-compatible service; optional <code>access_key_id</code>, <code>secret_access_key</code>, and <code>session_token</code> supply explicit credentials. Without explicit credentials, the S3 client can use its configured credential chain. Explicit credentials are serialized into workflow payloads, so use deployment-managed credentials where possible. A remote deployment in <code>env</code> mode resolves its own storage even when the caller supplies settings; the caller must be able to read that storage if local copying is requested.</p>
+<p>This fragment supplements the complete input above. <code>endpoint_url</code> can select an S3-compatible service; optional <code>access_key_id</code>, <code>secret_access_key</code>, and <code>session_token</code> supply explicit credentials. Without explicit credentials, the S3 client can use each executing worker's configured credential chain.</p>
+<p>Credentials in the initiating deployment's resolved storage settings are serialized into workflow payloads and forwarded to every selected Nexus receiver. This includes input credentials in <code>workflow_input</code> mode and credentials resolved from plugin configuration or access-key environment variables in <code>env</code> mode. A receiver in <code>env</code> mode still receives these values before replacing them with its own storage settings. Restrict receivers and access to workers and Temporal histories accordingly. Worker role or profile credentials resolved later by boto3 are not added to the workflow payload by this plugin; see <a href="install_this_plugin.html#configure-targets-and-s3">storage configuration</a>.</p>
+<p>A remote deployment in <code>env</code> mode resolves its own storage even when the caller supplies settings; the initiating deployment's worker must be able to read that storage if copying into its upload is requested.</p>
 <h2 id="inspect-the-results">Inspect the results<a class="headerlink" href="#inspect-the-results" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -824,7 +940,7 @@
 </tr>
 <tr>
 <td><code>remote_uri</code></td>
-<td>Primary URI, preferring local output; inspect per-target results for usable locations</td>
+<td>Primary URI, preferring output from the initiating deployment's <code>local</code> target; inspect per-target results for usable locations</td>
 </tr>
 <tr>
 <td><code>workflow_duration</code></td>
@@ -832,8 +948,8 @@
 </tr>
 </tbody>
 </table>
-<p>A remote target can report <code>FAILED</code> while other targets succeed and the parent workflow completes. A failure in local execution can fail the parent workflow. Local copying is part of each target's execution and can fail after its S3 output was written; inspect logs as well as results.</p>
-<p>Successful S3 ZIPs or prefixes contain the same data artifact, manifest, and metadata as <a href="export_entries.html#retrieve-and-inspect-the-export">Export Entries</a>. ZIP output normally returns a presigned download URL with a requested lifetime of two days (subject to credential expiry), falling back to an <code>s3://</code> URI if signing fails. Directory output returns an <code>s3://</code> prefix. Zero-match targets still write metadata and an empty manifest, without a data artifact. If copying was requested, find the copied ZIPs or directories in the destination project's files. The action returns storage locations rather than local upload paths.</p>
+<p>A remote target can report <code>FAILED</code> while other targets succeed and the parent workflow completes. A failure of the <code>local</code> target can fail the parent workflow. Copying into an upload on the initiating deployment is part of each target's execution and can fail after its S3 output was written; inspect logs as well as results.</p>
+<p>Successful S3 ZIPs or prefixes contain the same data artifact, manifest, and metadata as <a href="export_entries.html#retrieve-and-inspect-the-export">Export Entries</a>. ZIP output normally returns a presigned download URL with a requested lifetime of two days (subject to credential expiry), falling back to an <code>s3://</code> URI if signing fails. Directory output returns an <code>s3://</code> prefix. Zero-match targets still write metadata and an empty manifest, without a data artifact. If copying was requested, find the copied ZIPs or directories in the destination project's files on the initiating deployment. The action returns storage locations rather than upload paths.</p>
 
 
 
@@ -882,6 +998,8 @@
     
     
       <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../javascripts/theme-video.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
       
