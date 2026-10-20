@@ -27,7 +27,7 @@
     
     
       
-        <title>Tutorial - nomad-ml-workflows</title>
+        <title>Export Entries tutorial - nomad-ml-workflows</title>
       
     
     
@@ -66,10 +66,12 @@
   
     
     
+      
     
     
     
-    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="#2A4CDF" data-md-color-accent="#008A67">
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
   
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
@@ -78,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#tutorial" class="md-skip">
+        <a href="#export-ten-perovskite-solar-cell-entries-on-nomad-central" class="md-skip">
           Skip to content
         </a>
       
@@ -90,14 +92,17 @@
     
       
 
-<header class="md-header" data-md-component="header">
-  <nav class="md-header__inner md-grid" aria-label="header.title">
-    <a href="https://nomad-lab.eu" title="nomad-ml-workflows" class="md-header__button md-logo" aria-label="nomad-ml-workflows" data-md-component="logo">
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="https://fairmat-nfdi.github.io/nomad-ml-workflows/" title="nomad-ml-workflows" class="md-header__button md-logo" aria-label="nomad-ml-workflows" data-md-component="logo">
       
   <img src="../assets/nomad-plugin-logo.png" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
+      
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
     </label>
     <div class="md-header__title" data-md-component="header-title">
@@ -110,14 +115,93 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Tutorial
+              Export Entries tutorial
             
           </span>
         </div>
       </div>
     </div>
     
+      
+        <form class="md-header__option" data-md-component="palette">
+  
     
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
     
     
       <div class="md-header__source">
@@ -157,7 +241,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="https://nomad-lab.eu" title="nomad-ml-workflows" class="md-nav__button md-logo" aria-label="nomad-ml-workflows" data-md-component="logo">
+    <a href="https://fairmat-nfdi.github.io/nomad-ml-workflows/" title="nomad-ml-workflows" class="md-nav__button md-logo" aria-label="nomad-ml-workflows" data-md-component="logo">
       
   <img src="../assets/nomad-plugin-logo.png" alt="logo">
 
@@ -222,6 +306,24 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Export Entries tutorial
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="tutorial.html" class="md-nav__link md-nav__link--active">
         
   
@@ -229,7 +331,7 @@
   <span class="md-ellipsis">
     
   
-    Tutorial
+    Export Entries tutorial
   
 
     
@@ -238,6 +340,69 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#before-you-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before you start
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#use-the-gui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Use the GUI
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#submit-the-same-export-with-python-and-rest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Submit the same export with Python and REST
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#check-the-dataset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check the dataset
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -353,14 +518,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../how_to/contribute_to_this_plugin.html" class="md-nav__link">
+      <a href="../how_to/export_entries.html" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Contribute to this plugin
+    Export entries
   
 
     
@@ -381,14 +546,70 @@
   
   
     <li class="md-nav__item">
-      <a href="../how_to/contribute_to_the_documentation.html" class="md-nav__link">
+      <a href="../how_to/export_forces.html" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Contribute to the documentation
+    Export energies, forces, and stresses
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how_to/export_remote_entries.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Export remote entries
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how_to/contribute_to_this_plugin.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contribute to this plugin
   
 
     
@@ -415,9 +636,20 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../explanation/explanation.html" class="md-nav__link">
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
   
   
   <span class="md-ellipsis">
@@ -431,26 +663,35 @@
   
   
 
-      </a>
-    </li>
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Explanation
   
 
-    
-      
-      
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
   
   
   
   
     <li class="md-nav__item">
-      <a href="../reference/references.html" class="md-nav__link">
+      <a href="../explanation/export_entries.html" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Reference
+    Export functionality
   
 
     
@@ -459,6 +700,42 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../explanation/schema.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -483,6 +760,58 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#before-you-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before you start
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#use-the-gui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Use the GUI
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#submit-the-same-export-with-python-and-rest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Submit the same export with Python and REST
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#check-the-dataset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check the dataset
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -498,11 +827,97 @@
 
 
 
-<h1 id="tutorial">Tutorial<a class="headerlink" href="#tutorial" title="Permanent link">&para;</a></h1>
-<div class="admonition note">
-<p class="admonition-title">Attention</p>
-<p>TODO</p>
+<h1 id="export-ten-perovskite-solar-cell-entries-on-nomad-central">Export ten perovskite solar-cell entries on NOMAD Central<a class="headerlink" href="#export-ten-perovskite-solar-cell-entries-on-nomad-central" title="Permanent link">&para;</a></h1>
+<p>This tutorial exports up to ten entries of type <code>PerovskiteSolarCell</code> visible to you on <a href="https://nomad-lab.eu/">NOMAD Central</a>. The complete archives are saved as JSON in a ZIP in your destination project. Both the GUI and Python/REST instructions below run <strong>Export Entries Action</strong> with the same inputs.</p>
+<h2 id="before-you-start">Before you start<a class="headerlink" href="#before-you-start" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Open <a href="https://nomad-lab.eu/select-gui">NOMAD Central's GUI selector</a>, select <strong>Launch New GUI</strong>, and sign in with your NOMAD account. <strong>Export Entries Action</strong> is available on this installation.</li>
+<li>Open <a href="https://nomad-lab.eu/projects">Projects</a>, select <strong>New Project</strong>, enter a <strong>Project name</strong> such as <code>Perovskite export</code>, and select <strong>Create</strong>. Leave the files empty.</li>
+<li>Open the new project's overview and keep the project unpublished so the action can write the export to it.</li>
+</ol>
+<h2 id="use-the-gui">Use the GUI<a class="headerlink" href="#use-the-gui" title="Permanent link">&para;</a></h2>
+<p>Watch the screencast or follow the steps below:</p>
+<video class="theme-video" controls playsinline preload="none"
+    aria-label="Export Entries Action GUI walkthrough"
+    src="../assets/export_entries_action_light.webm"
+    data-theme-light="../assets/export_entries_action_light.webm"
+    data-theme-dark="../assets/export_entries_action_dark.webm">
+    Your browser does not support embedded video.
+    <a href="../assets/export_entries_action_light.webm">Download the screencast</a>.
+</video>
+
+<ol>
+<li>In the newly created project's overview, select <strong>Run action</strong>, and choose <strong>Export Entries Action</strong>.</li>
+<li>Confirm that <strong>Destination project ID</strong> is already populated with this project's ID.</li>
+<li>Under <strong>Search options</strong>, choose <strong>All entries visible to me (visible)</strong>, set <strong>Maximum entries</strong> to <code>10</code>, and enter <code>{"entry_type": "PerovskiteSolarCell"}</code> in <strong>Search query</strong>. Leave <strong>Archive required paths</strong> empty to export complete archives.</li>
+<li>Under <strong>Export options</strong>, choose <code>json</code> and keep <strong>Create ZIP archive</strong> enabled. Run the action.</li>
+</ol>
+<p>The action searches for entries and collects their archives in the background. To follow its progress:</p>
+<ol>
+<li>Select <strong>Actions</strong> in the left menu to view the actions you have run, along with their project IDs and creation times. Select the most recent action's ID in the first row to open its preview.</li>
+<li>Select <strong>Open full page</strong> in the preview to follow the action's status and logs. Once it succeeds, find the relative path of the exported artifacts under <code>exported_dir_path</code> in <strong>Results</strong>.</li>
+</ol>
+<p>Open the destination project's files and find the ZIP at that relative path (for example, <code>export_entries_&lt;timestamp&gt;.zip</code>). If the file is not visible, reload the page. Download and extract the ZIP to inspect <code>data.json</code>, <code>selected_entries.json</code>, and <code>metadata.json</code>.</p>
+<div class="admonition tip">
+<p class="admonition-title">Use a query for your data</p>
+<p>The query above selects perovskite solar-cell entries. To choose different data, find your entries in a NOMAD search app, open <strong>View API Call</strong>, and copy only the query object. Paste that object as JSON text into <strong>Search query</strong>. When editing an input JSON file, encode the object as a string, as shown below and in the <a href="../how_to/export_entries.html#action-form-inputs">action form inputs</a>.</p>
 </div>
+<h2 id="submit-the-same-export-with-python-and-rest">Submit the same export with Python and REST<a class="headerlink" href="#submit-the-same-export-with-python-and-rest" title="Permanent link">&para;</a></h2>
+<p>You need Python with <code>requests</code> installed and network access to Central's API. The client does not need a local NOMAD installation or worker.</p>
+<p>Using the same NOMAD account, open <strong>User Settings → Tokens</strong> (<a href="https://nomad-lab.eu/settings/tokens">Central's Tokens page</a>). Create a personal access token with a name, an expiration date, and the <code>actions:run</code> and <code>actions:read</code> scopes, then select <strong>Create token</strong>. Copy the displayed token for <code>NOMAD_TOKEN</code> below. Your account must have access to the source entries and write access to the destination project. For more details, see <a href="https://docs.nomad-lab.eu/howto/manage/program/auth.html">Authenticate programmatically</a>.</p>
+<p>Copy the ID of the project created above. Save this as <code>export_entries_input.json</code>, replacing <code>YOUR_STAGING_UPLOAD_ID</code> with that ID; REST requests require you to supply <code>upload_id</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">"upload_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"YOUR_STAGING_UPLOAD_ID"</span><span class="p">,</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">"search_settings"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">"owner"</span><span class="p">:</span><span class="w"> </span><span class="s2">"visible"</span><span class="p">,</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="nt">"max_entries"</span><span class="p">:</span><span class="w"> </span><span class="mi">10</span><span class="p">,</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="nt">"query"</span><span class="p">:</span><span class="w"> </span><span class="s2">"{\"entry_type\": \"PerovskiteSolarCell\"}"</span><span class="p">,</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span><span class="nt">"required"</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">  </span><span class="nt">"export_settings"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">    </span><span class="nt">"file_format"</span><span class="p">:</span><span class="w"> </span><span class="s2">"json"</span><span class="p">,</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">    </span><span class="nt">"create_zip_archive"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="p">}</span>
+</code></pre></div>
+<p><code>query</code> is a string containing a JSON object. Here it selects entries whose <code>entry_type</code> is <code>PerovskiteSolarCell</code> within the <code>visible</code> ownership scope, matching the GUI example. Omit <code>user_id</code>; REST injects the authenticated user's ID before validating the action inputs and overwrites any supplied value.</p>
+<p>Set Central's API base URL and your token in your shell environment, replacing the token placeholder with the value copied above:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">NOMAD_API_URL</span><span class="o">=</span><span class="s1">'https://nomad-lab.eu/backend/api/v1'</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">NOMAD_TOKEN</span><span class="o">=</span><span class="s1">'YOUR_PERSONAL_ACCESS_TOKEN'</span>
+</code></pre></div>
+<p>Save the following as <code>submit_export.py</code> and run <code>python submit_export.py</code> from the directory containing the input file:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="n">api_url</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s1">'NOMAD_API_URL'</span><span class="p">]</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="s1">'/'</span><span class="p">)</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="n">token</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s1">'NOMAD_TOKEN'</span><span class="p">]</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="n">input_json</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s1">'export_entries_input.json'</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="s1">'utf-8'</span><span class="p">))</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="n">action_id</span> <span class="o">=</span> <span class="s1">'nomad_ml_workflows.actions:export_entries'</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">post</span><span class="p">(</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>    <span class="sa">f</span><span class="s1">'</span><span class="si">{</span><span class="n">api_url</span><span class="si">}</span><span class="s1">/actions/</span><span class="si">{</span><span class="n">action_id</span><span class="si">}</span><span class="s1">/start'</span><span class="p">,</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>    <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s1">'Authorization'</span><span class="p">:</span> <span class="sa">f</span><span class="s1">'Bearer </span><span class="si">{</span><span class="n">token</span><span class="si">}</span><span class="s1">'</span><span class="p">},</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>    <span class="n">json</span><span class="o">=</span><span class="p">{</span><span class="s1">'data'</span><span class="p">:</span> <span class="n">input_json</span><span class="p">},</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>    <span class="n">timeout</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="p">)</span>
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="n">response</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span>
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="n">action_instance_id</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()[</span><span class="s1">'action_instance_id'</span><span class="p">]</span>
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="nb">print</span><span class="p">(</span><span class="n">action_instance_id</span><span class="p">)</span>
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">'https://nomad-lab.eu/actions/</span><span class="si">{</span><span class="n">action_instance_id</span><span class="si">}</span><span class="s1">'</span><span class="p">)</span>
+</code></pre></div>
+<p>The script submits the action and prints its instance ID and Central action-page URL. It does not wait for completion. Open the printed URL to follow the status and logs, then download the ZIP from the destination project's files as described above. You can also make authenticated requests to <code>GET /actions/{action_instance_id}/status</code> and, after completion, <code>GET /actions/{action_instance_id}/result</code>, relative to the same API base URL. The result's <code>exported_dir_path</code> identifies the ZIP in your destination upload's raw files.</p>
+<h2 id="check-the-dataset">Check the dataset<a class="headerlink" href="#check-the-dataset" title="Permanent link">&para;</a></h2>
+<p>After completing either interface's instructions, check the export:</p>
+<ol>
+<li>Confirm that the action succeeded and that the ZIP is available at <code>exported_dir_path</code> in the destination project's files.</li>
+<li>Extract the ZIP and check for <code>data.json</code>, <code>selected_entries.json</code>, and <code>metadata.json</code>.</li>
+<li>Inspect <code>data.json</code>, a JSON array of records with entry IDs, upload IDs, and archives for the selected <code>PerovskiteSolarCell</code> entries. Compare the entry and upload IDs with the selected sources in <code>selected_entries.json</code>.</li>
+<li>In <code>metadata.json</code>, inspect <code>data.num_entries_available</code>, <code>data.num_entries_selected</code>, and <code>data.num_entries_exported</code>. With enough readable entries, ten are selected and exported. Fewer matches or skipped archives can produce fewer exported records; check the action logs for skipped entries. Matching totals and selected entries can change as Central's data changes.</li>
+</ol>
+<p>If no entries match, the ZIP still contains an empty manifest and metadata, but no <code>data.json</code>. For selected archive paths, other formats, and directory output, continue with <a href="../how_to/export_entries.html">Export entries</a>.</p>
 
 
 
@@ -552,7 +967,7 @@
     
       <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
       
-        <script src="../javascript.js"></script>
+        <script src="../javascripts/theme-video.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
       

@@ -66,10 +66,12 @@
   
     
     
+      
     
     
     
-    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="#2A4CDF" data-md-color-accent="#008A67">
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
   
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
@@ -78,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#install-this-plugin" class="md-skip">
+        <a href="#install-and-configure-the-plugin" class="md-skip">
           Skip to content
         </a>
       
@@ -90,14 +92,17 @@
     
       
 
-<header class="md-header" data-md-component="header">
-  <nav class="md-header__inner md-grid" aria-label="header.title">
-    <a href="https://nomad-lab.eu" title="nomad-ml-workflows" class="md-header__button md-logo" aria-label="nomad-ml-workflows" data-md-component="logo">
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="https://fairmat-nfdi.github.io/nomad-ml-workflows/" title="nomad-ml-workflows" class="md-header__button md-logo" aria-label="nomad-ml-workflows" data-md-component="logo">
       
   <img src="../assets/nomad-plugin-logo.png" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
+      
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
     </label>
     <div class="md-header__title" data-md-component="header-title">
@@ -117,7 +122,86 @@
       </div>
     </div>
     
+      
+        <form class="md-header__option" data-md-component="palette">
+  
     
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
     
     
       <div class="md-header__source">
@@ -157,7 +241,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="https://nomad-lab.eu" title="nomad-ml-workflows" class="md-nav__button md-logo" aria-label="nomad-ml-workflows" data-md-component="logo">
+    <a href="https://fairmat-nfdi.github.io/nomad-ml-workflows/" title="nomad-ml-workflows" class="md-nav__button md-logo" aria-label="nomad-ml-workflows" data-md-component="logo">
       
   <img src="../assets/nomad-plugin-logo.png" alt="logo">
 
@@ -220,7 +304,7 @@
   <span class="md-ellipsis">
     
   
-    Tutorial
+    Export Entries tutorial
   
 
     
@@ -298,6 +382,24 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install this Plugin
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="install_this_plugin.html" class="md-nav__link md-nav__link--active">
         
   
@@ -314,6 +416,136 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Installation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nomad-deployment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NOMAD deployment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nomad-distro-dev" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NOMAD distro dev
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#enable-entry-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enable entry points
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#set-limits-and-action-access" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Set limits and action access
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configure-remote-export" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configure remote export
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configure remote export">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#configure-nexus-trust-and-payload-encryption" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configure Nexus trust and payload encryption
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configure-targets-and-s3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configure targets and S3
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verify-the-deployment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verify the deployment
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -355,14 +587,14 @@
   
   
     <li class="md-nav__item">
-      <a href="contribute_to_this_plugin.html" class="md-nav__link">
+      <a href="export_entries.html" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Contribute to this plugin
+    Export entries
   
 
     
@@ -383,14 +615,70 @@
   
   
     <li class="md-nav__item">
-      <a href="contribute_to_the_documentation.html" class="md-nav__link">
+      <a href="export_forces.html" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Contribute to the documentation
+    Export energies, forces, and stresses
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="export_remote_entries.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Export remote entries
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="contribute_to_this_plugin.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contribute to this plugin
   
 
     
@@ -417,9 +705,20 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../explanation/explanation.html" class="md-nav__link">
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
   
   
   <span class="md-ellipsis">
@@ -433,26 +732,35 @@
   
   
 
-      </a>
-    </li>
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Explanation
   
 
-    
-      
-      
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
   
   
   
   
     <li class="md-nav__item">
-      <a href="../reference/references.html" class="md-nav__link">
+      <a href="../explanation/export_entries.html" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Reference
+    Export functionality
   
 
     
@@ -461,6 +769,42 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../explanation/schema.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -485,6 +829,125 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Installation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nomad-deployment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NOMAD deployment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nomad-distro-dev" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NOMAD distro dev
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#enable-entry-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enable entry points
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#set-limits-and-action-access" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Set limits and action access
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configure-remote-export" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configure remote export
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configure remote export">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#configure-nexus-trust-and-payload-encryption" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configure Nexus trust and payload encryption
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configure-targets-and-s3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configure targets and S3
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verify-the-deployment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verify the deployment
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -500,11 +963,148 @@
 
 
 
-<h1 id="install-this-plugin">Install This Plugin<a class="headerlink" href="#install-this-plugin" title="Permanent link">&para;</a></h1>
-<div class="admonition note">
-<p class="admonition-title">Attention</p>
-<p>TODO</p>
-</div>
+<h1 id="install-and-configure-the-plugin">Install and configure the plugin<a class="headerlink" href="#install-and-configure-the-plugin" title="Permanent link">&para;</a></h1>
+<p>This guide covers installing and configuring the plugin in an existing NOMAD environment. For Temporal and CPU action-worker setup, follow <a href="https://github.com/FAIRmat-NFDI/nomad-distro-template#enabling-nomad-actions">Enabling NOMAD Actions in the distribution template</a>.</p>
+<h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h2>
+<h3 id="nomad-deployment">NOMAD deployment<a class="headerlink" href="#nomad-deployment" title="Permanent link">&para;</a></h3>
+<p>The plugin requires <code>nomad-lab&gt;=2.0.0</code>. Add it to your distribution following the <a href="https://docs.nomad-lab.eu/howto/oasis/configure.html#plugins">NOMAD Oasis plugin configuration guide</a>. Include the <code>cpu-action</code> extra for export dependencies:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">'nomad-ml-workflows[cpu-action]'</span>
+</code></pre></div>
+<p>The extra supplies PyArrow for tabular output, boto3 for S3, and <code>nomad-forces-export</code> for atomic data. The base installation provides the schema packages and action registration. Configure the plugin in your deployment's <code>nomad.yaml</code> as described below.</p>
+<h3 id="nomad-distro-dev">NOMAD distro dev<a class="headerlink" href="#nomad-distro-dev" title="Permanent link">&para;</a></h3>
+<p>Use <a href="https://github.com/FAIRmat-NFDI/nomad-distro-dev/">nomad-distro-dev</a> for an integrated development installation. Follow its setup instructions to add this plugin under <code>packages/nomad-ml-workflows</code> and register <code>nomad-ml-workflows[cpu-action]</code> as a workspace dependency. Apply the plugin settings below in the workspace's root <code>nomad.yaml</code>.</p>
+<p>For plugin tests, linting, and documentation previews, see <a href="contribute_to_this_plugin.html">Contribute to this plugin</a>.</p>
+<h2 id="enable-entry-points">Enable entry points<a class="headerlink" href="#enable-entry-points" title="Permanent link">&para;</a></h2>
+<p>The plugin registers these entry points:</p>
+<table>
+<thead>
+<tr>
+<th>Entry point</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>nomad_ml_workflows.actions:export_entries</code></td>
+<td>Archive export from this deployment</td>
+</tr>
+<tr>
+<td><code>nomad_ml_workflows.actions:export_forces</code></td>
+<td>Atomic structures and properties</td>
+</tr>
+<tr>
+<td><code>nomad_ml_workflows.actions:export_remote_entries</code></td>
+<td>Nexus and S3 export</td>
+</tr>
+<tr>
+<td><code>nomad_ml_workflows.schema_packages:dataset_schema</code></td>
+<td>Dataset schema</td>
+</tr>
+<tr>
+<td><code>nomad_ml_workflows.schema_packages:model_schema</code></td>
+<td>ML model schema</td>
+</tr>
+</tbody>
+</table>
+<p>Ensure the required entry points are included in your deployment's plugin selection and are not excluded. Configure action options under <code>plugins.entry_points.options</code> as below. Confirm the actions are offered by the GUI or authenticated <code>GET /actions/schemas</code> relative to the deployment's API base URL.</p>
+<h2 id="set-limits-and-action-access">Set limits and action access<a class="headerlink" href="#set-limits-and-action-access" title="Permanent link">&para;</a></h2>
+<p>Merge this example into the existing <code>nomad.yaml</code>, replacing the example user and group IDs:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">plugins</span><span class="p">:</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">entry_points</span><span class="p">:</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="nt">options</span><span class="p">:</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">      </span><span class="nt">nomad_ml_workflows.actions:export_entries</span><span class="p">:</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">        </span><span class="nt">max_entries_export_limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100000</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">        </span><span class="nt">read_archives_timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">7200</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">        </span><span class="nt">write_tabular_timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">7200</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">        </span><span class="nt">max_write_buffer_size_bytes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">67108864</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">        </span><span class="nt">max_write_buffer_size_rows</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1024</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">        </span><span class="nt">users</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">EXPORT_USER_ID</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">        </span><span class="nt">groups</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">EXPORT_GROUP_ID</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">      </span><span class="nt">nomad_ml_workflows.actions:export_forces</span><span class="p">:</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">        </span><span class="nt">max_entries_export_limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100000</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">        </span><span class="nt">export_archives_timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10800</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">        </span><span class="nt">users</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">EXPORT_USER_ID</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">        </span><span class="nt">groups</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">EXPORT_GROUP_ID</span><span class="p p-Indicator">]</span>
+</code></pre></div>
+<p>Limits must be positive; <code>0</code> does not mean unlimited. The shared manifest activity uses the Export Entries cap, including for forces and remote exports. Forces also validates its input against its own cap; keep the two caps aligned when you want the same limit. A remote search applies the executing deployment's cap separately for each target.</p>
+<p>Timeouts are in seconds. The two tabular buffer limits control buffered rows and encoded input bytes, not a hard process-memory ceiling; one oversized row can exceed the byte target.</p>
+<p><code>users</code> and <code>groups</code> contain NOMAD IDs and restrict action submission through the GUI and HTTP API. A user is allowed if their ID is listed <strong>or</strong> they belong to a listed group. Empty or unset restrictions allow authenticated users to start the action. Entry permissions still apply to searches. Remote export defaults to <code>users: [admin]</code>; replace it with intended IDs, or set <code>users: []</code> and a nonempty <code>groups</code> list for group-only access.</p>
+<h2 id="configure-remote-export">Configure remote export<a class="headerlink" href="#configure-remote-export" title="Permanent link">&para;</a></h2>
+<p>Here, <strong>local</strong> means the initiating deployment: the current NOMAD deployment from which the action is started. Its <code>local</code> target searches that deployment, and optional upload copying saves datasets there.</p>
+<p>Enable the remote action and its Nexus handler on the receiving deployment as well as the initiating one. Use Nexus endpoints already available in your deployment. The receiving deployment must recognize the forwarded initiating user's ID.</p>
+<h3 id="configure-nexus-trust-and-payload-encryption">Configure Nexus trust and payload encryption<a class="headerlink" href="#configure-nexus-trust-and-payload-encryption" title="Permanent link">&para;</a></h3>
+<p>Restrict access to the receiving Nexus endpoint to trusted initiating deployments using your Temporal authentication and authorization setup. Incoming Nexus calls start the export workflow directly and do not recheck the receiving action's <code>users</code> or <code>groups</code> lists. The receiver trusts the caller to forward the authenticated user's ID; extraction then applies that identity's entry permissions. Configuring a receiver's action allowlists does not restrict incoming Nexus calls.</p>
+<p>Configure the same Temporal payload encryption key and key ID in the API and CPU worker environments of all participating deployments. Merge this into each deployment's existing <code>nomad.yaml</code>, replacing the placeholder with the same securely supplied secret of at least 32 characters:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">temporal</span><span class="p">:</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">payload_codec_key</span><span class="p">:</span><span class="w"> </span><span class="s">"&lt;shared-secret-at-least-32-characters&gt;"</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">payload_codec_key_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nomad-export-federation</span>
+</code></pre></div>
+<p>Keep each deployment's <code>services.api_secret</code> separate. Without an explicit payload key, production clients encrypt using their own API secret, so independently configured deployments cannot decode each other's Nexus payloads. Development clients otherwise leave payloads unencrypted; configure the shared key explicitly when communicating with encrypted peers.</p>
+<h3 id="configure-targets-and-s3">Configure targets and S3<a class="headerlink" href="#configure-targets-and-s3" title="Permanent link">&para;</a></h3>
+<p>Merge this configuration on the initiating deployment:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">plugins</span><span class="p">:</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">entry_points</span><span class="p">:</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="nt">options</span><span class="p">:</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">      </span><span class="nt">nomad_ml_workflows.actions:export_remote_entries</span><span class="p">:</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">        </span><span class="nt">users</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">EXPORT_USER_ID</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">        </span><span class="nt">groups</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">EXPORT_GROUP_ID</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">        </span><span class="nt">local_display_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Local Oasis</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">        </span><span class="nt">nexus_endpoints</span><span class="p">:</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">          </span><span class="nt">oasis-b</span><span class="p">:</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">            </span><span class="nt">display_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Oasis B</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">            </span><span class="nt">endpoint</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">oasis-b</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">        </span><span class="nt">s3_mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">env</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="w">        </span><span class="nt">s3_bucket</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ml-datasets</span>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="w">        </span><span class="nt">s3_prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">exports</span>
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="w">        </span><span class="nt">s3_region</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">eu-central-1</span>
+</code></pre></div>
+<p>Use the <strong>same name</strong> for the mapping key (<code>oasis-b</code>), the <code>endpoint</code> value, and the registered Nexus endpoint. Current dispatch uses the selected mapping key as the endpoint name. <code>local</code> is reserved for execution on the initiating deployment. The display name is only a GUI label.</p>
+<p>The default <code>s3_mode: env</code> resolves storage on each executing deployment. Set an accessible bucket and credentials on each deployment; configuring the initiating worker alone does not configure a receiver. For optional copying back to an upload on the initiating deployment, its worker must also be able to read the receiver's storage, using a compatible endpoint and credentials.</p>
+<p>For ZIP copy-back, configure the same bucket name on the initiating and receiving deployments. ZIP exports normally return a presigned URL, and the current copy implementation parses that URL using the initiating deployment's configured bucket. Read access to a different receiver bucket alone is insufficient. Directory exports return an <code>s3://</code> URI that preserves the receiver's bucket name, so those buckets can differ if the initiating worker has the required storage access.</p>
+<table>
+<thead>
+<tr>
+<th>Entry point option</th>
+<th>Environment fallback</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>s3_bucket</code></td>
+<td><code>S3_BUCKET</code>, <code>AWS_S3_BUCKET</code>, <code>AWS_BUCKET</code></td>
+</tr>
+<tr>
+<td><code>s3_prefix</code></td>
+<td><code>S3_PREFIX</code>, <code>AWS_S3_PREFIX</code></td>
+</tr>
+<tr>
+<td><code>s3_endpoint_url</code></td>
+<td><code>S3_ENDPOINT_URL</code>, <code>AWS_ENDPOINT_URL_S3</code>, <code>AWS_ENDPOINT_URL</code></td>
+</tr>
+<tr>
+<td><code>s3_region</code></td>
+<td><code>S3_REGION</code>, <code>AWS_DEFAULT_REGION</code>, <code>AWS_REGION</code></td>
+</tr>
+<tr>
+<td><code>s3_access_key_id</code></td>
+<td><code>S3_ACCESS_KEY_ID</code>, <code>AWS_ACCESS_KEY_ID</code></td>
+</tr>
+<tr>
+<td><code>s3_secret_access_key</code></td>
+<td><code>S3_SECRET_ACCESS_KEY</code>, <code>AWS_SECRET_ACCESS_KEY</code></td>
+</tr>
+<tr>
+<td><code>s3_session_token</code></td>
+<td><code>S3_SESSION_TOKEN</code>, <code>AWS_SESSION_TOKEN</code></td>
+</tr>
+</tbody>
+</table>
+<p>Entry point values take precedence over the fallbacks, which are checked in the listed order. Set <code>s3_endpoint_url</code> for an S3-compatible service. Workers need permission to write export objects; copying ZIPs requires object reads, and copying directories also requires listing the export prefix.</p>
+<p>The initiating deployment forwards its resolved <code>storage_settings</code>, including any credential fields, to every selected Nexus receiver through Temporal payloads. These settings come from workflow input in <code>workflow_input</code> mode or plugin configuration and the listed environment variables in <code>env</code> mode. This forwarding also happens when a receiver uses <code>s3_mode: env</code> and replaces those settings before exporting. Only configure trusted receivers, and restrict access to workers and Temporal payloads and histories on both initiating and receiving deployments.</p>
+<p>When explicit credential fields are unset, boto3 can resolve credentials locally through each executing worker's configured role or profile. Credentials resolved later by boto3 are not added to the workflow payload by this plugin. Setting the listed access-key environment variables populates the credential fields and therefore forwards those values to receivers.</p>
+<p>Alternatively, set <code>s3_mode: workflow_input</code> to show and require <code>storage_settings</code> in the action form. Configure participating receivers the same way if they should use the caller's supplied settings. A receiver in <code>env</code> mode replaces them with its own deployment settings. See the <a href="export_remote_entries.html#storage-options">remote guide</a> for an input example.</p>
+<h2 id="verify-the-deployment">Verify the deployment<a class="headerlink" href="#verify-the-deployment" title="Permanent link">&para;</a></h2>
+<p>Run the small <a href="../tutorial/tutorial.html">Export Entries tutorial</a>, check the action instance completes, and inspect the ZIP in its destination upload. For remote setup, start with a single configured target and a small limit, check its per-target status and storage location, then enable copying into an upload on the initiating deployment if needed. Search and export counts are explained in the <a href="../explanation/export_entries.html">export overview</a>.</p>
 
 
 
@@ -554,7 +1154,7 @@
     
       <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
       
-        <script src="../javascript.js"></script>
+        <script src="../javascripts/theme-video.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
       
