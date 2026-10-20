@@ -41,10 +41,11 @@ dev = [
     "pytest",
     "structlog",
     "mkdocs",
-    "mkdocs-material>=8.1.1",
+    "mkdocs-material>=9.5.0",
     "pymdown-extensions",
     "mkdocs-click",
     "pytest-asyncio",
+    "poethepoet",
 ]
 cpu-action = [
     "pyarrow", # for parquet support
@@ -112,6 +113,14 @@ fixable = ["ALL"]
 
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.poe.tasks.markdown-lint]
+help = "Lint ML workflow Markdown using the CI rules"
+cmd = '''
+npx --yes markdownlint-cli2@0.23.2
+  --config .github/workflows/configs/nomad.markdownlint.jsonc
+  "*.md" "docs/**/*.md"
+'''
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["PLC0415"] # import-outside-top-level
