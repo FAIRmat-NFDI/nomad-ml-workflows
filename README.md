@@ -23,7 +23,7 @@ See the [documentation](https://fairmat-nfdi.github.io/nomad-ml-workflows/) for 
 
 ## 🛠️ Contributing
 
-See [Contribute to this plugin](docs/how_to/contribute_to_this_plugin.md) for development setup, tests, linting, and documentation previews.
+See [Contribute to this plugin](https://fairmat-nfdi.github.io/nomad-ml-workflows/how_to/contribute_to_this_plugin.html) for development setup, tests, linting, and documentation previews.
 
 ## License
 
