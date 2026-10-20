@@ -1,12 +1,10 @@
 # Export energies, forces, and stresses
 
-Use **Export MLIP Data Action** (`nomad_ml_workflows.actions:export_forces`) to export atomic structures and selected properties for machine learning interatomic potentials. Its formats are Extended XYZ (`extxyz`) and ASE database (`ase_db`). 
+Use **Export MLIP Data Action** (`nomad_ml_workflows.actions:export_forces`) to export atomic structures and selected properties for machine learning interatomic potentials. Its formats are Extended XYZ (`extxyz`) and ASE database (`ase_db`).
 
-Currently only `DFT` entries are supported. 
+Currently only `DFT` entries are supported.
 
 `magmoms` are currently only added for `VASP DFT` entries.
-
-
 
 ## Prerequisites
 
@@ -16,6 +14,7 @@ You need access to the action and compatible calculation archives, a writable st
 
 1. Open **Actions → Run action → Export MLIP Data Action** and set the destination staging upload ID.
 1. Choose an ownership scope and maximum entry count. Keep or adapt the prefilled calculation query for your source data.
+
 ```Json
 { 
   "results.method.method_name:any": [ "DFT" ],   
@@ -24,6 +23,7 @@ You need access to the action and compatible calculation archives, a writable st
       "run.system" ] 
 }
 ```
+
 1. Under **Properties**, select energies, forces, and/or stresses. The underlying field names are exactly `energies`, `forces`, and `stresses`; each defaults to `false`.
 1. Choose `extxyz` and/or `ase_db`, select ZIP or directory output, and run the action.
 1. Inspect status, logs, and results, then download the output from the destination project's files using `exported_dir_path`.
@@ -60,7 +60,7 @@ For REST, omit `user_id` and send the input under `data` to this action's start 
 
 The ZIP or directory contains `data.xyz` for Extended XYZ or `data.db` for an ASE database, plus `selected_entries.json` and `metadata.json`. Set `file_format` to `ase_db` for database output, or `create_zip_archive` to `false` for a directory. The result also reports `workflow_duration`.
 
-Metadata records source selection, inputs, versions, and timing. 
+Metadata records source selection, inputs, versions, and timing.
 
 `num_entries_exported` is set to the number of entries that were processed; it does **not** measure the number of exported atomic configurations. An entry can contain multiple configurations, and conversion may skip unsupported frames. The archive filtering checks for relevant properties being present before adding a entry to the count, however due to errors within the archive data there might be no usable frames in that entry.
 
