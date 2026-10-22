@@ -11,18 +11,16 @@ with workflow.unsafe.imports_passed_through():
     from nomad_ml_workflows.actions.export_entries.activities import (
         cleanup_artifacts,
         export_dataset_to_upload,
-        prepare_manifest,
     )
     from nomad_ml_workflows.actions.export_entries.models import (
         CleanupArtifactsInput,
         ExportDatasetInput,
         ExportEntriesOutput,
         ExtractEntriesWorkflowOutput,
-        OutputFile,
         PrepareManifestInput,
     )
     from nomad_ml_workflows.actions.export_forces.activities import (
-        read_archives_and_create_export,
+        manifest_archives_and_create_export,
         write_export_forces_metadata_file,
     )
     from nomad_ml_workflows.actions.export_forces.models import (
@@ -30,28 +28,12 @@ with workflow.unsafe.imports_passed_through():
         ForcesExportDatasetMetadata,
         ForcesExportEntriesUserInput,
         ForcesExtractEntriesWorkflowInput,
+        ForcesManifestArchiveExportInput,
         ForcesNormalizedSearchSettings,
         ForcesWriteMetadataFileInput,
     )
 
 config = nomad_config.get_plugin_entry_point('nomad_ml_workflows.actions:export_forces')
-
-
-@workflow.defn
-class ForcesCreateExportWorkflow:
-    """
-    Child workflow that reads archives and writes the output artifact.
-    """
-
-    @workflow.run
-    async def run(self, data: ForcesCreateExportWorkflowInput) -> OutputFile:
-        retry_policy = RetryPolicy(maximum_attempts=1)
-        return await workflow.execute_activity(
-            read_archives_and_create_export,
-            data,
-            start_to_close_timeout=timedelta(seconds=config.export_archives_timeout),  # type: ignore
-            retry_policy=retry_policy,
-        )
 
 
 @workflow.defn
@@ -75,19 +57,34 @@ class ForcesExtractEntriesWorkflow:
 
         try:
             search_settings = ForcesNormalizedSearchSettings.from_user_input(user_input)
-            manifest_output = await workflow.execute_activity(
-                prepare_manifest,
-                PrepareManifestInput(
-                    export_entries_workflow_id=data.export_entries_workflow_id,
-                    user_id=search_settings.user_id,
-                    owner=search_settings.owner,
-                    query=search_settings.query,
-                    num_entries_user_limit=search_settings.num_entries_user_limit,
+            manifest_data = PrepareManifestInput(
+                export_entries_workflow_id=data.export_entries_workflow_id,
+                user_id=search_settings.user_id,
+                owner=search_settings.owner,
+                query=search_settings.query,
+                num_entries_user_limit=search_settings.num_entries_user_limit,
+            )
+            export_data = ForcesCreateExportWorkflowInput(
+                export_entries_workflow_id=data.export_entries_workflow_id,
+                user_id=user_input.user_id,
+                output_file_format=user_input.export_settings.file_format.selected_formats,
+                properties=user_input.search_settings.required_properties,
+                max_frames=user_input.search_settings.max_frames,
+            )
+            manifest_archive_export_input = ForcesManifestArchiveExportInput(
+                manifest_data=manifest_data,
+                export_data=export_data,
+            )
+            manifest_archives_output = await workflow.execute_activity(
+                manifest_archives_and_create_export,
+                manifest_archive_export_input,
+                start_to_close_timeout=timedelta(
+                    seconds=config.export_archives_timeout
                 ),
-                start_to_close_timeout=timedelta(hours=2),
                 retry_policy=retry_policy,
             )
-            workflow_output.manifest_file_path = manifest_output.manifest_file.file_path
+            manifest_output = manifest_archives_output.manifest_output
+            output_file = manifest_archives_output.output_file
 
             metadata.num_entries_available = manifest_output.num_entries_available
             metadata.num_entries_selected = manifest_output.num_entries_selected
@@ -96,22 +93,11 @@ class ForcesExtractEntriesWorkflow:
             )
             metadata.search_start_time = manifest_output.search_start_time
             metadata.search_end_time = manifest_output.search_end_time
+            metadata.num_entries_exported = output_file.num_entries_exported
+            metadata.num_frames_exported = output_file.num_frames_exported
 
-            if manifest_output.num_entries_selected > 0:
-                output_file: OutputFile = await workflow.execute_child_workflow(
-                    ForcesCreateExportWorkflow.run,
-                    ForcesCreateExportWorkflowInput(
-                        export_entries_workflow_id=data.export_entries_workflow_id,
-                        user_id=user_input.user_id,
-                        output_file_format=user_input.export_settings.file_format,
-                        properties=user_input.search_settings.required_properties,
-                    ),
-                    id=f'{workflow.info().workflow_id}-read-archives-and-write-file',
-                    parent_close_policy=workflow.ParentClosePolicy.TERMINATE,
-                    retry_policy=retry_policy,
-                )
-                metadata.num_entries_exported = output_file.num_entries_exported
-                workflow_output.data_file_path = output_file.file_path
+            workflow_output.data_file_path = output_file.file_path
+            workflow_output.manifest_file_path = manifest_output.manifest_file.file_path
 
         except Exception as e:
             # Add error info to metadata and re-raise

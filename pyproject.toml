@@ -18,6 +18,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 authors = [
     { name = "Sarthak Kapoor", email = "sarthak.kapoor@physik.hu-berlin.de" },
+    { name = "Sharat Patil", email = "patilsha@physik.hu-berlin.de" }
 ]
 maintainers = [
     { name = "Sarthak Kapoor", email = "sarthak.kapoor@physik.hu-berlin.de" },
@@ -50,7 +51,7 @@ dev = [
 cpu-action = [
     "pyarrow", # for parquet support
     "boto3",   # s3 storage
-    "nomad-forces-export",  # extract forces from NOMAD entries
+    "nomad-forces-export>=0.1.1",
 ]
 
 [tool.uv]

@@ -8,10 +8,13 @@ try:
     from nomad_forces_export.config import BASE_QUERY
 except ImportError:
     BASE_QUERY = {}
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from nomad_ml_workflows.actions.export_entries.models import (
     ExportDatasetMetadata,
+    OutputFile,
+    PrepareManifestInput,
+    PrepareManifestOutput,
 )
 
 OwnerLiteral = Literal[
@@ -21,10 +24,12 @@ OwnerLiteral = Literal[
     'shared',
     'staging',
 ]
-DataFileFormatLiteral = Literal['extxyz', 'ase_db']
 
 
 config = nomad_config.get_plugin_entry_point('nomad_ml_workflows.actions:export_forces')
+
+DataFileFormatLiteral = Literal['extxyz', 'ase_db']
+PropertiesLiteral = Literal['energy', 'forces', 'stress']
 
 
 def _clean_field(field: str) -> str:
@@ -36,11 +41,13 @@ def _clean_field(field: str) -> str:
 
 _DIRECTIVE_PRIORITY = {'include': 1, 'include-resolved': 2, 'exclude': 3}
 
+PropertiesLiteral = Literal['Energy', 'Forces', 'Stress']
+
 
 class IncludeProperties(BaseModel):
-    Energies: bool = Field(False, description='Include energy data.')
-    Forces: bool = Field(False, description='Include forces data.')
-    Stresses: bool = Field(False, description='Include stress data.')
+    forces: bool = Field(False, description='Include forces data.')
+    energies: bool = Field(False, description='Include energy data.')
+    stresses: bool = Field(False, description='Include stress data.')
 
 
 class ForcesSearchSettings(BaseModel):
@@ -70,6 +77,16 @@ class ForcesSearchSettings(BaseModel):
             f'{config.max_entries_export_limit}.'  # type: ignore
         ),
     )
+    max_frames: int = Field(
+        config.max_frames_export_limit,  # type: ignore
+        gt=0,
+        le=config.max_frames_export_limit,  # type: ignore
+        title='Maximum frames',
+        description=(
+            'Export at most this many frames from the matching entries. (The deployment limit is '
+            f'{config.max_frames_export_limit}.)'  # type: ignore
+        ),
+    )
     query: str = Field(
         json.dumps(BASE_QUERY, indent=2),
         title='Search query',
@@ -89,7 +106,17 @@ class ForcesSearchSettings(BaseModel):
     properties: IncludeProperties = Field(
         ...,
         title='Properties',
+        description='Select which properties to include in the export.',
     )
+
+    @field_validator('properties')
+    @classmethod
+    def check_at_least_one_property(cls, v: IncludeProperties) -> IncludeProperties:
+        if not (v.energies or v.forces or v.stresses):
+            raise ValueError(
+                'At least one of Energies, Forces, or Stresses must be selected in properties.'
+            )
+        return v
 
     @property
     def required_properties(self) -> list[str]:
@@ -97,18 +124,35 @@ class ForcesSearchSettings(BaseModel):
         Returns a list of required properties based on the user's selection.
         """
         required = []
-        if self.properties.Energies:
+        if self.properties.energies:
             required.append('energy')
-        if self.properties.Forces:
+        if self.properties.forces:
             required.append('forces')
-        if self.properties.Stresses:
+        if self.properties.stresses:
             required.append('stress')
         return required
 
 
+class DataFileFormat(BaseModel):
+    extxyz: bool = Field(False, description='Export as extxyz file.')
+    ase_db: bool = Field(False, description='Export as ASE DB file.')
+
+    @property
+    def selected_formats(self) -> list[DataFileFormatLiteral]:
+        """
+        Returns a list of selected data file formats based on the user's selection.
+        """
+        selected = []
+        if self.extxyz:
+            selected.append('extxyz')
+        if self.ase_db:
+            selected.append('ase_db')
+        return selected
+
+
 class ForcesExportSettings(BaseModel):
-    file_format: DataFileFormatLiteral = Field(
-        'extxyz',
+    file_format: DataFileFormat = Field(
+        ...,
         title='File format',
         description='File format for the exported entry data.',
     )
@@ -125,6 +169,15 @@ class ForcesExportSettings(BaseModel):
             }
         },
     )
+
+    @field_validator('file_format')
+    @classmethod
+    def check_at_least_one_property(cls, v: DataFileFormat) -> DataFileFormat:
+        if not (v.extxyz or v.ase_db):
+            raise ValueError(
+                'At least one of extxyz or ase_db must be selected in file_format.'
+            )
+        return v
 
 
 class ForcesExportEntriesUserInput(BaseModel):
@@ -187,15 +240,22 @@ class ForcesCreateExportWorkflowInput(BaseModel):
         ..., description='ID of the export entries workflow.'
     )
     user_id: str = Field(..., description='User ID performing the search.')
-    output_file_format: DataFileFormatLiteral = Field(
+    output_file_format: list[DataFileFormatLiteral] = Field(
         ..., description='Output file format.'
     )
-    properties: list[str] = Field(..., description='List of required fields.')
+    properties: set[str] = Field(..., description='List of required fields.')
+    max_frames: int | None = Field(
+        ...,
+        description='Maximum number of frames to export.',
+    )
 
 
 class ForcesExportDatasetMetadata(ExportDatasetMetadata):
     user_input: ForcesExportEntriesUserInput | None = Field(
         None, description='Original user input for the export entries workflow.'
+    )  # type: ignore[assignment]
+    num_frames_exported: int | None = Field(
+        None, description='Number of frames exported in the dataset.'
     )  # type: ignore[assignment]
 
 
@@ -206,4 +266,28 @@ class ForcesWriteMetadataFileInput(BaseModel):
     )
     metadata: ForcesExportDatasetMetadata = Field(
         ..., description='Metadata to be written to the metadata file.'
+    )
+
+
+class ForcesOutputFile(OutputFile):
+    num_frames_exported: int | None = Field(
+        None, description='Number of frames exported in the dataset.'
+    )  # type: ignore[assignment]
+
+
+class ForcesExportOutputFile(BaseModel):
+    manifest_output: PrepareManifestOutput = Field(
+        ..., description='Output of the prepare manifest activity.'
+    )
+    output_file: ForcesOutputFile = Field(
+        ..., description='Output of the create export workflow.'
+    )
+
+
+class ForcesManifestArchiveExportInput(BaseModel):
+    manifest_data: PrepareManifestInput = Field(
+        ..., description='Input data for the prepare manifest activity.'
+    )
+    export_data: ForcesCreateExportWorkflowInput = Field(
+        ..., description='Input data for the create export workflow.'
     )
