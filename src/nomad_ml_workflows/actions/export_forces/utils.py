@@ -62,7 +62,7 @@ def write_atoms_to_file(
     return write_atoms(atoms, output_path=output_file_path, output_format=output_format)
 
 
-def yield_manifest_archives(
+def yield_manifest_archives(  # noqa: PLR0912
     data: PrepareManifestInput, response, logger=None
 ) -> Iterator[dict]:
     max_num_entries_limit = min(
