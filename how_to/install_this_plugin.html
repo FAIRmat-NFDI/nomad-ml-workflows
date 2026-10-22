@@ -967,8 +967,12 @@
 <p>This guide covers installing and configuring the plugin in an existing NOMAD environment. For Temporal and CPU action-worker setup, follow <a href="https://github.com/FAIRmat-NFDI/nomad-distro-template#enabling-nomad-actions">Enabling NOMAD Actions in the distribution template</a>.</p>
 <h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h2>
 <h3 id="nomad-deployment">NOMAD deployment<a class="headerlink" href="#nomad-deployment" title="Permanent link">&para;</a></h3>
-<p>The plugin requires <code>nomad-lab&gt;=2.0.0</code>. Add it to your distribution following the <a href="https://docs.nomad-lab.eu/howto/oasis/configure.html#plugins">NOMAD Oasis plugin configuration guide</a>. Include the <code>cpu-action</code> extra for export dependencies:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">'nomad-ml-workflows[cpu-action]'</span>
+<p>The plugin requires <code>nomad-lab&gt;=2.0.0</code>. Add it to your distribution following the <a href="https://docs.nomad-lab.eu/howto/oasis/configure.html#plugins">NOMAD Oasis plugin configuration guide</a>. Include the <code>cpu-action</code> extra for export dependencies when adding the plugin to the deployment's <code>pyproject.toml</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">[project]</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">dependencies</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="err">...</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="s2">"nomad-ml-workflows[cpu-action]"</span><span class="err">,</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="err">]</span>
 </code></pre></div>
 <p>The extra supplies PyArrow for tabular output, boto3 for S3, and <code>nomad-forces-export</code> for atomic data. The base installation provides the schema packages and action registration. Configure the plugin in your deployment's <code>nomad.yaml</code> as described below.</p>
 <h3 id="nomad-distro-dev">NOMAD distro dev<a class="headerlink" href="#nomad-distro-dev" title="Permanent link">&para;</a></h3>
