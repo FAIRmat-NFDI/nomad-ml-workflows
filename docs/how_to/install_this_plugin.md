@@ -6,10 +6,14 @@ This guide covers installing and configuring the plugin in an existing NOMAD env
 
 ### NOMAD deployment
 
-The plugin requires `nomad-lab>=2.0.0`. Add it to your distribution following the [NOMAD Oasis plugin configuration guide](https://docs.nomad-lab.eu/howto/oasis/configure.html#plugins). Include the `cpu-action` extra for export dependencies:
+The plugin requires `nomad-lab>=2.0.0`. Add it to your distribution following the [NOMAD Oasis plugin configuration guide](https://docs.nomad-lab.eu/howto/oasis/configure.html#plugins). Include the `cpu-action` extra for export dependencies when adding the plugin to the deployment's `pyproject.toml`:
 
-```sh
-pip install 'nomad-ml-workflows[cpu-action]'
+```toml
+[project]
+dependencies = [
+  ...
+  "nomad-ml-workflows[cpu-action]",
+]
 ```
 
 The extra supplies PyArrow for tabular output, boto3 for S3, and `nomad-forces-export` for atomic data. The base installation provides the schema packages and action registration. Configure the plugin in your deployment's `nomad.yaml` as described below.
