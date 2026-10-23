@@ -1,25 +1,12 @@
 from __future__ import annotations
 
+from collections import defaultdict
 from collections.abc import Iterator
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 from nomad.actions.manager import action_instance_artifacts_dir
-
-from nomad_ml_workflows.actions.export_entries.utils import (
-    write_dicts_to_json,
-)
-
-try:
-    from nomad_forces_export.config import REQUIRED_ARCHIVE_DATA, archive_filter
-except ImportError as e:
-    raise ImportError(
-        'nomad-forces-export is required. Install with: '
-        'pip install nomad-ml-workflows[cpu]'
-    ) from e
-from collections import defaultdict
-
 from nomad.app.v1.models.models import MetadataPagination, MetadataRequired, User
 from nomad.archive.required import RequiredReader
 from nomad.config import config as nomad_config
@@ -28,6 +15,9 @@ from nomad.search import search as nomad_search
 
 from nomad_ml_workflows.actions.export_entries.models import (
     PrepareManifestInput,
+)
+from nomad_ml_workflows.actions.export_entries.utils import (
+    write_dicts_to_json,
 )
 
 MANIFEST_FILE_NAME = 'selected_entries'
@@ -39,13 +29,28 @@ config = nomad_config.get_plugin_entry_point('nomad_ml_workflows.actions:export_
 def require_nomad_forces_export() -> tuple[Any, Any]:
     """Load optional nomad-forces-export dependency on demand."""
     try:
-        from nomad_forces_export import atoms_generator, write_atoms
+        from nomad_forces_export import (
+            atoms_generator,
+            write_atoms,
+        )
     except ImportError as e:
         raise ImportError(
             'nomad-forces-export is required. Install with: '
             'pip install nomad-ml-workflows[cpu]'
         ) from e
     return atoms_generator, write_atoms
+
+
+@lru_cache(maxsize=1)
+def require_nomad_force_export_config():
+    try:
+        from nomad_forces_export.config import REQUIRED_ARCHIVE_DATA, archive_filter
+    except ImportError as e:
+        raise ImportError(
+            'nomad-forces-export is required. Install with: '
+            'pip install nomad-ml-workflows[cpu]'
+        ) from e
+    return REQUIRED_ARCHIVE_DATA, archive_filter
 
 
 def generate_atoms_from_archives(
@@ -65,6 +70,7 @@ def write_atoms_to_file(
 def yield_manifest_archives(  # noqa: PLR0912
     data: PrepareManifestInput, response, logger=None
 ) -> Iterator[dict]:
+    REQUIRED_ARCHIVE_DATA, archive_filter = require_nomad_force_export_config()
     max_num_entries_limit = min(
         config.max_entries_export_limit,  # type: ignore
         data.num_entries_user_limit,
