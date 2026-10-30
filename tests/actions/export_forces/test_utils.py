@@ -155,7 +155,6 @@ def test_yield_manifest_archives_yields_entries_and_writes_manifest(manifest_env
     response = _response(_entries(('up1', 'e1'), ('up1', 'e2')))
 
     results = list(utils.yield_manifest_archives(_manifest_input(), response))
-
     assert results == [
         {'entry_id': 'e1', 'upload_id': 'up1', 'archive': {'a': 1}},
         {'entry_id': 'e2', 'upload_id': 'up1', 'archive': {'a': 2}},
@@ -182,7 +181,9 @@ def test_yield_manifest_archives_skips_missing_upload(manifest_env):
     logger = MagicMock()
     response = _response(_entries(('missing', 'e1'), ('up2', 'e2')))
 
-    results = list(utils.yield_manifest_archives(_manifest_input(), response, logger))
+    results = list(
+        utils.yield_manifest_archives(_manifest_input(), response, [], logger)
+    )
 
     assert [r['entry_id'] for r in results] == ['e2']
     logger.info.assert_any_call('no upload files found for upload_id: missing')
@@ -212,7 +213,9 @@ def test_yield_manifest_archives_logs_and_continues_on_read_error(manifest_env):
     logger = MagicMock()
     response = _response(_entries(('up1', 'bad'), ('up1', 'good')))
 
-    results = list(utils.yield_manifest_archives(_manifest_input(), response, logger))
+    results = list(
+        utils.yield_manifest_archives(_manifest_input(), response, [], logger)
+    )
 
     assert [r['entry_id'] for r in results] == ['good']
     logger.error.assert_called_once()

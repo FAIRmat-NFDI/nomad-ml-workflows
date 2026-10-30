@@ -1,5 +1,5 @@
 import json
-from typing import Literal
+from typing import Any, Literal
 
 from nomad.app.v1.models.models import Query
 from nomad.config import config as nomad_config
@@ -42,6 +42,36 @@ def _clean_field(field: str) -> str:
 _DIRECTIVE_PRIORITY = {'include': 1, 'include-resolved': 2, 'exclude': 3}
 
 PropertiesLiteral = Literal['Energy', 'Forces', 'Stress']
+
+
+class MetadataRequired(BaseModel):
+    name: str = Field(
+        default='',
+        description='Name for field in exported dataset. If empty, path is used.',
+    )
+    path: str = Field(
+        ..., description='Dot-separated path to an archive quantity or section.'
+    )
+
+
+def build_metadata_required(paths: list[str]) -> dict[str, Any]:
+    """Convert dot-separated metadata paths to a RequiredReader specification."""
+    result: dict[str, Any] = {}
+    for path in paths:
+        parts = [p for p in _clean_field(path).rstrip('*').split('.') if p]
+        if not parts:
+            continue
+        node = result
+        for part in parts[:-1]:
+            child = node.get(part)
+            if child == '*':  # a parent is already fully included
+                break
+            if not isinstance(child, dict):
+                child = node[part] = {}
+            node = child
+        else:
+            node[parts[-1]] = '*'
+    return result
 
 
 class IncludeProperties(BaseModel):
@@ -107,6 +137,22 @@ class ForcesSearchSettings(BaseModel):
         ...,
         title='Properties',
         description='Select which properties to include in the export.',
+    )
+
+    required_metadata: list[MetadataRequired] = Field(
+        default_factory=lambda: [],
+        title='Archive metadata paths',
+        description=(
+            'Customize the metadata added to each frame with quantity or section paths and names. '
+        ),
+        json_schema_extra={
+            'uiSchema': {
+                'items': {
+                    'type': {'ui:widget': 'hidden'},
+                    'path': {'ui:placeholder': 'results.method.method_name'},
+                },
+            },
+        },
     )
 
     @field_validator('properties')
@@ -232,6 +278,7 @@ class ForcesNormalizedSearchSettings(BaseModel):
             owner=user_input.search_settings.owner,
             query=query,
             num_entries_user_limit=user_input.search_settings.max_entries,
+            required_metadata=user_input.search_settings.required_metadata,
         )
 
 
@@ -244,6 +291,9 @@ class ForcesCreateExportWorkflowInput(BaseModel):
         ..., description='Output file format.'
     )
     properties: set[str] = Field(..., description='List of required fields.')
+    required_metadata: list[MetadataRequired] = Field(
+        ..., description='Required metadata for the export.'
+    )
     max_frames: int | None = Field(
         ...,
         description='Maximum number of frames to export.',

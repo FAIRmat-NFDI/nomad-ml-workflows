@@ -115,7 +115,9 @@ def manifest_archives_and_create_export(
     num_entries_available = response.pagination.total
 
     # load manifest
-    archives = yield_manifest_archives(manifest_data, response, activity_logger)
+    archives = yield_manifest_archives(
+        manifest_data, response, export_data.required_metadata, activity_logger
+    )
     atoms_generator = generate_atoms_from_archives(
         archives,
         properties=export_data.properties,

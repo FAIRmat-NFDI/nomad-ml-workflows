@@ -61,6 +61,7 @@ def _export_input(output_file_format, max_entries=100):
             export_entries_workflow_id='wf-1',
             user_id='user-1',
             output_file_format=output_file_format,
+            required_metadata=[],
             properties={'energy', 'forces'},
             max_frames=50,
         ),
@@ -136,7 +137,7 @@ def test_manifest_archives_and_create_export_wires_pipeline(export_env):
     assert search_kwargs['owner'] == 'public'
     assert search_kwargs['query'] == {'results.material.elements': ['Si']}
     assert search_kwargs['pagination'].page_size == 100  # noqa: PLR2004
-    manifest_input, response, _ = export_env.yield_archives.call_args.args
+    manifest_input, response, _, _ = export_env.yield_archives.call_args.args
     assert manifest_input.user_id == 'user-1'
     assert response is export_env.search.return_value
     gen_args = export_env.generate_atoms.call_args

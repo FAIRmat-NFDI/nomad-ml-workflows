@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from collections.abc import Iterator
 from functools import lru_cache
@@ -19,6 +20,7 @@ from nomad_ml_workflows.actions.export_entries.models import (
 from nomad_ml_workflows.actions.export_entries.utils import (
     write_dicts_to_json,
 )
+from nomad_ml_workflows.actions.export_forces.models import build_metadata_required
 
 MANIFEST_FILE_NAME = 'selected_entries'
 
@@ -53,6 +55,71 @@ def require_nomad_force_export_config():
     return REQUIRED_ARCHIVE_DATA, archive_filter
 
 
+def merge_required(base: dict[str, Any], extra: dict[str, Any]) -> dict[str, Any]:
+    """Deep-merge two RequiredReader specs without mutating inputs; '*' wins."""
+    merged = dict(base)
+    for key, value in extra.items():
+        current = merged.get(key)
+        if current is None:
+            merged[key] = value
+        elif isinstance(current, dict) and isinstance(value, dict):
+            merged[key] = merge_required(current, value)
+        elif isinstance(current, dict):
+            merged[key] = value if value == '*' else current
+        elif current != '*' and isinstance(value, str):
+            merged[key] = value
+    return merged
+
+
+_INDEX_PATTERN = re.compile(
+    r'^(?P<name>[^\[\]]+)\[(?P<start>-?\d*)(?P<colon>:?)(?P<stop>-?\d*)\]$'
+)
+
+
+def extract_metadata_values(
+    archive: dict[str, Any], required: dict[str, Any], _prefix: str = ''
+) -> dict[str, Any]:
+    """Map each dot-separated path in a required spec to its archive value.
+
+    Keys may carry a list index or slice, e.g. `ions[0]` or `ions[0:2]`.
+    Paths missing from the archive are omitted.
+    """
+    values: dict[str, Any] = {}
+    for key, spec in required.items():
+        match = _INDEX_PATTERN.match(key)
+        name = match['name'] if match else key
+        if not isinstance(archive, dict) or name not in archive:
+            continue
+        value = archive[name]
+        if match:
+            if not isinstance(value, list):
+                continue
+            if match['colon']:
+                value = value[
+                    int(match['start']) if match['start'] else None : int(match['stop'])
+                    if match['stop']
+                    else None
+                ]
+            elif match['start']:
+                try:
+                    value = value[int(match['start'])]
+                except IndexError:
+                    continue
+            else:
+                continue
+        path = f'{_prefix}{key}'
+        if isinstance(spec, dict) and isinstance(value, dict):
+            values.update(extract_metadata_values(value, spec, f'{path}.'))
+        elif isinstance(spec, dict) and isinstance(value, list) and match:
+            values[path] = [
+                extract_metadata_values(item, spec) if isinstance(item, dict) else item
+                for item in value
+            ]
+        else:
+            values[path] = value
+    return values
+
+
 def generate_atoms_from_archives(
     archives: Iterator, properties: list[str], max_frames: int | None = None
 ) -> Iterator:
@@ -68,9 +135,16 @@ def write_atoms_to_file(
 
 
 def yield_manifest_archives(  # noqa: PLR0912
-    data: PrepareManifestInput, response, logger=None
+    data: PrepareManifestInput, response, required_metadata=[], logger=None
 ) -> Iterator[dict]:
     REQUIRED_ARCHIVE_DATA, archive_filter = require_nomad_force_export_config()
+    required_metadata_paths = {
+        m.path: m.name if m.name else m.path for m in required_metadata if m.path
+    }
+    resolved_metadata_required = build_metadata_required(
+        list(required_metadata_paths.keys())
+    )
+    merged_required = merge_required(REQUIRED_ARCHIVE_DATA, resolved_metadata_required)
     max_num_entries_limit = min(
         config.max_entries_export_limit,  # type: ignore
         data.num_entries_user_limit,
@@ -88,7 +162,8 @@ def yield_manifest_archives(  # noqa: PLR0912
 
     while True:
         required_reader = RequiredReader(
-            required=REQUIRED_ARCHIVE_DATA,
+            # required=REQUIRED_ARCHIVE_DATA,
+            required=merged_required,
             resolve_inplace=True,
             user=User(user_id=data.user_id),
         )
@@ -120,6 +195,15 @@ def yield_manifest_archives(  # noqa: PLR0912
                                 {'entry_id': entry_id, 'upload_id': upload_id}
                             )
                             write_manifest_file(manifest, manifest_file_path)
+                            extra_metadata = extract_metadata_values(
+                                entry['archive'], resolved_metadata_required
+                            )
+                            extra_metadata = {
+                                required_metadata_paths.get(path, path): value
+                                for path, value in extra_metadata.items()
+                            }
+                            if extra_metadata:
+                                entry['archive']['extra_metadata'] = extra_metadata
                             yield entry
                             del entry
                             if len(manifest) >= max_num_entries_limit:
