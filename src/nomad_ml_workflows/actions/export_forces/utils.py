@@ -1,25 +1,12 @@
 from __future__ import annotations
 
+from collections import defaultdict
 from collections.abc import Iterator
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from types import ModuleType
 
 from nomad.actions.manager import action_instance_artifacts_dir
-
-from nomad_ml_workflows.actions.export_entries.utils import (
-    write_dicts_to_json,
-)
-
-try:
-    from nomad_forces_export.config import REQUIRED_ARCHIVE_DATA, archive_filter
-except ImportError as e:
-    raise ImportError(
-        'nomad-forces-export is required. Install with: '
-        'pip install nomad-ml-workflows[cpu]'
-    ) from e
-from collections import defaultdict
-
 from nomad.app.v1.models.models import MetadataPagination, MetadataRequired, User
 from nomad.archive.required import RequiredReader
 from nomad.config import config as nomad_config
@@ -29,6 +16,9 @@ from nomad.search import search as nomad_search
 from nomad_ml_workflows.actions.export_entries.models import (
     PrepareManifestInput,
 )
+from nomad_ml_workflows.actions.export_entries.utils import (
+    write_dicts_to_json,
+)
 
 MANIFEST_FILE_NAME = 'selected_entries'
 
@@ -36,35 +26,42 @@ config = nomad_config.get_plugin_entry_point('nomad_ml_workflows.actions:export_
 
 
 @lru_cache(maxsize=1)
-def require_nomad_forces_export() -> tuple[Any, Any]:
-    """Load optional nomad-forces-export dependency on demand."""
+def require_nomad_forces_export() -> tuple[ModuleType, ModuleType]:
+    """Load the optional dependency when first needed."""
     try:
-        from nomad_forces_export import atoms_generator, write_atoms
+        import nomad_forces_export
+        from nomad_forces_export import config as nomad_forces_export_config
     except ImportError as e:
         raise ImportError(
             'nomad-forces-export is required. Install with: '
-            'pip install nomad-ml-workflows[cpu]'
+            'pip install nomad-ml-workflows[cpu-action]'
         ) from e
-    return atoms_generator, write_atoms
+
+    return nomad_forces_export, nomad_forces_export_config
 
 
 def generate_atoms_from_archives(
     archives: Iterator, properties: list[str], max_frames: int | None = None
 ) -> Iterator:
-    atoms_generator, _ = require_nomad_forces_export()
-    return atoms_generator(archives, properties=set(properties), max_frames=max_frames)
+    nomad_forces_export, _ = require_nomad_forces_export()
+    return nomad_forces_export.atoms_generator(
+        archives, properties=set(properties), max_frames=max_frames
+    )
 
 
 def write_atoms_to_file(
     atoms: Iterator, output_file_path: str | Path, output_format: list[str] = ['extxyz']
 ) -> int:
-    _, write_atoms = require_nomad_forces_export()
-    return write_atoms(atoms, output_path=output_file_path, output_format=output_format)
+    nomad_forces_export, _ = require_nomad_forces_export()
+    return nomad_forces_export.write_atoms(
+        atoms, output_path=output_file_path, output_format=output_format
+    )
 
 
 def yield_manifest_archives(  # noqa: PLR0912
     data: PrepareManifestInput, response, logger=None
 ) -> Iterator[dict]:
+    _, nomad_forces_export_config = require_nomad_forces_export()
     max_num_entries_limit = min(
         config.max_entries_export_limit,  # type: ignore
         data.num_entries_user_limit,
@@ -82,7 +79,7 @@ def yield_manifest_archives(  # noqa: PLR0912
 
     while True:
         required_reader = RequiredReader(
-            required=REQUIRED_ARCHIVE_DATA,
+            required=nomad_forces_export_config.REQUIRED_ARCHIVE_DATA,
             resolve_inplace=True,
             user=User(user_id=data.user_id),
         )
@@ -108,7 +105,11 @@ def yield_manifest_archives(  # noqa: PLR0912
                             entry['archive'] = required_reader.read(
                                 upload_archive, entry_id, upload_id
                             )
-                            if entry['archive'] is None or archive_filter(entry):
+                            if entry[
+                                'archive'
+                            ] is None or nomad_forces_export_config.archive_filter(
+                                entry
+                            ):
                                 continue
                             manifest.append(
                                 {'entry_id': entry_id, 'upload_id': upload_id}
